@@ -1,4 +1,10 @@
+import { MantineProvider } from '@mantine/core';
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
+import { AppFooter } from '../components/common/AppFooter';
+import { AppHeader } from '../components/common/AppHeader';
+import { Sidebar } from '../components/common/Sidebar';
+import { AppProvider } from '../lib/app-context';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -11,14 +17,25 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <div id="app">{children}</div>
+        <MantineProvider defaultColorScheme="dark">
+          <AppProvider>
+            <div className="app-shell">
+              <Sidebar />
+              <main>
+                <AppHeader />
+                <section className="content">{children}</section>
+                <AppFooter />
+              </main>
+            </div>
+          </AppProvider>
+        </MantineProvider>
         <Scripts />
       </body>
     </html>
