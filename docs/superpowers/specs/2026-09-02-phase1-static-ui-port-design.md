@@ -203,7 +203,8 @@ Result is visually indistinguishable from the mock.
 - `FilesTable` (shared by Unique Files + Browse; filename/dir/ext/size/date columns, sort, open
   file, unique-mode Preview action column).
 - `DirectoryTree` (recursive checkbox tree).
-- Small shared: `MetricCard`, `DuplicateBadge`, `StatusBadge`, `EmptyState`, `KeepToggle` (if shared).
+- Small shared: `MetricCard`, `DuplicateBadge`, `StatusBadge`, `EmptyState`. (`KeepToggle` is
+  Duplicates-only and is colocated with that route, per the shared-components rule.)
 
 ## 10. Testing
 
