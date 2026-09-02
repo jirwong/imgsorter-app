@@ -1,0 +1,51 @@
+{
+  "name": "imgsorter-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "scripts": {
+    "prepare": "lefthook install",
+    "dev": "vite dev --port 3000",
+    "generate-routes": "tsr generate",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "oxlint app",
+    "lint:fix": "oxlint --fix app",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm generate-routes && pnpm typecheck && pnpm lint && pnpm test && pnpm format:check"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.5.2",
+    "@mantine/hooks": "^9.5.2",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-start": "latest",
+    "lucide-react": "^1.16.0",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@tanstack/router-cli": "latest",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^27.0.0",
+    "lefthook": "^2.1.10",
+    "lint-staged": "^17.3.0",
+    "oxlint": "^1.79.0",
+    "prettier": "^3.9.6",
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}
