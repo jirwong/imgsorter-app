@@ -9,7 +9,6 @@ function renderDrawer() {
     <MantineProvider defaultColorScheme="dark">
       <AppProvider>
         <FilePreviewDrawer />
-        <button onClick={() => {}}>open</button>
       </AppProvider>
     </MantineProvider>,
   );

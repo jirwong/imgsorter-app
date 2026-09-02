@@ -8,7 +8,13 @@ export function FilePreviewDrawer() {
   const { selectedFile, setSelectedFile } = useApp();
 
   return (
-    <Drawer opened={!!selectedFile} onClose={() => setSelectedFile(null)} position="right" title="File details">
+    <Drawer
+      opened={!!selectedFile}
+      onClose={() => setSelectedFile(null)}
+      position="right"
+      size={360}
+      title="File details"
+    >
       {selectedFile && (
         <>
           <div
