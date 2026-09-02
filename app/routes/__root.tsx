@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { AppFooter } from '../components/common/AppFooter';
 import { AppHeader } from '../components/common/AppHeader';
 import { Sidebar } from '../components/common/Sidebar';
+import { FilePreviewDrawer } from '../components/common/FilePreviewDrawer';
 import { AppProvider } from '../lib/app-context';
 
 export const Route = createRootRoute({
@@ -34,6 +35,7 @@ function RootDocument({ children }: { children: ReactNode }) {
                 <AppFooter />
               </main>
             </div>
+            <FilePreviewDrawer />
           </AppProvider>
         </MantineProvider>
         <Scripts />

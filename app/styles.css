@@ -214,6 +214,22 @@ h2 {
   border-color: #2a323d;
 }
 
+.drawer-thumb {
+  height: 190px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+}
+
+.path {
+  word-break: break-all;
+  color: #8d98a8;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
 @media (max-width: 900px) {
   aside {
     width: 190px;
