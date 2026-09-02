@@ -44,6 +44,14 @@ describe('applyFilters', () => {
     expect(applyFilters(all, 'library/c', 'All directories', 'All types', [])).toEqual([all[2]]);
   });
 
+  it('trims surrounding whitespace on query', () => {
+    expect(applyFilters(all, '  sunset  ', 'All directories', 'All types', [])).toEqual([all[0]]);
+  });
+
+  it('returns an empty array when nothing matches the query', () => {
+    expect(applyFilters(all, 'zzz-nothing-zzz', 'All directories', 'All types', [])).toEqual([]);
+  });
+
   it('filters by exact directory', () => {
     expect(applyFilters(all, '', 'C:/Media/2024', 'All types', [])).toEqual([all[1]]);
   });
@@ -55,6 +63,19 @@ describe('applyFilters', () => {
   it('applies selectedDirs as OR-prefix scope', () => {
     expect(applyFilters(all, '', 'All directories', 'All types', ['C:/Media'])).toEqual([all[0], all[1]]);
     expect(applyFilters(all, '', 'All directories', 'All types', ['C:/Media/2025/Sub'])).toEqual([]);
+  });
+
+  it('matches deeper-nested directories within a selected scope', () => {
+    const nested = e({
+      id: 4,
+      filename: 'nested.jpg',
+      path: 'C:/Media/2025/Trips/Summer/nested.jpg',
+      directory: 'C:/Media/2025/Trips/Summer',
+    });
+    expect(applyFilters([all[0], all[1], nested], '', 'All directories', 'All types', ['C:/Media/2025'])).toEqual([
+      all[0],
+      nested,
+    ]);
   });
 
   it('returns all when every filter is at default', () => {

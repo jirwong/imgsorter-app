@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import type { Entry, LogEntry } from './types';
-import { entries } from './mock-data';
+import { entries, initialLogs } from './mock-data';
 import { applyFilters } from './filter-pipeline';
 
 export type AppContextValue = {
@@ -34,11 +34,7 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
   const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<Entry | null>(null);
   const [scanActive, setScanActive] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { time: '09:42:18', event: 'Scan completed', directory: 'C:/Media/2025', status: 'Complete' },
-    { time: '09:42:04', event: 'Permission denied', directory: 'C:/Media/2025/Private', status: 'Warning' },
-    { time: '09:40:12', event: 'Files indexed', directory: 'D:/Camera Imports', status: 'Complete' },
-  ]);
+  const [logs, setLogs] = useState<LogEntry[]>(initialLogs);
   const [keepers, setKeepers] = useState<number[]>([]);
 
   const filtered = useMemo(() => applyFilters(entries, query, dir, ext, selectedDirs), [query, dir, ext, selectedDirs]);
