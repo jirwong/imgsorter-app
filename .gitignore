@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.tanstack
+*.local
+.env
+.env.*
+!.env.example
