@@ -200,15 +200,21 @@ formatter.
 
 **Cross-page state:**
 
-- Global filters (`query`, `dir`, `ext`, `selectedDirs`) → TanStack Router search
-  params on the relevant routes so they are URL-addressable and shareable.
+- Global filters (`query`, `dir`, `ext`) → TanStack Router search params on the
+  filter-consuming routes **only** — `/unique-files`, `/browse`, and
+  `/duplicates` — so they are URL-addressable and shareable. The AppHeader still
+  shows the filters on every page, but non-filterable routes (Overview,
+  Analytics, Activity, Preferences) do not carry these params. Browse adds a
+  route-scoped `selectedDirs` search param for its multi-folder `DirectoryTree`
+  filter (configured from Browse only, not shared cross-page).
 - `selectedFile` (drawer), `scanActive`, `logs`, `keepers` → a single lightweight
   client context (`AppProvider` / `useApp`). Low-frequency, few consumers — no
   store needed.
 
-The `filtered` memo (global search + dir + ext + selectedDirs pipeline) is
-recomputed in the context/provider and consumed by the Files and Duplicates
-features.
+The `filtered` memo (global search + dir + ext pipeline) is recomputed in the
+context/provider and consumed by the Files and Duplicates features. Browse
+composes the same global `filtered` pipeline with its route-scoped
+`selectedDirs` selection.
 
 ## 8. Features summary (behavior contract from HANDOVER)
 
@@ -217,11 +223,14 @@ features.
 - **Duplicates:** duplicate groups by hash; per-group expand/collapse; search;
   directory multi-select popover picker; extension/count/size filters; sortable
   columns; keeper selection state (no consequence yet); clicking a file opens the
-  drawer.
+  drawer. The `KeepToggle` (per-row checkbox/badge marking which copy to keep)
+  renders **only** within Duplicates — on each duplicate group's rows and the
+  drawer opened from them. `keepers` state lives in the global context so the
+  selection persists across navigation; it is not surfaced on Files/Browse.
 - **Files (Unique Files + Browse):** filterable table (filename/path search,
   directory, count, size, extension). Unique Files adds an Actions column with
   "Needs backup" badge. Browse adds the `DirectoryTree` multi-folder sidebar
-  filter. Clicking a row opens the drawer.
+  filter, scoped to the Browse route via the `selectedDirs` search param. Clicking a row opens the drawer.
 - **Analytics:** "Ranked by size" and "Ranked by copies" tables with independent
   page-size Selects and Previous/Next pagination.
 - **Activity:** "Current scan" card (progress + status branching on `scanActive`)
