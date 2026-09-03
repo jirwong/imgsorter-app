@@ -419,3 +419,62 @@ h2 {
 .duplicate-filters .mantine-Select-root {
   width: 190px;
 }
+
+.browse-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.browse-directory-filter {
+  width: 240px;
+  flex: none;
+  padding: 16px;
+  border: 1px solid #2a323d;
+  background: #171b22;
+  border-radius: 8px;
+}
+
+.directory-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border-radius: 4px;
+}
+
+.directory-node:hover {
+  background: #1d232c;
+}
+
+.directory-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8d98a8;
+  cursor: pointer;
+}
+
+.directory-spacer {
+  width: 13px;
+}
+
+.browse-results {
+  min-width: 0;
+  flex: 1;
+}
+
+@media (max-width: 800px) {
+  .browse-layout {
+    display: block;
+  }
+  .browse-directory-filter {
+    width: auto;
+    margin-bottom: 16px;
+  }
+}
