@@ -14,6 +14,7 @@ import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as DuplicatesRouteImport } from './routes/duplicates'
+import { Route as PreferencesRouteImport } from './routes/preferences'
 import { Route as UniqueFilesRouteImport } from './routes/unique-files'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,11 @@ const DuplicatesRoute = DuplicatesRouteImport.update({
   path: '/duplicates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreferencesRoute = PreferencesRouteImport.update({
+  id: '/preferences',
+  path: '/preferences',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UniqueFilesRoute = UniqueFilesRouteImport.update({
   id: '/unique-files',
   path: '/unique-files',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
+  '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
+  '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
+  '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/browse'
     | '/duplicates'
+    | '/preferences'
     | '/unique-files'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/browse'
     | '/duplicates'
+    | '/preferences'
     | '/unique-files'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/browse'
     | '/duplicates'
+    | '/preferences'
     | '/unique-files'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   BrowseRoute: typeof BrowseRoute
   DuplicatesRoute: typeof DuplicatesRoute
+  PreferencesRoute: typeof PreferencesRoute
   UniqueFilesRoute: typeof UniqueFilesRoute
 }
 
@@ -145,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DuplicatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preferences': {
+      id: '/preferences'
+      path: '/preferences'
+      fullPath: '/preferences'
+      preLoaderRoute: typeof PreferencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unique-files': {
       id: '/unique-files'
       path: '/unique-files'
@@ -161,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   BrowseRoute: BrowseRoute,
   DuplicatesRoute: DuplicatesRoute,
+  PreferencesRoute: PreferencesRoute,
   UniqueFilesRoute: UniqueFilesRoute,
 }
 export const routeTree = rootRouteImport
