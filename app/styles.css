@@ -352,3 +352,70 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.files-table {
+  background: #171b22;
+  border: 1px solid #2a323d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.files-table th {
+  color: #8d98a8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.files-table td,
+.files-table th {
+  padding: 4px 12px;
+  border-bottom: 1px solid #2a323d;
+}
+
+.files-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.file-table-row {
+  cursor: pointer;
+}
+
+.file-table-row .table-meta {
+  font-size: 11px;
+  color: #8d98a8;
+}
+
+.files-table td:first-child .mantine-Text-root {
+  font-size: 12px;
+}
+
+.files-table .preview-button {
+  height: 22px;
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.duplicate-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.duplicate-filters .mantine-TextInput-input,
+.duplicate-filters .mantine-Select-input {
+  height: 30px;
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.duplicate-filters .mantine-TextInput-root {
+  width: 250px;
+}
+
+.duplicate-filters .mantine-Select-root {
+  width: 190px;
+}
