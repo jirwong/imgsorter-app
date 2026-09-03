@@ -867,3 +867,20 @@ h2 {
     padding: 7px 8px;
   }
 }
+
+:root {
+  --background: #101318;
+  --card: #171b22;
+  --card-2: #1d232c;
+  --primary: #18c7d8;
+  --muted: #8d98a8;
+  --border: #2a323d;
+  --text: #edf3f7;
+  --orange: #f5a34a;
+}
+
+.run-list svg,
+.mantine-Text-root svg {
+  vertical-align: middle;
+  margin-right: 6px;
+}
