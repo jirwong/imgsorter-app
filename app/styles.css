@@ -698,3 +698,53 @@ h2 {
 .analytics-ranking-table td {
   font-size: 12px;
 }
+
+.activity-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.activity-page h3 {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.scan-progress-card {
+  border-color: #18c7d8;
+}
+
+.activity-log {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+.activity-log-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid #2a323d;
+}
+
+.activity-log-row > div {
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .activity-log-row {
+    grid-template-columns: 1fr auto;
+  }
+  .activity-log-row > .mantine-Text-root {
+    grid-column: 1 / -1;
+  }
+}
