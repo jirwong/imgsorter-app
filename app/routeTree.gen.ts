@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as DuplicatesRouteImport } from './routes/duplicates'
 import { Route as UniqueFilesRouteImport } from './routes/unique-files'
@@ -17,6 +18,11 @@ import { Route as UniqueFilesRouteImport } from './routes/unique-files'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrowseRoute = BrowseRouteImport.update({
@@ -37,12 +43,14 @@ const UniqueFilesRoute = UniqueFilesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
@@ -50,20 +58,28 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
   '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/browse' | '/duplicates' | '/unique-files'
+  fullPaths: '/' | '/analytics' | '/browse' | '/duplicates' | '/unique-files'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/browse' | '/duplicates' | '/unique-files'
-  id: '__root__' | '/' | '/browse' | '/duplicates' | '/unique-files'
+  to: '/' | '/analytics' | '/browse' | '/duplicates' | '/unique-files'
+  id:
+    | '__root__'
+    | '/'
+    | '/analytics'
+    | '/browse'
+    | '/duplicates'
+    | '/unique-files'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   BrowseRoute: typeof BrowseRoute
   DuplicatesRoute: typeof DuplicatesRoute
   UniqueFilesRoute: typeof UniqueFilesRoute
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/browse': {
@@ -104,6 +127,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnalyticsRoute: AnalyticsRoute,
   BrowseRoute: BrowseRoute,
   DuplicatesRoute: DuplicatesRoute,
   UniqueFilesRoute: UniqueFilesRoute,

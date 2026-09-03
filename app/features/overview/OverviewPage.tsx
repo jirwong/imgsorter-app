@@ -34,7 +34,7 @@ export function OverviewPage() {
             <Text className="eyebrow">AT A GLANCE</Text>
             <h2>Largest files</h2>
           </div>
-          <Button variant="subtle" size="xs" onClick={() => router.navigate({ to: '/analytics' as string })}>
+          <Button variant="subtle" size="xs" onClick={() => router.navigate({ to: '/analytics' })}>
             View analytics <ChevronRight size={14} />
           </Button>
         </Group>

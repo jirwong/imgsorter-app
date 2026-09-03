@@ -694,3 +694,7 @@ h2 {
   color: #8d98a8;
   display: flex;
 }
+
+.analytics-ranking-table td {
+  font-size: 12px;
+}
