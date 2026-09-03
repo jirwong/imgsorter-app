@@ -230,6 +230,70 @@ h2 {
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metric {
+  background: #171b22;
+  border: 1px solid #2a323d;
+  padding: 17px;
+}
+
+.metric strong {
+  display: block;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+  margin: 9px 0 6px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.two-col .mantine-Card-root,
+.compact-list {
+  padding: 22px;
+}
+
+.bar-row {
+  margin: 18px 0;
+}
+
+.run-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 19px;
+}
+
+.run-list span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compact-list {
+  margin-bottom: 18px;
+}
+
+.file-row {
+  padding: 10px 0;
+  border-top: 1px solid #2a323d;
+}
+
+.file-row img {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
 @media (max-width: 900px) {
   aside {
     width: 190px;
@@ -268,5 +332,23 @@ h2 {
   }
   footer span:last-child {
     display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .two-col {
+    grid-template-columns: 1fr;
   }
 }

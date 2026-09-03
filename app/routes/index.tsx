@@ -1,9 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { OverviewPage } from '../features/overview/OverviewPage';
 
 export const Route = createFileRoute('/')({
-  component: IndexComponent,
+  component: OverviewPage,
 });
-
-function IndexComponent() {
-  return <main>Placeholder — Overview lands here in Task 6.</main>;
-}
