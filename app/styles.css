@@ -478,3 +478,219 @@ h2 {
     margin-bottom: 16px;
   }
 }
+
+.duplicates-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.duplicate-filters > .mantine-Text-root {
+  font-size: 12px;
+}
+
+.duplicate-filters .directory-filter {
+  width: 190px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 8px 0 12px;
+  border: 1px solid rgb(66, 66, 66);
+  border-radius: 8px;
+  background: rgb(46, 46, 46);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 400;
+  color: rgb(201, 201, 201);
+  text-align: left;
+}
+
+.duplicate-filters .directory-filter span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-filters .directory-filter svg {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: auto;
+  color: #777;
+  stroke-width: 1.5;
+  opacity: 1;
+}
+
+.duplicate-filters .directory-filter:hover {
+  background: rgb(46, 46, 46);
+  border-color: rgb(66, 66, 66);
+}
+
+.duplicate-filters .directory-filter[data-active] {
+  color: #edf3f7;
+}
+
+.duplicate-filters .mantine-Popover-dropdown {
+  background: #171c22;
+  border-color: #2a323d;
+  padding: 8px;
+}
+
+.duplicate-filters .mantine-Popover-dropdown .mantine-Button-root {
+  color: #edf3f7;
+  text-align: left;
+}
+
+.duplicate-filters .mantine-Popover-dropdown .mantine-Button-root:hover {
+  background: #222b34;
+}
+
+.directory-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #edf3f7;
+  padding-left: 8px !important;
+}
+
+.directory-option:hover {
+  background: #222b34;
+}
+
+.directory-option .mantine-Checkbox-root {
+  min-width: 0;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.directory-option .mantine-Checkbox-inner {
+  flex: none;
+}
+
+.directory-option .mantine-Checkbox-labelWrapper {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.directory-option .mantine-Checkbox-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directory-option > .mantine-Text-root {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  padding-left: 16px;
+}
+
+.picker-actions {
+  border-top: 1px solid #2a323d;
+  padding-top: 8px;
+}
+
+.filter-count {
+  margin-left: auto;
+}
+
+.duplicate-table-wrap {
+  border: 1px solid #2a323d;
+  border-radius: 8px;
+  overflow: auto;
+  background: #171b22;
+}
+
+.duplicate-table {
+  min-width: 920px;
+}
+
+.duplicate-table thead tr {
+  background: #1d232c;
+}
+
+.duplicate-table th {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8d98a8;
+  font-weight: 600;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
+.duplicate-table .sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.duplicate-table .sortable-th:hover {
+  color: #edf3f7;
+}
+
+.duplicate-table td {
+  padding: 7px 12px;
+  height: 38px;
+  border-color: #252c35;
+  white-space: nowrap;
+}
+
+.duplicate-table .file-name-cell {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.duplicate-table td:nth-child(3) {
+  width: 230px;
+  max-width: 230px;
+  overflow: hidden;
+}
+
+.duplicate-table .directory-cell {
+  display: block;
+  max-width: 202px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-table .group-row {
+  cursor: pointer;
+  background: #1a2028;
+}
+
+.duplicate-table .group-row:hover {
+  background: #202932;
+}
+
+.duplicate-table .group-row td:first-child {
+  border-left: 2px solid #18c7d8;
+}
+
+.duplicate-table .keeper-row {
+  background: #18343a;
+}
+
+.duplicate-table .keeper-row td:first-child {
+  border-left: 2px solid #18c7d8;
+}
+
+.chevron {
+  color: #8d98a8;
+  display: flex;
+}

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as DuplicatesRouteImport } from './routes/duplicates'
 import { Route as UniqueFilesRouteImport } from './routes/unique-files'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const BrowseRoute = BrowseRouteImport.update({
   path: '/browse',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DuplicatesRoute = DuplicatesRouteImport.update({
+  id: '/duplicates',
+  path: '/duplicates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UniqueFilesRoute = UniqueFilesRouteImport.update({
   id: '/unique-files',
   path: '/unique-files',
@@ -32,30 +38,34 @@ const UniqueFilesRoute = UniqueFilesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
+  '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
+  '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/browse': typeof BrowseRoute
+  '/duplicates': typeof DuplicatesRoute
   '/unique-files': typeof UniqueFilesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/browse' | '/unique-files'
+  fullPaths: '/' | '/browse' | '/duplicates' | '/unique-files'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/browse' | '/unique-files'
-  id: '__root__' | '/' | '/browse' | '/unique-files'
+  to: '/' | '/browse' | '/duplicates' | '/unique-files'
+  id: '__root__' | '/' | '/browse' | '/duplicates' | '/unique-files'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BrowseRoute: typeof BrowseRoute
+  DuplicatesRoute: typeof DuplicatesRoute
   UniqueFilesRoute: typeof UniqueFilesRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BrowseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/duplicates': {
+      id: '/duplicates'
+      path: '/duplicates'
+      fullPath: '/duplicates'
+      preLoaderRoute: typeof DuplicatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unique-files': {
       id: '/unique-files'
       path: '/unique-files'
@@ -88,8 +105,18 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BrowseRoute: BrowseRoute,
+  DuplicatesRoute: DuplicatesRoute,
   UniqueFilesRoute: UniqueFilesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
