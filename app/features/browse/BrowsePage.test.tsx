@@ -4,13 +4,16 @@ import { MantineProvider } from '@mantine/core';
 import { AppProvider } from '../../lib/app-context';
 import { BrowsePage } from './BrowsePage';
 import { entries } from '../../lib/mock-data';
+import type { DirectoryNode } from '../../lib/types';
+
+const tree: DirectoryNode[] = [{ label: 'Media (C:)', path: 'C:/Media' }];
 
 describe('BrowsePage', () => {
   it('renders directory filter and results', () => {
     render(
       <MantineProvider defaultColorScheme="dark">
         <AppProvider>
-          <BrowsePage />
+          <BrowsePage files={entries} tree={tree} />
         </AppProvider>
       </MantineProvider>,
     );

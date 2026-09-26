@@ -1,9 +1,10 @@
 import { PageHeading } from '../../components/common/PageHeading';
 import { FilesTable } from './FilesTable';
 import { useApp } from '../../lib/app-context';
+import type { Entry } from '../../lib/types';
 
-export function FilesPage() {
-  const { filtered, setSelectedFile } = useApp();
+export function FilesPage({ files }: { files: Entry[] }) {
+  const { setSelectedFile } = useApp();
 
   return (
     <>
@@ -13,7 +14,7 @@ export function FilesPage() {
         subtitle="Explore unique files across your indexed media library."
         showExport
       />
-      <FilesTable files={filtered} unique onSelect={setSelectedFile} />
+      <FilesTable files={files} unique onSelect={setSelectedFile} />
     </>
   );
 }

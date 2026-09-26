@@ -1,11 +1,10 @@
 import { useState, type ReactElement } from 'react';
 import { Button, Checkbox, Group, Text } from '@mantine/core';
 import { ChevronDown, ChevronRight, ChevronsUpDown, FolderOpen } from 'lucide-react';
-import { directoryTree } from '../../lib/mock-data';
 import type { DirectoryNode } from '../../lib/types';
 import { useApp } from '../../lib/app-context';
 
-export function DirectoryTree() {
+export function DirectoryTree({ tree }: { tree: DirectoryNode[] }) {
   const { selectedDirs, toggleSelectedDir } = useApp();
   const [nodeOpen, setNodeOpen] = useState<Record<string, boolean>>({ 'C:/Media': true, 'C:/Media/2025': true });
 
@@ -47,7 +46,7 @@ export function DirectoryTree() {
           <ChevronsUpDown size={14} />
         </Button>
       </Group>
-      {directoryTree.map((node) => render(node, 0))}
+      {tree.map((node) => render(node, 0))}
     </aside>
   );
 }
