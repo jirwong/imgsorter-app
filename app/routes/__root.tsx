@@ -8,6 +8,7 @@ import { AppHeader } from '../components/common/AppHeader';
 import { Sidebar } from '../components/common/Sidebar';
 import { FilePreviewDrawer } from '../components/common/FilePreviewDrawer';
 import { AppProvider } from '../lib/app-context';
+import { getShellData } from '../../server/routes/shell';
 
 const theme = createTheme({
   primaryColor: 'cyan',
@@ -31,6 +32,7 @@ const theme = createTheme({
 });
 
 export const Route = createRootRoute({
+  loader: async () => getShellData(),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

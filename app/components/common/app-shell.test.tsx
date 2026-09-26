@@ -1,19 +1,25 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>();
+  return {
+    ...actual,
+    useLoaderData: () => ({ files: 1272, size: 391_000_000, roots: [], extensions: [] }),
+  };
+});
+
 import { MantineProvider } from '@mantine/core';
-import { AppProvider } from '../../lib/app-context';
 import { AppFooter } from './AppFooter';
 
 describe('app shell', () => {
-  it('renders footer totals', () => {
+  it('renders real footer totals', () => {
     render(
       <MantineProvider defaultColorScheme="dark">
-        <AppProvider>
-          <AppFooter />
-        </AppProvider>
+        <AppFooter />
       </MantineProvider>,
     );
-    expect(screen.getByText('18,426 files')).toBeInTheDocument();
-    expect(screen.getByText('2.4 GB indexed')).toBeInTheDocument();
+    expect(screen.getByText('1,272 files')).toBeInTheDocument();
+    expect(screen.getByText('391.0 MB indexed')).toBeInTheDocument();
   });
 });

@@ -10,8 +10,9 @@ import {
   Upload,
   type LucideIcon,
 } from 'lucide-react';
-import { Link, useRouter } from '@tanstack/react-router';
+import { Link, useLoaderData, useRouter } from '@tanstack/react-router';
 import { useApp } from '../../lib/app-context';
+import { formatBytes } from '../../lib/format';
 
 const navItems: { label: string; to: string; icon: LucideIcon }[] = [
   { label: 'Overview', to: '/', icon: BarChart3 },
@@ -25,6 +26,7 @@ const navItems: { label: string; to: string; icon: LucideIcon }[] = [
 export function Sidebar() {
   const { startScan } = useApp();
   const router = useRouter();
+  const { files, size } = useLoaderData({ from: '__root__' });
 
   const handleScan = () => {
     startScan();
@@ -56,7 +58,7 @@ export function Sidebar() {
         </Group>
         <Progress value={100} color="cyan" size="xs" mt={7} />
         <Text size="xs" c="dimmed" mt={8}>
-          18,426 files · 2.4 GB
+          {files.toLocaleString('en-US')} files · {formatBytes(size)}
         </Text>
       </div>
       <nav>
