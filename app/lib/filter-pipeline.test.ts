@@ -64,6 +64,16 @@ describe('applyFilters', () => {
     expect(applyFilters([all[0], all[1], nested], '', 'C:/Media/2025/Trips', 'All types', [])).toEqual([nested]);
   });
 
+  it('does not over-match a sibling directory sharing a string prefix', () => {
+    const sibling = e({
+      id: 5,
+      filename: 'sib.jpg',
+      path: 'C:/Media/20240/sib.jpg',
+      directory: 'C:/Media/20240',
+    });
+    expect(applyFilters([all[1], sibling], '', 'C:/Media/2024', 'All types', [])).toEqual([all[1]]);
+  });
+
   it('filters by exact extension', () => {
     expect(applyFilters(all, '', 'All directories', '.png', [])).toEqual([all[1]]);
   });
