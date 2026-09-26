@@ -2,30 +2,28 @@ import { useEffect, useState } from 'react';
 import { Button, Card, Group, Select, Table, Text } from '@mantine/core';
 import { PageHeading } from '../../components/common/PageHeading';
 import { formatBytes } from '../../lib/format';
-import { entries, groups } from '../../lib/mock-data';
+import type { AnalyticsData } from '../../lib/types';
 
-export function AnalyticsPage() {
+export function AnalyticsPage({ data }: { data: AnalyticsData }) {
   const [pageSize, setPageSize] = useState('10');
   const [copiesPageSize, setCopiesPageSize] = useState('10');
   const [sizePage, setSizePage] = useState(1);
   const [copiesPage, setCopiesPage] = useState(1);
 
-  const rankedBySize = [...entries].sort((a, b) => b.size - a.size);
-  const rankedByCopies = [...groups].sort((a, b) => b.count - a.count);
   const sizeLimit = Number(pageSize);
   const copiesLimit = Number(copiesPageSize);
-  const sizePages = Math.max(1, Math.ceil(rankedBySize.length / sizeLimit));
-  const copiesPages = Math.max(1, Math.ceil(rankedByCopies.length / copiesLimit));
+  const sizePages = Math.max(1, Math.ceil(data.rankedBySize.length / sizeLimit));
+  const copiesPages = Math.max(1, Math.ceil(data.rankedByCopies.length / copiesLimit));
 
   useEffect(() => {
     setSizePage(1);
-  }, [pageSize, rankedBySize.length]);
+  }, [pageSize, data.rankedBySize.length]);
   useEffect(() => {
     setCopiesPage(1);
-  }, [copiesPageSize, rankedByCopies.length]);
+  }, [copiesPageSize, data.rankedByCopies.length]);
 
-  const sizeRows = rankedBySize.slice((sizePage - 1) * sizeLimit, sizePage * sizeLimit);
-  const copiesRows = rankedByCopies.slice((copiesPage - 1) * copiesLimit, copiesPage * copiesLimit);
+  const sizeRows = data.rankedBySize.slice((sizePage - 1) * sizeLimit, sizePage * sizeLimit);
+  const copiesRows = data.rankedByCopies.slice((copiesPage - 1) * copiesLimit, copiesPage * copiesLimit);
 
   return (
     <>
@@ -52,7 +50,7 @@ export function AnalyticsPage() {
           <Table className="analytics-ranking-table" mt="md">
             <Table.Tbody>
               {sizeRows.map((e, i) => (
-                <Table.Tr key={e.id}>
+                <Table.Tr key={`${e.filename}-${i}`}>
                   <Table.Td>{(sizePage - 1) * sizeLimit + i + 1}</Table.Td>
                   <Table.Td>{e.filename}</Table.Td>
                   <Table.Td>{formatBytes(e.size)}</Table.Td>
@@ -99,7 +97,7 @@ export function AnalyticsPage() {
           <Table className="analytics-ranking-table" mt="md">
             <Table.Tbody>
               {copiesRows.map((g, i) => (
-                <Table.Tr key={g.hash}>
+                <Table.Tr key={`${g.name}-${i}`}>
                   <Table.Td>{(copiesPage - 1) * copiesLimit + i + 1}</Table.Td>
                   <Table.Td>{g.name}</Table.Td>
                   <Table.Td>×{g.count}</Table.Td>
