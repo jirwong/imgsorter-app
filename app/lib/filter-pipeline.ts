@@ -11,7 +11,7 @@ export function applyFilters(input: Entry[], query: string, dir: string, ext: st
   const q = query.trim().toLowerCase();
   return input.filter((entry) => {
     const matchesQuery = !q || entry.filename.toLowerCase().includes(q) || entry.path.toLowerCase().includes(q);
-    const matchesDir = dir === 'All directories' || entry.directory === dir;
+    const matchesDir = dir === 'All directories' || entry.directory === dir || entry.directory.startsWith(`${dir}/`);
     const matchesExt = ext === 'All types' || entry.extension === ext;
     const matchesSelectedDirs =
       selectedDirs.length === 0 ||

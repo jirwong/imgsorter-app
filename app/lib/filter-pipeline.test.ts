@@ -52,8 +52,26 @@ describe('applyFilters', () => {
     expect(applyFilters(all, 'zzz-nothing-zzz', 'All directories', 'All types', [])).toEqual([]);
   });
 
-  it('filters by exact directory', () => {
+  it('filters by directory, including descendants', () => {
     expect(applyFilters(all, '', 'C:/Media/2024', 'All types', [])).toEqual([all[1]]);
+    const nested = e({
+      id: 4,
+      filename: 'deep.jpg',
+      path: 'C:/Media/2025/Trips/deep.jpg',
+      directory: 'C:/Media/2025/Trips',
+    });
+    expect(applyFilters([all[0], all[1], nested], '', 'C:/Media/2025', 'All types', [])).toEqual([all[0], nested]);
+    expect(applyFilters([all[0], all[1], nested], '', 'C:/Media/2025/Trips', 'All types', [])).toEqual([nested]);
+  });
+
+  it('does not over-match a sibling directory sharing a string prefix', () => {
+    const sibling = e({
+      id: 5,
+      filename: 'sib.jpg',
+      path: 'C:/Media/20240/sib.jpg',
+      directory: 'C:/Media/20240',
+    });
+    expect(applyFilters([all[1], sibling], '', 'C:/Media/2024', 'All types', [])).toEqual([all[1]]);
   });
 
   it('filters by exact extension', () => {
