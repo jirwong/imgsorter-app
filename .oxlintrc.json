@@ -3,5 +3,13 @@
   "categories": {
     "correctness": "error",
     "perf": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["server/engine/**"],
+      "rules": {
+        "no-await-in-loop": "off"
+      }
+    }
+  ]
 }
