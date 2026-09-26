@@ -5,11 +5,23 @@ import { PageHeading } from '../../components/common/PageHeading';
 import { MetricCard } from './MetricCard';
 import { StorageMap } from './StorageMap';
 import { LastRunCard } from './LastRunCard';
-import { largestFiles, metricRows, thumbs } from '../../lib/mock-data';
 import { formatBytes } from '../../lib/format';
+import { thumbs } from '../../lib/mock-data';
+import type { OverviewData } from '../../lib/types';
 
-export function OverviewPage() {
+const STATIC_METRIC: [string, string, string] = ['Not backed up', '2,184', 'attention'];
+
+export function OverviewPage({ data }: { data: OverviewData }) {
   const router = useRouter();
+
+  const metrics: [string, string, string][] = [
+    ['Total files', data.totalFiles.toLocaleString('en-US'), ''],
+    ['Total size', formatBytes(data.totalSize), ''],
+    ['Duplicate groups', String(data.duplicateGroups), ''],
+    ['Redundant space', formatBytes(data.redundantSpace), ''],
+    ['Unique files', data.uniqueFiles.toLocaleString('en-US'), ''],
+    STATIC_METRIC,
+  ];
 
   return (
     <>
@@ -20,12 +32,12 @@ export function OverviewPage() {
         showExport
       />
       <div className="metric-grid">
-        {metricRows.map(([label, value, note]) => (
+        {metrics.map(([label, value, note]) => (
           <MetricCard key={label} label={label} value={value} note={note} />
         ))}
       </div>
       <div className="two-col">
-        <StorageMap />
+        <StorageMap rows={data.storageMap} />
         <LastRunCard />
       </div>
       <Card className="compact-list">
@@ -38,7 +50,7 @@ export function OverviewPage() {
             View analytics <ChevronRight size={14} />
           </Button>
         </Group>
-        {largestFiles.map((entry, i) => (
+        {data.largestFiles.map((entry, i) => (
           <Group justify="space-between" className="file-row" key={entry.id}>
             <Group>
               <img src={thumbs[i % thumbs.length]} alt="" />
