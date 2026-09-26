@@ -97,7 +97,7 @@ export function AnalyticsPage({ data }: { data: AnalyticsData }) {
           <Table className="analytics-ranking-table" mt="md">
             <Table.Tbody>
               {copiesRows.map((g, i) => (
-                <Table.Tr key={g.name}>
+                <Table.Tr key={`${g.name}-${i}`}>
                   <Table.Td>{(copiesPage - 1) * copiesLimit + i + 1}</Table.Td>
                   <Table.Td>{g.name}</Table.Td>
                   <Table.Td>×{g.count}</Table.Td>
