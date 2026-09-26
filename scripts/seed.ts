@@ -32,6 +32,9 @@ function writeFixtureFiles(): void {
 
 async function main(): Promise<void> {
   writeFixtureFiles();
+  rmSync(sampleDbPath(), { force: true });
+  rmSync(`${sampleDbPath()}-wal`, { force: true });
+  rmSync(`${sampleDbPath()}-shm`, { force: true });
   mkdirSync(dirname(sampleDbPath()), { recursive: true });
 
   const config: RunConfiguration = {
