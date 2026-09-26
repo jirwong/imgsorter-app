@@ -8,3 +8,5 @@ coverage
 !.env.example
 .worktrees
 server/.fixtures
+server/data/*.db-shm
+server/data/*.db-wal
