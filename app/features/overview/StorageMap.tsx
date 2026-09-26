@@ -1,8 +1,10 @@
 import { Card, Group, Progress, Text } from '@mantine/core';
 import { HardDrive } from 'lucide-react';
-import { storageRows } from '../../lib/mock-data';
+import { formatBytes } from '../../lib/format';
 
-export function StorageMap() {
+export type StorageMapRow = { path: string; share: number; size: number };
+
+export function StorageMap({ rows }: { rows: StorageMapRow[] }) {
   return (
     <Card>
       <Group justify="space-between" mb="lg">
@@ -12,15 +14,15 @@ export function StorageMap() {
         </div>
         <HardDrive size={18} />
       </Group>
-      {storageRows.map(([path, value, size]) => (
-        <div className="bar-row" key={path}>
+      {rows.map((row) => (
+        <div className="bar-row" key={row.path}>
           <Group justify="space-between">
-            <Text size="sm">{path}</Text>
+            <Text size="sm">{row.path}</Text>
             <Text size="xs" c="dimmed">
-              {size}
+              {formatBytes(row.size)}
             </Text>
           </Group>
-          <Progress value={value} color="cyan" mt={7} />
+          <Progress value={row.share} color="cyan" mt={7} />
         </div>
       ))}
     </Card>
