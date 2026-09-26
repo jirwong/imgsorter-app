@@ -12,7 +12,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | Phase | Scope | Delivers | Status |
 | ----- | ----- | -------- | ------ |
 | 1 | TanStack Start UI recreation (mock data) | Modular, URL-routed UI; parity with imgsorter-ui-v1 prototype | `[x]` |
-| 2 | Vendor engine server-side; wire read-only pages (Overview, Unique Files, Browse, Analytics) + shell totals to real SQLite data | Real data on read-only pages | `[ ]` |
+| 2 | Vendor engine server-side; wire read-only pages (Overview, Unique Files, Browse, Analytics) + shell totals to real SQLite data | Real data on read-only pages | `[x]` |
 | 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[ ]` |
 | 4 | Preferences persistence (`app_config`) + directory management + Reveal/Open/keeper actions | Full config persistence + actions | `[ ]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[ ]` |
