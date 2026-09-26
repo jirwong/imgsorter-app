@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import { fixturesDir, sampleDbPath, virtualToReal } from './db-path';
+
+function normalize(value: string): string {
+  return value.replace(/\\/g, '/');
+}
+
+describe('db-path', () => {
+  it('derives the sample db path under server/data', () => {
+    expect(normalize(sampleDbPath())).toMatch(/\/server\/data\/imgsorter\.db$/);
+  });
+
+  it('derives the fixtures dir under server/.fixtures', () => {
+    expect(normalize(fixturesDir())).toMatch(/\/server\/\.fixtures$/);
+  });
+
+  it('resolves a virtual fixture path under the fixtures dir', () => {
+    expect(normalize(virtualToReal('@fixtures/Media/2025/a.jpg'))).toBe(`${normalize(fixturesDir())}/Media/2025/a.jpg`);
+  });
+
+  it('strips leading slashes after the prefix', () => {
+    expect(normalize(virtualToReal('@fixtures///Media/a.jpg'))).toBe(`${normalize(fixturesDir())}/Media/a.jpg`);
+  });
+
+  it('throws for non-fixture virtual paths', () => {
+    expect(() => virtualToReal('C:/Media/a.jpg')).toThrow();
+  });
+});

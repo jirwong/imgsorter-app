@@ -31,3 +31,23 @@ export type LogEntry = {
   directory: string;
   status: LogStatus;
 };
+
+export type OverviewData = {
+  totalFiles: number;
+  totalSize: number;
+  duplicateGroups: number;
+  redundantSpace: number;
+  uniqueFiles: number;
+  storageMap: { path: string; share: number; size: number }[];
+  largestFiles: Entry[];
+};
+
+export type SizeRankRow = { filename: string; size: number };
+
+export type CopyRankRow = { name: string; count: number };
+
+export type AnalyticsData = { rankedBySize: SizeRankRow[]; rankedByCopies: CopyRankRow[] };
+
+export type ShellData = { files: number; size: number; roots: string[]; extensions: string[] };
+
+export type FilesInput = { query: string; dir: string; ext: string; selectedDirs: string[] };
