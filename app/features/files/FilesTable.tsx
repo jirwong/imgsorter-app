@@ -46,7 +46,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
 
   useEffect(() => {
     setPage(1);
-  }, [fileQuery, directory, extension, count, size, list.length]);
+  }, [fileQuery, directory, extension, count, size, pageSize, list.length]);
 
   return (
     <>
