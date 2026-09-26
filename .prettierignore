@@ -4,3 +4,4 @@ coverage
 app/routeTree.gen.ts
 docs
 .superpowers
+server/data
