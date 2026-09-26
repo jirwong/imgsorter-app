@@ -21,15 +21,18 @@ export function useFilterSearchParams() {
   }, [search.query, search.dir, search.ext, query, dir, ext, setQuery, setDir, setExt]);
 
   useEffect(() => {
-    navigate({
-      replace: true,
-      search: ((prev: Record<string, unknown>) => ({
-        ...prev,
-        query: query || undefined,
-        dir: dir === 'All directories' ? undefined : dir,
-        ext: ext === 'All types' ? undefined : ext,
-      })) as never,
-    });
+    const timer = setTimeout(() => {
+      navigate({
+        replace: true,
+        search: ((prev: Record<string, unknown>) => ({
+          ...prev,
+          query: query || undefined,
+          dir: dir === 'All directories' ? undefined : dir,
+          ext: ext === 'All types' ? undefined : ext,
+        })) as never,
+      });
+    }, 300);
+    return () => clearTimeout(timer);
   }, [query, dir, ext, navigate]);
 }
 

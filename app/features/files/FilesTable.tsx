@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Group, Select, Table, Text, TextInput } from '@mantine/core';
 import { Search } from 'lucide-react';
 import { formatBytes } from '../../lib/format';
@@ -16,6 +16,8 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
   const [count, setCount] = useState('All counts');
   const [size, setSize] = useState('All sizes');
   const [extension, setExtension] = useState('All extensions');
+  const [pageSize, setPageSize] = useState('25');
+  const [page, setPage] = useState(1);
 
   const directories = useMemo(() => [...new Set(files.map((e) => e.directory))], [files]);
   const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
@@ -37,6 +39,14 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
         .sort((a, b) => a.filename.localeCompare(b.filename)),
     [files, fileQuery, directory, extension, count, size],
   );
+
+  const pageLimit = Number(pageSize);
+  const pageCount = Math.max(1, Math.ceil(list.length / pageLimit));
+  const pageRows = list.slice((page - 1) * pageLimit, page * pageLimit);
+
+  useEffect(() => {
+    setPage(1);
+  }, [fileQuery, directory, extension, count, size, list.length]);
 
   return (
     <>
@@ -80,7 +90,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {list.map((e) => (
+          {pageRows.map((e) => (
             <Table.Tr key={e.id} onClick={() => onSelect(e)} className="file-table-row">
               <Table.Td>
                 <Text size="sm" fw={500} truncate>
@@ -119,6 +129,31 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
           ))}
         </Table.Tbody>
       </Table>
+      <Group className="analytics-pagination" justify="space-between" mt="md">
+        <Select
+          aria-label="Items per page"
+          value={pageSize}
+          onChange={(v) => setPageSize(v ?? '25')}
+          data={['10', '25', '50']}
+          w={80}
+        />
+        <Group gap="8">
+          <Button variant="subtle" size="xs" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            Previous
+          </Button>
+          <Text size="xs" c="dimmed">
+            Page {page} of {pageCount}
+          </Text>
+          <Button
+            variant="subtle"
+            size="xs"
+            disabled={page === pageCount}
+            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+          >
+            Next
+          </Button>
+        </Group>
+      </Group>
     </>
   );
 }
