@@ -75,8 +75,9 @@ review`.
 ## Current Plan State
 
 - Phase 1 (UI recreation) — complete.
-- Phase 2 (vendor engine + wire read-only pages to real SQLite) — plan written at
-  `docs/superpowers/plans/2026-09-08-phase2-real-data.md`; spec at
-  `docs/superpowers/specs/2026-09-08-phase2-real-data-design.md`. No steps
-  executed yet; next up is Task 1 (project plumbing).
+- Phase 2 (vendor engine + wire read-only pages to real SQLite) — **complete**
+  (PRs #15–#26). Plan at `docs/superpowers/plans/2026-09-08-phase2-real-data.md`;
+  spec at `docs/superpowers/specs/2026-09-08-phase2-real-data-design.md`.
+- Phase 3 (duplicates feature + real scan with progress streaming) — not started;
+  begins with Phase 0 (brainstorm → spec → plan → approval).
 - Roadmap: `docs/ROADMAP.md`.
