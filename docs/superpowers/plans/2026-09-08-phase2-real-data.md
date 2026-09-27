@@ -1,6 +1,6 @@
 # Phase 2 Real-Data Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Vendor the imgsorter-v2 engine server-side, seed a committed sample SQLite DB, and wire Overview, Unique Files, Browse, Analytics, and the shell totals to real data via TanStack Start server functions and route loaders.
 
@@ -42,7 +42,7 @@
 **Interfaces:**
 - Produces: `better-sqlite3`, `@types/better-sqlite3`, `tsx` installed; `tsc --noEmit` resolves Node globals and CJS default imports; vitest runs two projects (`client` = jsdom for `app/**`, `server` = node for `server/**`).
 
-- [ ] **Step 1: Add dependencies and scripts to `package.json`**
+- [x] **Step 1: Add dependencies and scripts to `package.json`**
 
 Add to `"dependencies"`:
 ```json
@@ -58,7 +58,7 @@ Add to `"scripts"`:
 "seed": "tsx scripts/seed.ts"
 ```
 
-- [ ] **Step 2: Approve the native build for `better-sqlite3`**
+- [x] **Step 2: Approve the native build for `better-sqlite3`**
 
 `pnpm-workspace.yaml` — add `better-sqlite3` to `allowBuilds`:
 ```yaml
@@ -69,12 +69,12 @@ allowBuilds:
   better-sqlite3: true
 ```
 
-- [ ] **Step 3: Install dependencies**
+- [x] **Step 3: Install dependencies**
 
 Run: `pnpm install`
 Expected: installs; `prepare` runs `lefthook install`; `better-sqlite3` native build approved and completes. Do not run the seed yet (script does not exist until Task 3).
 
-- [ ] **Step 4: Update `tsconfig.json`**
+- [x] **Step 4: Update `tsconfig.json`**
 
 Replace the `compilerOptions` with (adds `esModuleInterop` and `"node"` to `types`):
 ```json
@@ -100,7 +100,7 @@ Replace the `compilerOptions` with (adds `esModuleInterop` and `"node"` to `type
 }
 ```
 
-- [ ] **Step 5: Split vitest into client (jsdom) and server (node) projects**
+- [x] **Step 5: Split vitest into client (jsdom) and server (node) projects**
 
 Replace `vitest.config.ts` with:
 ```ts
@@ -135,7 +135,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 6: Update ignore files**
+- [x] **Step 6: Update ignore files**
 
 `.gitignore` — append:
 ```
@@ -147,12 +147,12 @@ server/.fixtures
 server/data
 ```
 
-- [ ] **Step 7: Run the full check**
+- [x] **Step 7: Run the full check**
 
 Run: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`
 Expected: all pass; client tests still run (12 files, 26 tests).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json vitest.config.ts .gitignore .prettierignore
@@ -174,11 +174,11 @@ git commit -m "chore: add server deps, node typecheck, and dual vitest projects"
   - `class ProgressEmitter implements ProgressSink { emitProgress(e: ProgressEvent): void }`
   - `type RunConfiguration`, `type FileEntry`, `type FileRecord`, `type ProgressEvent`, `type ProgressSink`, `type RunSummary`, `type Reporter` (all as in the engine).
 
-- [ ] **Step 1: Copy the engine source files**
+- [x] **Step 1: Copy the engine source files**
 
 Copy the files listed above from `C:\dev\repos\imgsorter-v2\src` into `server/engine/` preserving directory structure and file contents exactly. Do NOT copy: `index.ts`, `cli.ts`, `utilities/load-config.ts`, `phases/test-helpers.ts`, and any `*.test.ts`. Relative imports inside the engine stay as-is (they resolve under `moduleResolution: bundler` and via tsx/Vite).
 
-- [ ] **Step 2: Trim `server/engine/output/reporter.ts`**
+- [x] **Step 2: Trim `server/engine/output/reporter.ts`**
 
 Replace the vendored reporter with the interface only (drop `CliReporter`, nanospinner, `ReporterOptions`, and the label maps):
 ```ts
@@ -193,7 +193,7 @@ export interface Reporter {
 }
 ```
 
-- [ ] **Step 3: Write the engine smoke test**
+- [x] **Step 3: Write the engine smoke test**
 
 `server/engine/engine.test.ts`:
 ```ts
@@ -249,17 +249,17 @@ describe('vendored engine', () => {
 });
 ```
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `pnpm test`
 Expected: server project runs 2 engine tests, PASS.
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck**
 
 Run: `pnpm typecheck`
 Expected: PASS — the vendored engine type-checks under the app's tsconfig (Node globals, `esModuleInterop`, bundler resolution).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/engine
@@ -285,7 +285,7 @@ git commit -m "feat: vendor imgsorter-v2 engine into server"
   - `mapPathToDisplay(path: string): string`, `rootLabelOf(mappedPath: string): string`
   - `buildDirectoryTree(directories: string[]): DirectoryNode[]`
 
-- [ ] **Step 1: Write the failing `fixture-plan` test**
+- [x] **Step 1: Write the failing `fixture-plan` test**
 
 `server/lib/fixture-plan.test.ts`:
 ```ts
@@ -311,12 +311,12 @@ describe('fixture-plan', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `pnpm test`
 Expected: server project FAIL, module not found (`./fixture-plan`).
 
-- [ ] **Step 3: Create `server/lib/db-path.ts`**
+- [x] **Step 3: Create `server/lib/db-path.ts`**
 
 ```ts
 import { fileURLToPath } from 'node:url';
@@ -342,7 +342,7 @@ export function virtualToReal(virtualPath: string): string {
 }
 ```
 
-- [ ] **Step 4: Create `server/lib/fixture-plan.ts`**
+- [x] **Step 4: Create `server/lib/fixture-plan.ts`**
 
 ```ts
 import { createHash } from 'node:crypto';
@@ -419,12 +419,12 @@ export function expectedFixtureStats(files: FixtureFile[] = buildFixtureFiles())
 }
 ```
 
-- [ ] **Step 5: Run the fixture test and see it pass**
+- [x] **Step 5: Run the fixture test and see it pass**
 
 Run: `pnpm test`
 Expected: server `fixture-plan` test PASS.
 
-- [ ] **Step 6: Write the failing `labels` and `tree` tests**
+- [x] **Step 6: Write the failing `labels` and `tree` tests**
 
 `server/lib/labels.test.ts`:
 ```ts
@@ -474,12 +474,12 @@ describe('buildDirectoryTree', () => {
 });
 ```
 
-- [ ] **Step 7: Run the tests and see them fail**
+- [x] **Step 7: Run the tests and see them fail**
 
 Run: `pnpm test`
 Expected: server tests FAIL, modules not found (`./labels`, `./tree`).
 
-- [ ] **Step 8: Create `server/lib/labels.ts`**
+- [x] **Step 8: Create `server/lib/labels.ts`**
 
 ```ts
 export const ROOT_LABELS = [
@@ -509,7 +509,7 @@ export function rootLabelOf(mappedPath: string): string {
 }
 ```
 
-- [ ] **Step 9: Create `server/lib/tree.ts`**
+- [x] **Step 9: Create `server/lib/tree.ts`**
 
 ```ts
 import type { DirectoryNode } from '../../app/lib/types';
@@ -550,12 +550,12 @@ export function buildDirectoryTree(directories: string[]): DirectoryNode[] {
 }
 ```
 
-- [ ] **Step 10: Run the tests and see them pass**
+- [x] **Step 10: Run the tests and see them pass**
 
 Run: `pnpm test`
 Expected: server `labels` + `tree` tests PASS.
 
-- [ ] **Step 11: Write the seed script**
+- [x] **Step 11: Write the seed script**
 
 `scripts/seed.ts`:
 ```ts
@@ -632,24 +632,24 @@ main().catch((err) => {
 });
 ```
 
-- [ ] **Step 12: Update the lint script to cover server code**
+- [x] **Step 12: Update the lint script to cover server code**
 
 In `package.json`, change the `lint` script from `oxlint app` to:
 ```json
 "lint": "oxlint app server scripts"
 ```
 
-- [ ] **Step 13: Run the seed**
+- [x] **Step 13: Run the seed**
 
 Run: `pnpm seed`
 Expected: creates `server/data/imgsorter.db` and prints `Seed complete: 1272 files, ... bytes, 24 duplicate groups`.
 
-- [ ] **Step 14: Run typecheck, lint, and tests**
+- [x] **Step 14: Run typecheck, lint, and tests**
 
 Run: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`
 Expected: all pass (server tests now also include engine, fixture-plan, labels, tree).
 
-- [ ] **Step 15: Commit the code and the sample DB**
+- [x] **Step 15: Commit the code and the sample DB**
 
 ```bash
 git add server/lib scripts package.json
@@ -672,7 +672,7 @@ git commit -m "feat: add fixture plan, label map, tree builder, and seed script 
   - `getAnalyticsData(): AnalyticsData`
   - `getShellData(): ShellData`
 
-- [ ] **Step 1: Add shared data types to `app/lib/types.ts`**
+- [x] **Step 1: Add shared data types to `app/lib/types.ts`**
 
 Append:
 ```ts
@@ -697,7 +697,7 @@ export type ShellData = { files: number; size: number; roots: string[]; extensio
 export type FilesInput = { query: string; dir: string; ext: string; selectedDirs: string[] };
 ```
 
-- [ ] **Step 2: Write the failing integration test**
+- [x] **Step 2: Write the failing integration test**
 
 `server/lib/queries.test.ts`:
 ```ts
@@ -766,12 +766,12 @@ describe('queries against the committed sample db', () => {
 });
 ```
 
-- [ ] **Step 3: Run the test and see it fail**
+- [x] **Step 3: Run the test and see it fail**
 
 Run: `pnpm test`
 Expected: server test FAIL, module not found (`./queries`).
 
-- [ ] **Step 4: Create `server/lib/queries.ts`**
+- [x] **Step 4: Create `server/lib/queries.ts`**
 
 ```ts
 import '@tanstack/react-start/server-only';
@@ -916,17 +916,17 @@ export function getShellData(): ShellData {
 }
 ```
 
-- [ ] **Step 5: Run the tests and see them pass**
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `pnpm test`
 Expected: server `queries` tests PASS (8 tests) against the committed DB.
 
-- [ ] **Step 6: Run the full check**
+- [x] **Step 6: Run the full check**
 
 Run: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`
 Expected: all pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/lib/types.ts server/lib/queries.ts
@@ -951,7 +951,7 @@ git commit -m "feat: add read-only query module against the sample db"
   - `getAnalyticsData(): Promise<AnalyticsData>`
   - `getShellData(): Promise<ShellData>`
 
-- [ ] **Step 1: Create `server/routes/overview.ts`**
+- [x] **Step 1: Create `server/routes/overview.ts`**
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
@@ -962,7 +962,7 @@ export const getOverviewData = createServerFn({ method: 'GET' }).handler(async (
 });
 ```
 
-- [ ] **Step 2: Create `server/routes/files.ts`**
+- [x] **Step 2: Create `server/routes/files.ts`**
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
@@ -976,7 +976,7 @@ export const getFilteredEntries = createServerFn({ method: 'POST' })
   });
 ```
 
-- [ ] **Step 3: Create `server/routes/browse.ts`**
+- [x] **Step 3: Create `server/routes/browse.ts`**
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
@@ -990,7 +990,7 @@ export const getBrowseData = createServerFn({ method: 'POST' })
   });
 ```
 
-- [ ] **Step 4: Create `server/routes/analytics.ts`**
+- [x] **Step 4: Create `server/routes/analytics.ts`**
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
@@ -1001,7 +1001,7 @@ export const getAnalyticsData = createServerFn({ method: 'GET' }).handler(async 
 });
 ```
 
-- [ ] **Step 5: Create `server/routes/shell.ts`**
+- [x] **Step 5: Create `server/routes/shell.ts`**
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
@@ -1012,12 +1012,12 @@ export const getShellData = createServerFn({ method: 'GET' }).handler(async () =
 });
 ```
 
-- [ ] **Step 6: Typecheck and lint**
+- [x] **Step 6: Typecheck and lint**
 
 Run: `pnpm typecheck && pnpm lint`
 Expected: PASS. (These wrappers are intentionally thin and untested directly; all logic is covered by the `queries` tests. Calling them in a test would require the RPC layer.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/routes
@@ -1036,7 +1036,7 @@ git commit -m "feat: add server function wrappers for overview, files, browse, a
 - Consumes: `getOverviewData` (Task 5); `OverviewData` (Task 4).
 - Produces: `OverviewPage({ data }: { data: OverviewData })`, `StorageMap({ rows }: { rows: { path: string; share: number; size: number }[] })`.
 
-- [ ] **Step 1: Update `app/routes/index.tsx`**
+- [x] **Step 1: Update `app/routes/index.tsx`**
 
 ```tsx
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
@@ -1054,7 +1054,7 @@ function IndexComponent() {
 }
 ```
 
-- [ ] **Step 2: Replace `app/features/overview/OverviewPage.tsx`**
+- [x] **Step 2: Replace `app/features/overview/OverviewPage.tsx`**
 
 ```tsx
 import { Button, Card, Group, Text } from '@mantine/core';
@@ -1129,7 +1129,7 @@ export function OverviewPage({ data }: { data: OverviewData }) {
 }
 ```
 
-- [ ] **Step 3: Replace `app/features/overview/StorageMap.tsx`**
+- [x] **Step 3: Replace `app/features/overview/StorageMap.tsx`**
 
 ```tsx
 import { Card, Group, Progress, Text } from '@mantine/core';
@@ -1164,7 +1164,7 @@ export function StorageMap({ rows }: { rows: StorageMapRow[] }) {
 }
 ```
 
-- [ ] **Step 4: Replace `app/features/overview/OverviewPage.test.tsx`**
+- [x] **Step 4: Replace `app/features/overview/OverviewPage.test.tsx`**
 
 ```tsx
 import { describe, expect, it, vi } from 'vitest';
@@ -1216,16 +1216,16 @@ describe('OverviewPage', () => {
 });
 ```
 
-- [ ] **Step 5: Run tests, typecheck, lint, format**
+- [x] **Step 5: Run tests, typecheck, lint, format**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`
 Expected: all pass.
 
-- [ ] **Step 6: Visual check**
+- [x] **Step 6: Visual check**
 
 Run: `pnpm dev`, open `http://localhost:3000/`. Expected: Overview shows real totals (1272 files, sized in MB), 5 real metrics + static "Not backed up", Storage Map with 3 roots from the DB, largest-files list from the DB. Drawer still opens from mock thumbs.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/routes/index.tsx app/features/overview
@@ -1248,7 +1248,7 @@ git commit -m "feat: wire Overview to real sqlite data via route loader"
 - Consumes: `getFilteredEntries`/`getBrowseData` (Task 5); `useLoaderData` from `@tanstack/react-router`.
 - Produces: `FilesPage({ files }: { files: Entry[] })`, `BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNode[] })`, `DirectoryTree({ tree }: { tree: DirectoryNode[] })`; `FilesTable` gains client-side pagination.
 
-- [ ] **Step 1: Update `app/lib/filter-sync.ts` to debounce URL writes**
+- [x] **Step 1: Update `app/lib/filter-sync.ts` to debounce URL writes**
 
 Replace the second effect in `useFilterSearchParams` with:
 ```tsx
@@ -1268,7 +1268,7 @@ useEffect(() => {
 }, [query, dir, ext, navigate]);
 ```
 
-- [ ] **Step 2: Replace `app/routes/unique-files.tsx`**
+- [x] **Step 2: Replace `app/routes/unique-files.tsx`**
 
 ```tsx
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
@@ -1301,7 +1301,7 @@ function UniqueFilesRoute() {
 }
 ```
 
-- [ ] **Step 3: Replace `app/routes/browse.tsx`**
+- [x] **Step 3: Replace `app/routes/browse.tsx`**
 
 ```tsx
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
@@ -1341,7 +1341,7 @@ function BrowseRoute() {
 }
 ```
 
-- [ ] **Step 4: Replace `app/features/files/FilesPage.tsx`**
+- [x] **Step 4: Replace `app/features/files/FilesPage.tsx`**
 
 ```tsx
 import { PageHeading } from '../../components/common/PageHeading';
@@ -1366,7 +1366,7 @@ export function FilesPage({ files }: { files: Entry[] }) {
 }
 ```
 
-- [ ] **Step 5: Add client-side pagination to `app/features/files/FilesTable.tsx`**
+- [x] **Step 5: Add client-side pagination to `app/features/files/FilesTable.tsx`**
 
 Replace the imports line and the `list` memo, and add pagination state + controls. Full replacement:
 ```tsx
@@ -1531,7 +1531,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
 }
 ```
 
-- [ ] **Step 6: Replace `app/features/browse/BrowsePage.tsx`**
+- [x] **Step 6: Replace `app/features/browse/BrowsePage.tsx`**
 
 ```tsx
 import { PageHeading } from '../../components/common/PageHeading';
@@ -1562,7 +1562,7 @@ export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNod
 }
 ```
 
-- [ ] **Step 7: Update `app/components/common/DirectoryTree.tsx` to take a tree prop**
+- [x] **Step 7: Update `app/components/common/DirectoryTree.tsx` to take a tree prop**
 
 Replace the top of the file (imports + signature + the `directoryTree.map` usage). Full replacement:
 ```tsx
@@ -1620,7 +1620,7 @@ export function DirectoryTree({ tree }: { tree: DirectoryNode[] }) {
 }
 ```
 
-- [ ] **Step 8: Replace `app/features/files/FilesPage.test.tsx`**
+- [x] **Step 8: Replace `app/features/files/FilesPage.test.tsx`**
 
 ```tsx
 import { describe, expect, it } from 'vitest';
@@ -1645,7 +1645,7 @@ describe('FilesPage', () => {
 });
 ```
 
-- [ ] **Step 9: Replace `app/features/browse/BrowsePage.test.tsx`**
+- [x] **Step 9: Replace `app/features/browse/BrowsePage.test.tsx`**
 
 ```tsx
 import { describe, expect, it } from 'vitest';
@@ -1673,16 +1673,16 @@ describe('BrowsePage', () => {
 });
 ```
 
-- [ ] **Step 10: Run tests, typecheck, lint, format**
+- [x] **Step 10: Run tests, typecheck, lint, format**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`
 Expected: all pass.
 
-- [ ] **Step 11: Visual check**
+- [x] **Step 11: Visual check**
 
 Run: `pnpm dev`. Expected: `/unique-files` shows real rows with a pagination bar; header search/dir/ext filters update the URL (debounced) and re-query; `/browse` shows the real directory tree; selecting tree nodes scopes results; both open the drawer on row click.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add app/routes/unique-files.tsx app/routes/browse.tsx app/features/files app/features/browse app/components/common/DirectoryTree.tsx app/lib/filter-sync.ts
@@ -1700,7 +1700,7 @@ git commit -m "feat: wire Unique Files and Browse to real data with pagination"
 - Consumes: `getAnalyticsData` (Task 5); `AnalyticsData` (Task 4).
 - Produces: `AnalyticsPage({ data }: { data: AnalyticsData })`.
 
-- [ ] **Step 1: Replace `app/routes/analytics.tsx`**
+- [x] **Step 1: Replace `app/routes/analytics.tsx`**
 
 ```tsx
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
@@ -1718,7 +1718,7 @@ function AnalyticsRoute() {
 }
 ```
 
-- [ ] **Step 2: Replace `app/features/analytics/AnalyticsPage.tsx`**
+- [x] **Step 2: Replace `app/features/analytics/AnalyticsPage.tsx`**
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -1856,7 +1856,7 @@ export function AnalyticsPage({ data }: { data: AnalyticsData }) {
 }
 ```
 
-- [ ] **Step 3: Replace `app/features/analytics/AnalyticsPage.test.tsx`**
+- [x] **Step 3: Replace `app/features/analytics/AnalyticsPage.test.tsx`**
 
 ```tsx
 import { describe, expect, it } from 'vitest';
@@ -1890,12 +1890,12 @@ describe('AnalyticsPage', () => {
 });
 ```
 
-- [ ] **Step 4: Run tests, typecheck, lint, format**
+- [x] **Step 4: Run tests, typecheck, lint, format**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/routes/analytics.tsx app/features/analytics
@@ -1915,7 +1915,7 @@ git commit -m "feat: wire Analytics to real rankings"
 - Consumes: `getShellData` (Task 5); `ShellData` (Task 4).
 - Produces: root route `loader` returning `ShellData`; `Sidebar`/`AppFooter`/`AppHeader` read it via `useLoaderData({ from: '__root__' })`.
 
-- [ ] **Step 1: Add the root loader to `app/routes/__root.tsx`**
+- [x] **Step 1: Add the root loader to `app/routes/__root.tsx`**
 
 Add the import and the `loader` on the root route. Modify:
 ```tsx
@@ -1926,7 +1926,7 @@ and inside `createRootRoute({ ... })`, add before `head`:
 loader: async () => getShellData(),
 ```
 
-- [ ] **Step 2: Replace `app/components/common/Sidebar.tsx`**
+- [x] **Step 2: Replace `app/components/common/Sidebar.tsx`**
 
 ```tsx
 import { Badge, Button, Group, Progress, Text, ThemeIcon } from '@mantine/core';
@@ -2016,7 +2016,7 @@ export function Sidebar() {
 }
 ```
 
-- [ ] **Step 3: Replace `app/components/common/AppFooter.tsx`**
+- [x] **Step 3: Replace `app/components/common/AppFooter.tsx`**
 
 ```tsx
 import { Group } from '@mantine/core';
@@ -2043,7 +2043,7 @@ export function AppFooter() {
 }
 ```
 
-- [ ] **Step 4: Replace `app/components/common/AppHeader.tsx`**
+- [x] **Step 4: Replace `app/components/common/AppHeader.tsx`**
 
 ```tsx
 import { Select, Text, TextInput } from '@mantine/core';
@@ -2099,7 +2099,7 @@ export function AppHeader() {
 }
 ```
 
-- [ ] **Step 5: Replace `app/components/common/app-shell.test.tsx`**
+- [x] **Step 5: Replace `app/components/common/app-shell.test.tsx`**
 
 ```tsx
 import { describe, expect, it, vi } from 'vitest';
@@ -2129,16 +2129,16 @@ describe('app shell', () => {
 });
 ```
 
-- [ ] **Step 6: Run tests, typecheck, lint, format**
+- [x] **Step 6: Run tests, typecheck, lint, format**
 
 Run: `pnpm test && pnpm typecheck && pnpm lint && pnpm format:check`
 Expected: all pass. (If `useLoaderData` inside the shell component fails typecheck because the root loader data is not yet resolved, ensure `@tanstack/react-router` types resolve `ShellData` from the `loader` return; the `getShellData` server fn returns `Promise<ShellData>`, so `useLoaderData({ from: '__root__' })` is `ShellData`.)
 
-- [ ] **Step 7: Visual check**
+- [x] **Step 7: Visual check**
 
 Run: `pnpm dev`. Expected: Sidebar scan-state and Footer show real totals (e.g. `1,272 files · …`); header dir/ext dropdowns list the real roots and extensions on every page.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/routes/__root.tsx app/components/common/Sidebar.tsx app/components/common/AppFooter.tsx app/components/common/AppHeader.tsx app/components/common/app-shell.test.tsx
@@ -2154,17 +2154,17 @@ git commit -m "feat: drive shell totals and header options from real data"
 **Interfaces:**
 - Consumes: everything above.
 
-- [ ] **Step 1: Run the full check**
+- [x] **Step 1: Run the full check**
 
 Run: `pnpm check`
 Expected: typecheck, lint, tests (client + server), format all pass. Server tests recompute fixture-plan expectations against the committed DB (guards against stale fixtures).
 
-- [ ] **Step 2: Production build**
+- [x] **Step 2: Production build**
 
 Run: `pnpm build`
 Expected: Vite client + SSR build succeed. Verify the client bundle contains no `better-sqlite3`/native chunks (server-only guard held): `grep -r "sqlite" dist/client` returns nothing.
 
-- [ ] **Step 3: Full manual parity walkthrough**
+- [x] **Step 3: Full manual parity walkthrough**
 
 Run: `pnpm dev` and verify:
 1. `/` — real metrics (1272 files), storage map, largest files; "Not backed up" static; Last Run static.
@@ -2175,15 +2175,15 @@ Run: `pnpm dev` and verify:
 6. `/duplicates`, `/activity`, `/preferences` still render mock data unchanged.
 7. Reload a filtered URL — filters survive (loader reads search params).
 
-- [ ] **Step 4: Re-seed sanity**
+- [x] **Step 4: Re-seed sanity**
 
 Run: `pnpm seed` again, then `pnpm test`. Expected: DB regenerated, all server tests still pass (proves seed reproducibility).
 
-- [ ] **Step 5: Update the roadmap**
+- [x] **Step 5: Update the roadmap**
 
 Mark Phase 2 complete in `docs/ROADMAP.md` (`[ ]` → `[x]` for the Phase 2 row).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/ROADMAP.md
