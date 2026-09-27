@@ -16,10 +16,14 @@ export type DirectoryNode = {
 };
 
 export type DuplicateGroup = {
+  key: string;
   hash: string;
   name: string;
   count: number;
-  space: string;
+  size: number;
+  redundantSpace: number;
+  extension: string;
+  directories: string[];
   files: Entry[];
 };
 
