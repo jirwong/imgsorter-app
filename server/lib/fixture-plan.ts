@@ -7,14 +7,14 @@ export const FIXTURE_ROOTS = [
   '@fixtures/Camera Imports',
 ] as const;
 
-const SIZES = [120_000, 240_000, 480_000, 960_000, 1_920_000, 3_840_000, 7_680_000, 15_360_000];
+const SIZES = [1_200, 2_400, 4_800, 9_600, 19_200, 38_400, 76_800, 153_600];
 const BASE_COUNTS: Record<string, number> = {
   '@fixtures/Media/2025/Trips': 200,
   '@fixtures/Media/2025/Library': 400,
   '@fixtures/Media/2024': 300,
   '@fixtures/Camera Imports': 300,
 };
-const DUPLICATE_SIZE = 640_000;
+const DUPLICATE_SIZE = 6_400;
 
 export type FixtureFile = {
   root: string;

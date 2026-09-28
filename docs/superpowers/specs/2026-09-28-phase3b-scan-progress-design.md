@@ -143,7 +143,7 @@ app/
   - `cancel()`: aborts the controller if running.
 - The **app singleton** is `createScanService(runFixtureScan)`.
 - Injectable `runScan` keeps the state machine unit-testable without generating the
-  ~4.6GB fixture tree.
+  ~46MB fixture tree.
 
 ### 6.3 Server functions (`server/routes/scan.ts`)
 - `startScan` (POST) → `service.start()`.
@@ -213,11 +213,12 @@ All dynamically import `../lib/scan` inside the handler (server-only guard).
   consumers still render after cleanup.
 - **Gates:** `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `pnpm build`
   (no `better-sqlite3` in `dist/client`); manual/`curl` smoke of `/activity`.
-- The heavy `runFixtureScan` (engine over ~4.6GB fixtures) is not unit-tested; its
+- The heavy `runFixtureScan` (engine over ~46MB fixtures) is not unit-tested; its
   engine path remains covered by `pnpm seed` and the existing DB-parity tests.
 
 ## 10. Task outline (detailed via writing-plans)
 
+0. Shrink the fixture tree to ~46 MB (1/100 byte sizes) and regenerate the committed DB.
 1. Extract `fixtures.ts` + `scan-runner.ts`; refactor `seed.ts`; add
    `ShellData.duplicateGroups` (+ test).
 2. `scan.ts` service + `server/routes/scan.ts` server fns + service tests.

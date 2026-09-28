@@ -157,7 +157,7 @@ from `app/lib/mock-data.test.ts`.
 - `getDuplicateGroups()` returns **24** groups; counts are 8×2, 8×3, 8×4; each group's
   `files.length === count`; every member's `hash`/`filename` match the group;
   `directories` and member `directory` are display labels (`C:/…`, `D:/…`).
-- Total `redundantSpace` = `48 * 640_000 = 30_720_000`, matching
+- Total `redundantSpace` = `48 * 6_400 = 307_200`, matching
   `expectedFixtureStats(buildFixtureFiles())`.
 
 **Client** (`app/features/duplicates/DuplicatesPage.test.tsx`, jsdom):

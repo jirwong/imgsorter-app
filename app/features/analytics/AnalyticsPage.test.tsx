@@ -6,8 +6,8 @@ import type { AnalyticsData } from '../../lib/types';
 
 const data: AnalyticsData = {
   rankedBySize: [
-    { filename: 'big-1.jpg', size: 3_840_000 },
-    { filename: 'big-2.jpg', size: 1_920_000 },
+    { filename: 'big-1.jpg', size: 38_400 },
+    { filename: 'big-2.jpg', size: 19_200 },
   ],
   rankedByCopies: [
     { name: 'duplicate-1.jpg', count: 4 },
