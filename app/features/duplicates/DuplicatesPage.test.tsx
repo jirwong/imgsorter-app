@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { AppProvider } from '../../lib/app-context';
 import { DuplicatesPage } from './DuplicatesPage';
@@ -53,6 +53,10 @@ describe('DuplicatesPage keepers', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
     expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
+    const libraryRow = screen.getByText('C:/Media/2025/Library').closest('tr') as HTMLElement;
+    expect(within(libraryRow).getByRole('button', { name: 'Keeper' })).toBeInTheDocument();
+    const tripsRow = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    expect(within(tripsRow).getByRole('button', { name: 'Keep' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Keeper' }));
     expect(screen.getByText('1 groups · 2 files · 0 keepers')).toBeInTheDocument();
