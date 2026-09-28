@@ -147,7 +147,14 @@ export function getShellData(): ShellData {
       extension: string;
     }[];
     const roots = [...new Set(dirs.map((row) => rootLabelOf(mapPathToDisplay(row.directory))))].sort();
-    return { files: totals.files, size: totals.size, roots, extensions: exts.map((row) => row.extension) };
+    const groups = db.prepare(`SELECT COUNT(*) AS n FROM records WHERE count > 1`).get() as { n: number };
+    return {
+      files: totals.files,
+      size: totals.size,
+      roots,
+      extensions: exts.map((row) => row.extension),
+      duplicateGroups: groups.n,
+    };
   } finally {
     db.close();
   }

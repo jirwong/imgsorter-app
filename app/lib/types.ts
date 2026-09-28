@@ -52,6 +52,6 @@ export type CopyRankRow = { name: string; count: number };
 
 export type AnalyticsData = { rankedBySize: SizeRankRow[]; rankedByCopies: CopyRankRow[] };
 
-export type ShellData = { files: number; size: number; roots: string[]; extensions: string[] };
+export type ShellData = { files: number; size: number; roots: string[]; extensions: string[]; duplicateGroups: number };
 
 export type FilesInput = { query: string; dir: string; ext: string; selectedDirs: string[] };
