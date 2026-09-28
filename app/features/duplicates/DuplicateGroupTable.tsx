@@ -7,12 +7,12 @@ import { KeepToggle } from './KeepToggle';
 
 export type DuplicateGroupTableProps = {
   groups: DuplicateGroup[];
-  keepers: number[];
-  onToggleKeeper: (id: number) => void;
+  keeperByGroup: Record<string, number>;
+  onToggleKeeper: (groupKey: string, id: number) => void;
   onSelect: (e: Entry) => void;
 };
 
-export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect }: DuplicateGroupTableProps) {
+export function DuplicateGroupTable({ groups, keeperByGroup, onToggleKeeper, onSelect }: DuplicateGroupTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<'count' | 'name' | 'redundant'>('count');
   const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
@@ -90,7 +90,7 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
               </Table.Tr>
               {expanded === g.key &&
                 g.files.map((e) => (
-                  <Table.Tr key={e.id} className={keepers.includes(e.id) ? 'keeper-row' : ''}>
+                  <Table.Tr key={e.id} className={keeperByGroup[g.key] === e.id ? 'keeper-row' : ''}>
                     <Table.Td>
                       <Text size="xs" c="dimmed">
                         ↳
@@ -121,7 +121,10 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
                     </Table.Td>
                     <Table.Td>
                       <Group gap={4}>
-                        <KeepToggle keeper={keepers.includes(e.id)} onToggle={() => onToggleKeeper(e.id)} />
+                        <KeepToggle
+                          keeper={keeperByGroup[g.key] === e.id}
+                          onToggle={() => onToggleKeeper(g.key, e.id)}
+                        />
                         <Button size="compact-xs" variant="subtle" onClick={() => onSelect(e)}>
                           Preview
                         </Button>
