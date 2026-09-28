@@ -16,9 +16,54 @@
 - Every task ends green: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`; `pnpm build` must succeed at the end of an implementation task.
 - Engine/`better-sqlite3` is server-only; never in a client bundle. Server fns dynamically `import()` server libs inside the handler.
 - The scan is **fixture-driven** and writes the app DB `server/data/imgsorter.db`; it must reuse the deterministic fixture plan (1272 files / 24 groups).
-- Running the scan (or `pnpm seed`) generates ~4.6GB of temp fixtures and rewrites the committed DB bytes; run it manually only, and `git restore server/data/imgsorter.db` afterwards.
+- Running the scan (or `pnpm seed`) generates ~46MB of temp fixtures and rewrites the committed DB bytes; run it manually only, and `git restore server/data/imgsorter.db` afterwards.
 - Operating rules (`artifacts/operating-rules.md`) bind execution: branch → PR → fresh sub-agent review (max 3 rounds) → STOP AND WAIT; never merge.
 - Non-goals: persisted scan config/directory management (Phase 4), scanning real user dirs, keeper persistence/actions (Phase 4).
+
+### Task 0: Shrink fixture tree to ~46 MB
+
+**Files:**
+- Modify: `server/lib/fixture-plan.ts` (`SIZES`, `DUPLICATE_SIZE`)
+- Modify: `server/lib/fixture-plan.test.ts`
+- Modify: `server/lib/queries.test.ts`
+- Modify (regenerate): `server/data/imgsorter.db`
+- Modify: `docs/superpowers/plans/2026-09-28-phase3b-scan-progress.md`, `docs/superpowers/specs/2026-09-28-phase3b-scan-progress-design.md`, `docs/superpowers/specs/2026-09-27-phase3a-duplicates-design.md`, `docs/superpowers/plans/2026-09-27-phase3a-duplicates.md`, `docs/superpowers/plans/2026-09-08-phase2-real-data.md`
+
+**Interfaces:**
+- Produces: unchanged fixture shape (1272 files / 24 duplicate groups) at 1/100 byte sizes; `expectedFixtureStats().totalSize === 46_360_800`.
+
+- [ ] **Step 1: Scale sizes in `server/lib/fixture-plan.ts`**
+
+```ts
+const SIZES = [1_200, 2_400, 4_800, 9_600, 19_200, 38_400, 76_800, 153_600];
+const DUPLICATE_SIZE = 6_400;
+```
+
+- [ ] **Step 2: Update fixture-derived test literals**
+
+`server/lib/fixture-plan.test.ts`: `expect(stats.redundantSpace).toBe(48 * 6_400);`
+`server/lib/queries.test.ts`: `expect(group.size).toBe(6_400);`
+
+- [ ] **Step 3: Regenerate the committed DB**
+
+Run: `pnpm seed`
+Expected: `Seed complete: 1272 files, 46360800 bytes, 24 duplicate groups` / `Scan summary: 1272 scanned, 1272 written`.
+
+- [ ] **Step 4: Update plan/spec fixture-size references**
+
+Replace every fixture-size reference (`4.6GB`, `4_636_080_000`, `640_000`, `30_720_000`, the `SIZES` array) in the phase 2 and 3 plan/spec docs with the new values.
+
+- [ ] **Step 5: Verify**
+
+Run: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`
+Expected: all pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/lib/fixture-plan.ts server/lib/fixture-plan.test.ts server/lib/queries.test.ts server/data/imgsorter.db docs
+git commit -m "chore: shrink fixture tree to ~46 MB"
+```
 
 ### Task 1: Extract scan libs + ShellData.duplicateGroups
 
@@ -202,7 +247,7 @@ Run: `pnpm typecheck && pnpm lint && pnpm test && pnpm format:check`
 Expected: all pass (18 test files / 49 tests).
 
 Run: `pnpm seed`
-Expected: `Seed complete: 1272 files, 4636080000 bytes, 24 duplicate groups` / `Scan summary: 1272 scanned, 1272 written`.
+Expected: `Seed complete: 1272 files, 46360800 bytes, 24 duplicate groups` / `Scan summary: 1272 scanned, 1272 written`.
 Then restore the committed DB: `git restore server/data/imgsorter.db`.
 
 - [ ] **Step 7: Commit**

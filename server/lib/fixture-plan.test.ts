@@ -18,7 +18,7 @@ describe('fixture-plan', () => {
     const stats = expectedFixtureStats(files);
     expect(stats.uniqueFiles).toBe(1200);
     expect(stats.duplicateGroups).toBe(24);
-    expect(stats.redundantSpace).toBe(48 * 640_000);
+    expect(stats.redundantSpace).toBe(48 * 6_400);
     expect(new Set(files.map((f) => f.root))).toEqual(new Set(FIXTURE_ROOTS));
   });
 });

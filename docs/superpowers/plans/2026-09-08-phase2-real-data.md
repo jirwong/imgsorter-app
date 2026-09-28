@@ -305,7 +305,7 @@ describe('fixture-plan', () => {
     const stats = expectedFixtureStats(files);
     expect(stats.uniqueFiles).toBe(1200);
     expect(stats.duplicateGroups).toBe(24);
-    expect(stats.redundantSpace).toBe(48 * 640_000);
+    expect(stats.redundantSpace).toBe(48 * 6_400);
     expect(new Set(files.map((f) => f.root))).toEqual(new Set(FIXTURE_ROOTS));
   });
 });
@@ -354,14 +354,14 @@ export const FIXTURE_ROOTS = [
   '@fixtures/Camera Imports',
 ] as const;
 
-const SIZES = [120_000, 240_000, 480_000, 960_000, 1_920_000, 3_840_000, 7_680_000, 15_360_000];
+const SIZES = [1_200, 2_400, 4_800, 9_600, 19_200, 38_400, 76_800, 153_600];
 const BASE_COUNTS: Record<string, number> = {
   '@fixtures/Media/2025/Trips': 200,
   '@fixtures/Media/2025/Library': 400,
   '@fixtures/Media/2024': 300,
   '@fixtures/Camera Imports': 300,
 };
-const DUPLICATE_SIZE = 640_000;
+const DUPLICATE_SIZE = 6_400;
 
 export type FixtureFile = {
   root: string;
@@ -1187,7 +1187,7 @@ const data: OverviewData = {
   totalFiles: 1272,
   totalSize: 391_000_000,
   duplicateGroups: 24,
-  redundantSpace: 30_720_000,
+  redundantSpace: 307_200,
   uniqueFiles: 1200,
   storageMap: [
     { path: 'C:/Media/2025', share: 52, size: 200_000_000 },
@@ -1867,8 +1867,8 @@ import type { AnalyticsData } from '../../lib/types';
 
 const data: AnalyticsData = {
   rankedBySize: [
-    { filename: 'big-1.jpg', size: 3_840_000 },
-    { filename: 'big-2.jpg', size: 1_920_000 },
+    { filename: 'big-1.jpg', size: 38_400 },
+    { filename: 'big-2.jpg', size: 19_200 },
   ],
   rankedByCopies: [
     { name: 'duplicate-1.jpg', count: 4 },

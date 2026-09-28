@@ -130,7 +130,7 @@ Add this test inside the existing `describe('queries against the committed sampl
       expect(group.files).toHaveLength(group.count);
       expect(group.files.every((f) => f.hash === group.hash && f.filename === group.name)).toBe(true);
       expect(group.files.every((f) => f.directory.startsWith('C:/') || f.directory.startsWith('D:/'))).toBe(true);
-      expect(group.size).toBe(640_000);
+      expect(group.size).toBe(6_400);
       expect(group.redundantSpace).toBe((group.count - 1) * group.size);
     }
     const totalRedundant = groups.reduce((sum, g) => sum + g.redundantSpace, 0);
@@ -418,7 +418,7 @@ import type { DuplicateGroup, Entry } from '../../lib/types';
 
 const entry = (id: number, directory: string): Entry => ({
   id,
-  size: 640_000,
+  size: 6_400,
   directory,
   extension: '.jpg',
   filename: 'dup.jpg',
@@ -433,8 +433,8 @@ const groups: DuplicateGroup[] = [
     hash: 'h1',
     name: 'dup.jpg',
     count: 2,
-    size: 640_000,
-    redundantSpace: 640_000,
+    size: 6_400,
+    redundantSpace: 6_400,
     extension: '.jpg',
     directories: ['C:/Media/2025/Trips', 'C:/Media/2025/Library'],
     files: [entry(1, 'C:/Media/2025/Trips'), entry(2, 'C:/Media/2025/Library')],
@@ -495,7 +495,7 @@ import type { DuplicateGroup, Entry } from '../../lib/types';
 
 const entry = (id: number, directory: string): Entry => ({
   id,
-  size: 640_000,
+  size: 6_400,
   directory,
   extension: '.jpg',
   filename: 'dup.jpg',
@@ -510,8 +510,8 @@ const groups: DuplicateGroup[] = [
     hash: 'h1',
     name: 'dup.jpg',
     count: 2,
-    size: 640_000,
-    redundantSpace: 640_000,
+    size: 6_400,
+    redundantSpace: 6_400,
     extension: '.jpg',
     directories: ['C:/Media/2025/Trips', 'C:/Media/2025/Library'],
     files: [entry(1, 'C:/Media/2025/Trips'), entry(2, 'C:/Media/2025/Library')],

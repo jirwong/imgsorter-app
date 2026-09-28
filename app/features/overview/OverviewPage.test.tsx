@@ -18,7 +18,7 @@ const data: OverviewData = {
   totalFiles: 1272,
   totalSize: 391_000_000,
   duplicateGroups: 24,
-  redundantSpace: 30_720_000,
+  redundantSpace: 307_200,
   uniqueFiles: 1200,
   storageMap: [
     { path: 'C:/Media/2025', share: 52, size: 200_000_000 },

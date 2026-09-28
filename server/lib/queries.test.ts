@@ -84,7 +84,7 @@ describe('queries against the committed sample db', () => {
       expect(group.files.every((f) => f.hash === group.hash && f.filename === group.name)).toBe(true);
       expect(group.files.every((f) => f.directory.startsWith('C:/') || f.directory.startsWith('D:/'))).toBe(true);
       expect(group.directories.every((d) => d.startsWith('C:/') || d.startsWith('D:/'))).toBe(true);
-      expect(group.size).toBe(640_000);
+      expect(group.size).toBe(6_400);
       expect(group.redundantSpace).toBe((group.count - 1) * group.size);
     }
     const totalRedundant = groups.reduce((sum, g) => sum + g.redundantSpace, 0);
