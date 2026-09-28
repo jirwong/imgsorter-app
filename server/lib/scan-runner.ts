@@ -36,9 +36,11 @@ export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): 
   const runner = new Runner(config, { reporter: silentReporter, progress, signal });
   let summary: RunSummary | null = null;
   let failure: unknown = null;
+  let failed = false;
   try {
     summary = await runner.run();
   } catch (error) {
+    failed = true;
     failure = error;
   } finally {
     runner.close();
@@ -67,7 +69,7 @@ export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): 
     removeFixtureTree();
   }
 
-  if (failure) {
+  if (failed) {
     throw failure;
   }
   if (!summary) {
