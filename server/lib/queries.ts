@@ -1,7 +1,15 @@
 import '@tanstack/react-start/server-only';
 import Database from 'better-sqlite3';
 import { applyFilters } from '../../app/lib/filter-pipeline';
-import type { AnalyticsData, DirectoryNode, Entry, FilesInput, OverviewData, ShellData } from '../../app/lib/types';
+import type {
+  AnalyticsData,
+  DirectoryNode,
+  DuplicateGroup,
+  Entry,
+  FilesInput,
+  OverviewData,
+  ShellData,
+} from '../../app/lib/types';
 import { mapPathToDisplay, rootLabelOf } from './labels';
 import { buildDirectoryTree } from './tree';
 import { sampleDbPath } from './db-path';
@@ -140,6 +148,43 @@ export function getShellData(): ShellData {
     }[];
     const roots = [...new Set(dirs.map((row) => rootLabelOf(mapPathToDisplay(row.directory))))].sort();
     return { files: totals.files, size: totals.size, roots, extensions: exts.map((row) => row.extension) };
+  } finally {
+    db.close();
+  }
+}
+
+export function getDuplicateGroups(): DuplicateGroup[] {
+  const db = openReadonly();
+  try {
+    const rows = db
+      .prepare(
+        `SELECT filename, hash, count, size, extension, directories FROM records WHERE count > 1 ORDER BY filename`,
+      )
+      .all() as {
+      filename: string;
+      hash: string;
+      count: number;
+      size: number;
+      extension: string;
+      directories: string;
+    }[];
+    const memberStmt = db.prepare(
+      `SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries WHERE hash = ? AND filename = ? ORDER BY path`,
+    );
+    return rows.map((row) => {
+      const files = memberStmt.all(row.hash, row.filename) as EntryRow[];
+      return {
+        key: `${row.hash}:${row.filename}`,
+        hash: row.hash,
+        name: row.filename,
+        count: row.count,
+        size: row.size,
+        redundantSpace: (row.count - 1) * row.size,
+        extension: row.extension,
+        directories: (JSON.parse(row.directories) as string[]).map(mapPathToDisplay),
+        files: files.map(toEntry),
+      };
+    });
   } finally {
     db.close();
   }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
-import { getAnalyticsData, getDirectoryTree, getOverviewStats, getShellData, listEntries } from './queries';
+import {
+  getAnalyticsData,
+  getDirectoryTree,
+  getDuplicateGroups,
+  getOverviewStats,
+  getShellData,
+  listEntries,
+} from './queries';
 
 describe('queries against the committed sample db', () => {
   const expected = expectedFixtureStats(buildFixtureFiles());
@@ -64,5 +71,23 @@ describe('queries against the committed sample db', () => {
     expect(shell.size).toBe(expected.totalSize);
     expect(shell.roots).toContain('C:/Media/2025');
     expect(shell.extensions).toEqual(['.gif', '.jpg', '.png']);
+  });
+
+  it('returns 24 duplicate groups with their member files', () => {
+    const groups = getDuplicateGroups();
+    expect(groups).toHaveLength(expected.duplicateGroups);
+    expect(groups.filter((g) => g.count === 2)).toHaveLength(8);
+    expect(groups.filter((g) => g.count === 3)).toHaveLength(8);
+    expect(groups.filter((g) => g.count === 4)).toHaveLength(8);
+    for (const group of groups) {
+      expect(group.files).toHaveLength(group.count);
+      expect(group.files.every((f) => f.hash === group.hash && f.filename === group.name)).toBe(true);
+      expect(group.files.every((f) => f.directory.startsWith('C:/') || f.directory.startsWith('D:/'))).toBe(true);
+      expect(group.directories.every((d) => d.startsWith('C:/') || d.startsWith('D:/'))).toBe(true);
+      expect(group.size).toBe(640_000);
+      expect(group.redundantSpace).toBe((group.count - 1) * group.size);
+    }
+    const totalRedundant = groups.reduce((sum, g) => sum + g.redundantSpace, 0);
+    expect(totalRedundant).toBe(expected.redundantSpace);
   });
 });

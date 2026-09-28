@@ -4,10 +4,10 @@ import { Search } from 'lucide-react';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DuplicateGroupTable } from './DuplicateGroupTable';
 import { DirectoryPicker } from './DirectoryPicker';
-import { groups } from '../../lib/mock-data';
 import { useApp } from '../../lib/app-context';
+import type { DuplicateGroup } from '../../lib/types';
 
-export function DuplicatesPage() {
+export function DuplicatesPage({ groups }: { groups: DuplicateGroup[] }) {
   const { keepers, toggleKeeper, setSelectedFile } = useApp();
   const [fileQuery, setFileQuery] = useState('');
   const [extension, setExtension] = useState('All extensions');
@@ -46,9 +46,9 @@ export function DuplicatesPage() {
               (countFilter === '2 files' && g.count === 2) ||
               (countFilter === '3+ files' && g.count >= 3)) &&
             (sizeFilter === 'All sizes' ||
-              (sizeFilter === 'Under 10 MB' && g.files[0].size < 10000000) ||
-              (sizeFilter === '10–25 MB' && g.files[0].size >= 10000000 && g.files[0].size <= 25000000) ||
-              (sizeFilter === 'Over 25 MB' && g.files[0].size > 25000000)),
+              (sizeFilter === 'Under 10 MB' && g.size < 10000000) ||
+              (sizeFilter === '10–25 MB' && g.size >= 10000000 && g.size <= 25000000) ||
+              (sizeFilter === 'Over 25 MB' && g.size > 25000000)),
         ),
     [fileQuery, extension, appliedDirectories, countFilter, sizeFilter, groups],
   );

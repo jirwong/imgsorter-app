@@ -20,8 +20,8 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
   const sorted = useMemo(
     () =>
       [...groups].sort((a, b) => {
-        const av = sortKey === 'count' ? a.count : sortKey === 'redundant' ? parseFloat(a.space) : a.name;
-        const bv = sortKey === 'count' ? b.count : sortKey === 'redundant' ? parseFloat(b.space) : b.name;
+        const av = sortKey === 'count' ? a.count : sortKey === 'redundant' ? a.redundantSpace : a.name;
+        const bv = sortKey === 'count' ? b.count : sortKey === 'redundant' ? b.redundantSpace : b.name;
         const result =
           typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
         return direction === 'asc' ? result : -result;
@@ -62,12 +62,12 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
         </Table.Thead>
         <Table.Tbody>
           {sorted.map((g) => (
-            <Fragment key={g.hash}>
-              <Table.Tr className="group-row" onClick={() => setExpanded(expanded === g.hash ? null : g.hash)}>
+            <Fragment key={g.key}>
+              <Table.Tr className="group-row" onClick={() => setExpanded(expanded === g.key ? null : g.key)}>
                 <Table.Td>
                   <Group gap={6}>
                     <span className="chevron">
-                      {expanded === g.hash ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      {expanded === g.key ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
                     <Badge size="xs" color={g.count > 2 ? 'orange' : 'gray'}>
                       ×{g.count}
@@ -79,7 +79,7 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
                 </Table.Td>
                 <Table.Td colSpan={5}>
                   <Text size="xs" c="dimmed">
-                    {g.hash} · {g.space} redundant
+                    {g.hash} · {formatBytes(g.redundantSpace)} redundant
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -88,7 +88,7 @@ export function DuplicateGroupTable({ groups, keepers, onToggleKeeper, onSelect 
                   </Text>
                 </Table.Td>
               </Table.Tr>
-              {expanded === g.hash &&
+              {expanded === g.key &&
                 g.files.map((e) => (
                   <Table.Tr key={e.id} className={keepers.includes(e.id) ? 'keeper-row' : ''}>
                     <Table.Td>

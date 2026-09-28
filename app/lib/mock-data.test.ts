@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { directoryTree, entries, groups, initialLogs, thumbs } from './mock-data';
-import type { DirectoryNode, DuplicateGroup, Entry } from './types';
+import { directoryTree, entries, initialLogs, thumbs } from './mock-data';
+import type { DirectoryNode, Entry } from './types';
 
 function isEntry(e: Entry): boolean {
   return (
@@ -19,17 +19,6 @@ function isDirectoryNode(n: DirectoryNode): boolean {
   return typeof n.label === 'string' && typeof n.path === 'string';
 }
 
-function isDuplicateGroup(g: DuplicateGroup): boolean {
-  return (
-    typeof g.hash === 'string' &&
-    typeof g.name === 'string' &&
-    typeof g.count === 'number' &&
-    typeof g.space === 'string' &&
-    Array.isArray(g.files) &&
-    g.files.every(isEntry)
-  );
-}
-
 describe('mock-data', () => {
   it('has 18 valid entries', () => {
     expect(entries).toHaveLength(18);
@@ -39,12 +28,6 @@ describe('mock-data', () => {
   it('entries keep the prototype id sequence', () => {
     expect(entries[0].id).toBe(1);
     expect(entries[17].id).toBe(18);
-  });
-
-  it('has 3 valid duplicate groups whose files are entries', () => {
-    expect(groups).toHaveLength(3);
-    expect(groups.every(isDuplicateGroup)).toBe(true);
-    expect(groups[0].files).toEqual(entries.slice(0, 5));
   });
 
   it('has a valid 3-root directory tree', () => {

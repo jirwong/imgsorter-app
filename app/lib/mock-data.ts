@@ -1,4 +1,4 @@
-import type { DirectoryNode, DuplicateGroup, Entry, LogEntry } from './types';
+import type { DirectoryNode, Entry, LogEntry } from './types';
 
 export const thumbs = [
   'https://images.unsplash.com/photo-1500534623283-312aade485b7?w=200&q=70',
@@ -25,12 +25,6 @@ export const entries: Entry[] = Array.from({ length: 18 }, (_, i) => ({
   hash: i % 5 === 0 ? null : `sha256-${['a1f9', 'b82c', 'c31e', 'd94a'][i % 4]}`,
   path: `C:/Media/2025/${i % 2 ? 'Trips' : 'Library'}/file-${i + 1}.jpg`,
 }));
-
-export const groups: DuplicateGroup[] = [
-  { hash: 'sha256-a1f9', name: 'mountain-lake.jpg', count: 5, space: '112.8 MB', files: entries.slice(0, 5) },
-  { hash: 'sha256-b82c', name: 'shoreline.jpg', count: 3, space: '44.2 MB', files: entries.slice(5, 8) },
-  { hash: 'sha256-c31e', name: 'forest-trail.jpg', count: 2, space: '9.7 MB', files: entries.slice(8, 10) },
-];
 
 export const directoryTree: DirectoryNode[] = [
   {
