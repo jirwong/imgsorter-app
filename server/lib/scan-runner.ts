@@ -44,23 +44,34 @@ export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): 
     runner.close();
   }
 
-  const db = new Database(sampleDbPath());
-  db.prepare(
-    `UPDATE entries SET
-       directory = replace(replace(directory, @root, '@fixtures'), char(92), '/'),
-       path = replace(replace(path, @root, '@fixtures'), char(92), '/'),
-       birthtime = '2025-0' || ((id % 8) + 1) || '-1' || (id % 9) || 'T10:24:00Z'`,
-  ).run({ root: fixturesDir() });
-  db.close();
+  try {
+    const db = new Database(sampleDbPath());
+    try {
+      db.prepare(
+        `UPDATE entries SET
+           directory = replace(replace(directory, @root, '@fixtures'), char(92), '/'),
+           path = replace(replace(path, @root, '@fixtures'), char(92), '/'),
+           birthtime = '2025-0' || ((id % 8) + 1) || '-1' || (id % 9) || 'T10:24:00Z'`,
+      ).run({ root: fixturesDir() });
+    } finally {
+      db.close();
+    }
 
-  const service = new DbService(sampleDbPath());
-  service.updateFileRecords();
-  service.close();
-
-  removeFixtureTree();
+    const service = new DbService(sampleDbPath());
+    try {
+      service.updateFileRecords();
+    } finally {
+      service.close();
+    }
+  } finally {
+    removeFixtureTree();
+  }
 
   if (failure) {
     throw failure;
   }
-  return summary as RunSummary;
+  if (!summary) {
+    throw new Error('Scan completed without a summary');
+  }
+  return summary;
 }
