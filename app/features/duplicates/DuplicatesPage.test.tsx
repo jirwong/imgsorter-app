@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { AppProvider } from '../../lib/app-context';
 import { DuplicatesPage } from './DuplicatesPage';
@@ -30,16 +30,31 @@ const groups: DuplicateGroup[] = [
   },
 ];
 
-describe('DuplicatesPage', () => {
-  it('renders the provided groups with a zero-keeper summary', () => {
-    render(
-      <MantineProvider defaultColorScheme="dark">
-        <AppProvider>
-          <DuplicatesPage groups={groups} />
-        </AppProvider>
-      </MantineProvider>,
-    );
+function renderPage() {
+  render(
+    <MantineProvider defaultColorScheme="dark">
+      <AppProvider>
+        <DuplicatesPage groups={groups} />
+      </AppProvider>
+    </MantineProvider>,
+  );
+}
+
+describe('DuplicatesPage keepers', () => {
+  it('allows at most one keeper per group', () => {
+    renderPage();
     expect(screen.getByText('1 groups · 2 files · 0 keepers')).toBeInTheDocument();
-    expect(screen.getByText('dup.jpg')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('dup.jpg'));
+    expect(screen.getAllByRole('button', { name: 'Keep' })).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
+    expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
+    expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keeper' }));
+    expect(screen.getByText('1 groups · 2 files · 0 keepers')).toBeInTheDocument();
   });
 });

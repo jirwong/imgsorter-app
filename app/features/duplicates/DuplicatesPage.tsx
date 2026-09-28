@@ -8,7 +8,8 @@ import { useApp } from '../../lib/app-context';
 import type { DuplicateGroup } from '../../lib/types';
 
 export function DuplicatesPage({ groups }: { groups: DuplicateGroup[] }) {
-  const { keepers, toggleKeeper, setSelectedFile } = useApp();
+  const { setSelectedFile } = useApp();
+  const [keeperByGroup, setKeeperByGroup] = useState<Record<string, number>>({});
   const [fileQuery, setFileQuery] = useState('');
   const [extension, setExtension] = useState('All extensions');
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
@@ -55,6 +56,16 @@ export function DuplicatesPage({ groups }: { groups: DuplicateGroup[] }) {
 
   const visibleFiles = useMemo(() => visibleGroups.reduce((n, g) => n + g.files.length, 0), [visibleGroups]);
 
+  const toggleKeeper = (groupKey: string, id: number) =>
+    setKeeperByGroup((current) => {
+      if (current[groupKey] === id) {
+        const next = { ...current };
+        delete next[groupKey];
+        return next;
+      }
+      return { ...current, [groupKey]: id };
+    });
+
   return (
     <>
       <PageHeading
@@ -91,12 +102,12 @@ export function DuplicatesPage({ groups }: { groups: DuplicateGroup[] }) {
             data={['All extensions', ...extensions]}
           />
           <Text size="xs" c="dimmed" className="filter-count">
-            {visibleGroups.length} groups · {visibleFiles} files · {keepers.length} keepers
+            {visibleGroups.length} groups · {visibleFiles} files · {Object.keys(keeperByGroup).length} keepers
           </Text>
         </Group>
         <DuplicateGroupTable
           groups={visibleGroups}
-          keepers={keepers}
+          keeperByGroup={keeperByGroup}
           onToggleKeeper={toggleKeeper}
           onSelect={setSelectedFile}
         />
