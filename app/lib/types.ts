@@ -55,3 +55,25 @@ export type AnalyticsData = { rankedBySize: SizeRankRow[]; rankedByCopies: CopyR
 export type ShellData = { files: number; size: number; roots: string[]; extensions: string[]; duplicateGroups: number };
 
 export type FilesInput = { query: string; dir: string; ext: string; selectedDirs: string[] };
+
+export type ScanRunStatus = 'idle' | 'running' | 'completed' | 'cancelled' | 'error';
+
+export type ScanState = {
+  status: ScanRunStatus;
+  phase: 'scan' | 'resync' | 'records' | null;
+  filesProcessed: number;
+  totalFiles: number | null;
+  currentFile: string | null;
+  currentDirectory: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  summary: {
+    filesScanned: number;
+    entriesWritten: number;
+    duplicateGroups: number;
+    duplicateFiles: number;
+    errors: number;
+  } | null;
+  error: string | null;
+  log: LogEntry[];
+};
