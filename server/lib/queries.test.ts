@@ -69,6 +69,7 @@ describe('queries against the committed sample db', () => {
     const shell = getShellData();
     expect(shell.files).toBe(expected.totalFiles);
     expect(shell.size).toBe(expected.totalSize);
+    expect(shell.duplicateGroups).toBe(expected.duplicateGroups);
     expect(shell.roots).toContain('C:/Media/2025');
     expect(shell.extensions).toEqual(['.gif', '.jpg', '.png']);
   });
