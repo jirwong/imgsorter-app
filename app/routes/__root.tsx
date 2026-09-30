@@ -7,6 +7,7 @@ import { AppFooter } from '../components/common/AppFooter';
 import { AppHeader } from '../components/common/AppHeader';
 import { Sidebar } from '../components/common/Sidebar';
 import { FilePreviewDrawer } from '../components/common/FilePreviewDrawer';
+import { ScanRevalidator } from '../components/common/ScanRevalidator';
 import { AppProvider } from '../lib/app-context';
 import { getShellData } from '../../server/routes/shell';
 
@@ -61,6 +62,7 @@ function RootDocument({ children }: { children: ReactNode }) {
               </main>
             </div>
             <FilePreviewDrawer />
+            <ScanRevalidator />
           </AppProvider>
         </MantineProvider>
         <Scripts />
