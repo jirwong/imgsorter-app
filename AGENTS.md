@@ -78,6 +78,13 @@ review`.
 - Phase 2 (vendor engine + wire read-only pages to real SQLite) — **complete**
   (PRs #15–#26). Plan at `docs/superpowers/plans/2026-09-08-phase2-real-data.md`;
   spec at `docs/superpowers/specs/2026-09-08-phase2-real-data-design.md`.
-- Phase 3 (duplicates feature + real scan with progress streaming) — not started;
-  begins with Phase 0 (brainstorm → spec → plan → approval).
+- Phase 3 (duplicates feature + real scan with progress streaming) — **complete**
+  (Phase 3a PRs #28–#29; Phase 3b PRs #30–#35 plus this finalization PR). Specs at
+  `docs/superpowers/specs/2026-09-27-phase3a-duplicates-design.md` and
+  `docs/superpowers/specs/2026-09-28-phase3b-scan-progress-design.md`; plan at
+  `docs/superpowers/plans/2026-09-28-phase3b-scan-progress.md`. Drives the vendored
+  engine from the UI ("Scan library") with in-memory progress polling, cancel, a real
+  Duplicates badge, and no dead mock plumbing in `app-context`.
+- Phase 4 (Preferences persistence via `app_config`, directory management, Reveal/Open +
+  keeper actions) — next; begins with Phase 0 (brainstorm → spec → plan → approval).
 - Roadmap: `docs/ROADMAP.md`.
