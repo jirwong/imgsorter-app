@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Link, useLoaderData, useRouter } from '@tanstack/react-router';
-import { useApp } from '../../lib/app-context';
+import { startScan, useScanStatus } from '../../lib/scan-store';
 import { formatBytes } from '../../lib/format';
 
 const navItems: { label: string; to: string; icon: LucideIcon }[] = [
@@ -24,12 +24,16 @@ const navItems: { label: string; to: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar() {
-  const { startScan } = useApp();
   const router = useRouter();
-  const { files, size } = useLoaderData({ from: '__root__' });
+  const { files, size, duplicateGroups } = useLoaderData({ from: '__root__' });
+  const scan = useScanStatus();
+
+  const running = scan.status === 'running';
+  const percent =
+    running && scan.totalFiles ? Math.round((scan.filesProcessed / scan.totalFiles) * 100) : running ? 0 : 100;
 
   const handleScan = () => {
-    startScan();
+    void startScan();
     router.navigate({ to: '/activity' as string });
   };
 
@@ -50,13 +54,13 @@ export function Sidebar() {
       <div className="scan-state">
         <Group justify="space-between">
           <Text size="xs" c="dimmed">
-            INDEXING COMPLETE
+            {running ? 'INDEXING' : 'INDEXING COMPLETE'}
           </Text>
           <Text size="xs" c="cyan">
-            100%
+            {percent}%
           </Text>
         </Group>
-        <Progress value={100} color="cyan" size="xs" mt={7} />
+        <Progress value={percent} color="cyan" size="xs" mt={7} />
         <Text size="xs" c="dimmed" mt={8}>
           {files.toLocaleString('en-US')} files · {formatBytes(size)}
         </Text>
@@ -68,7 +72,7 @@ export function Sidebar() {
             {label}
             {label === 'Duplicates' && (
               <Badge size="xs" color="orange">
-                3
+                {duplicateGroups}
               </Badge>
             )}
           </Link>
