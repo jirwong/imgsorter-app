@@ -13,7 +13,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | ----- | ----- | -------- | ------ |
 | 1 | TanStack Start UI recreation (mock data) | Modular, URL-routed UI; parity with imgsorter-ui-v1 prototype | `[x]` |
 | 2 | Vendor engine server-side; wire read-only pages (Overview, Unique Files, Browse, Analytics) + shell totals to real SQLite data | Real data on read-only pages | `[x]` |
-| 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[ ]` |
+| 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[x]` |
 | 4 | Preferences persistence (`app_config`) + directory management + Reveal/Open/keeper actions | Full config persistence + actions | `[ ]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[ ]` |
 
@@ -45,6 +45,7 @@ phase's brainstorm runs.*
 | ----- | ---- |
 | 1 | [2026-09-02-phase1-ui-recreation-design.md](superpowers/specs/2026-09-02-phase1-ui-recreation-design.md) |
 | 2 | [2026-09-08-phase2-real-data-design.md](superpowers/specs/2026-09-08-phase2-real-data-design.md) |
+| 3 | [2026-09-27-phase3a-duplicates-design.md](superpowers/specs/2026-09-27-phase3a-duplicates-design.md) · [2026-09-28-phase3b-scan-progress-design.md](superpowers/specs/2026-09-28-phase3b-scan-progress-design.md) |
 
 ## How to add a phase
 
