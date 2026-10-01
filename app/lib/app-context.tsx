@@ -1,7 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactElement, type ReactNode } from 'react';
-import type { Entry, LogEntry } from './types';
-import { entries, initialLogs } from './mock-data';
-import { applyFilters } from './filter-pipeline';
+import type { Entry } from './types';
 
 export type AppContextValue = {
   query: string;
@@ -14,15 +12,8 @@ export type AppContextValue = {
   setSelectedDirs: (dirs: string[]) => void;
   toggleSelectedDir: (path: string) => void;
   clearSelectedDirs: () => void;
-  filtered: Entry[];
   selectedFile: Entry | null;
   setSelectedFile: (e: Entry | null) => void;
-  scanActive: boolean;
-  logs: LogEntry[];
-  startScan: () => void;
-  keepers: number[];
-  toggleKeeper: (id: number) => void;
-  setKeepers: (ids: number[]) => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -33,11 +24,6 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
   const [ext, setExt] = useState('All types');
   const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<Entry | null>(null);
-  const [scanActive, setScanActive] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>(initialLogs);
-  const [keepers, setKeepers] = useState<number[]>([]);
-
-  const filtered = useMemo(() => applyFilters(entries, query, dir, ext, selectedDirs), [query, dir, ext, selectedDirs]);
 
   const toggleSelectedDir = useCallback((path: string) => {
     setSelectedDirs((current) =>
@@ -46,18 +32,6 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
   }, []);
 
   const clearSelectedDirs = useCallback(() => setSelectedDirs([]), []);
-
-  const startScan = useCallback(() => {
-    setScanActive(true);
-    setLogs((current) => [
-      { time: 'Now', event: 'Scan started', directory: 'Enabled directories', status: 'Running' },
-      ...current,
-    ]);
-  }, []);
-
-  const toggleKeeper = useCallback((id: number) => {
-    setKeepers((current) => (current.includes(id) ? current.filter((k) => k !== id) : [...current, id]));
-  }, []);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -71,32 +45,10 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
       setSelectedDirs,
       toggleSelectedDir,
       clearSelectedDirs,
-      filtered,
       selectedFile,
       setSelectedFile,
-      scanActive,
-      logs,
-      startScan,
-      keepers,
-      toggleKeeper,
-      setKeepers,
     }),
-    [
-      query,
-      dir,
-      ext,
-      selectedDirs,
-      setSelectedDirs,
-      toggleSelectedDir,
-      clearSelectedDirs,
-      filtered,
-      selectedFile,
-      scanActive,
-      logs,
-      startScan,
-      keepers,
-      toggleKeeper,
-    ],
+    [query, dir, ext, selectedDirs, toggleSelectedDir, clearSelectedDirs, selectedFile],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
