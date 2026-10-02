@@ -77,3 +77,23 @@ export type ScanState = {
   error: string | null;
   log: LogEntry[];
 };
+
+export type IndexedDirectory = { path: string; enabled: boolean };
+
+export type DirectoriesConfig = {
+  indexed: IndexedDirectory[];
+  ignored: string[];
+};
+
+export type ApplicationConfig = {
+  extensions: string;
+  processDirectories: boolean;
+  updateRecords: boolean;
+  resyncDirectories: boolean;
+  verifyFiles: boolean;
+};
+
+export type AppConfig = {
+  directories: DirectoriesConfig;
+  application: ApplicationConfig;
+};
