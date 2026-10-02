@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixturesDir, sampleDbPath, virtualToReal } from './db-path';
+import { appConfigDbPath, fixturesDir, sampleDbPath, virtualToReal } from './db-path';
 
 function normalize(value: string): string {
   return value.replace(/\\/g, '/');
@@ -8,6 +8,10 @@ function normalize(value: string): string {
 describe('db-path', () => {
   it('derives the sample db path under server/data', () => {
     expect(normalize(sampleDbPath())).toMatch(/\/server\/data\/imgsorter\.db$/);
+  });
+
+  it('derives the app config db path under server/data', () => {
+    expect(normalize(appConfigDbPath())).toMatch(/\/server\/data\/app-config\.db$/);
   });
 
   it('derives the fixtures dir under server/.fixtures', () => {
