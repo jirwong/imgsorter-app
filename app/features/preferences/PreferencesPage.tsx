@@ -1,36 +1,30 @@
 import { useMemo, useState } from 'react';
 import { Badge, Button, Card, Checkbox, Group, Switch, Tabs, Text, TextInput } from '@mantine/core';
 import { FolderOpen, ShieldCheck } from 'lucide-react';
+import { useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
-import { preferences as defaultPreferences } from '../../lib/mock-data';
+import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
+import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
+import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
-type IndexedRow = { path: string; enabled: boolean; lastScan: string; files: string };
-
-export function PreferencesPage() {
-  const [indexed, setIndexed] = useState<IndexedRow[]>(defaultPreferences.indexed);
-  const [ignored, setIgnored] = useState<string[]>(defaultPreferences.ignored);
+export function PreferencesPage({ config }: { config: AppConfig }) {
+  const router = useRouter();
+  const [indexed, setIndexed] = useState<IndexedDirectory[]>(config.directories.indexed);
+  const [ignored, setIgnored] = useState<string[]>(config.directories.ignored);
   const [indexedPath, setIndexedPath] = useState('');
   const [ignoredPath, setIgnoredPath] = useState('');
   const [message, setMessage] = useState('');
-  const [databaseName, setDatabaseName] = useState(defaultPreferences.databaseName);
-  const [extensions, setExtensions] = useState(defaultPreferences.extensions);
-  const [processDirectories, setProcessDirectories] = useState(true);
-  const [updateRecords, setUpdateRecords] = useState(true);
-  const [resyncDirectories, setResyncDirectories] = useState(false);
-  const [verifyFiles, setVerifyFiles] = useState(false);
+  const [application, setApplication] = useState<ApplicationConfig>(config.application);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('application');
 
   const activeCount = useMemo(() => indexed.filter((item) => item.enabled).length, [indexed]);
 
-  const resetDefaults = () => {
-    setDatabaseName(defaultPreferences.databaseName);
-    setExtensions(defaultPreferences.extensions);
-    setProcessDirectories(true);
-    setUpdateRecords(true);
-    setResyncDirectories(false);
-    setVerifyFiles(false);
-    setSaved(false);
+  const persistDirectories = async (nextIndexed: IndexedDirectory[], nextIgnored: string[]): Promise<void> => {
+    const result = await saveDirectories({ data: { indexed: nextIndexed, ignored: nextIgnored } });
+    setIndexed(result.directories.indexed);
+    setIgnored(result.directories.ignored);
+    await router.invalidate();
   };
 
   const addIndexed = () => {
@@ -43,9 +37,9 @@ export function PreferencesPage() {
       setMessage('That directory is already configured.');
       return;
     }
-    setIndexed((items) => [...items, { path, enabled: true, lastScan: 'Not scanned yet', files: '—' }]);
+    setMessage('');
     setIndexedPath('');
-    setMessage('Indexed directory added.');
+    void persistDirectories([...indexed, { path, enabled: true }], ignored);
   };
 
   const addIgnored = () => {
@@ -58,9 +52,21 @@ export function PreferencesPage() {
       setMessage('That directory is already configured.');
       return;
     }
-    setIgnored((items) => [...items, path]);
+    setMessage('');
     setIgnoredPath('');
-    setMessage('Ignored directory added.');
+    void persistDirectories(indexed, [...ignored, path]);
+  };
+
+  const resetDefaults = () => {
+    setApplication(DEFAULT_APP_CONFIG.application);
+    setSaved(false);
+  };
+
+  const saveApplication = async (): Promise<void> => {
+    const result = await saveApplicationSettings({ data: application });
+    setApplication(result.application);
+    setSaved(true);
+    await router.invalidate();
   };
 
   return (
@@ -116,10 +122,11 @@ export function PreferencesPage() {
                     <Checkbox
                       checked={item.enabled}
                       onChange={() =>
-                        setIndexed((items) =>
-                          items.map((current) =>
+                        void persistDirectories(
+                          indexed.map((current) =>
                             current.path === item.path ? { ...current, enabled: !current.enabled } : current,
                           ),
+                          ignored,
                         )
                       }
                       aria-label={`Enable ${item.path}`}
@@ -128,14 +135,19 @@ export function PreferencesPage() {
                     <div className="preference-path">
                       <Text size="sm">{item.path}</Text>
                       <Text size="xs" c="dimmed">
-                        {item.files} files · Last scan {item.lastScan}
+                        — files · Not scanned yet
                       </Text>
                     </div>
                     <Button
                       variant="subtle"
                       size="xs"
                       color="red"
-                      onClick={() => setIndexed((items) => items.filter((current) => current.path !== item.path))}
+                      onClick={() =>
+                        void persistDirectories(
+                          indexed.filter((current) => current.path !== item.path),
+                          ignored,
+                        )
+                      }
                     >
                       Remove
                     </Button>
@@ -181,7 +193,12 @@ export function PreferencesPage() {
                       variant="subtle"
                       size="xs"
                       color="red"
-                      onClick={() => setIgnored((items) => items.filter((item) => item !== path))}
+                      onClick={() =>
+                        void persistDirectories(
+                          indexed,
+                          ignored.filter((item) => item !== path),
+                        )
+                      }
                     >
                       Remove
                     </Button>
@@ -204,19 +221,16 @@ export function PreferencesPage() {
             <div className="settings-grid">
               <TextInput
                 label="Local database name"
-                description="SQLite database used to store indexed file metadata."
-                value={databaseName}
-                onChange={(event) => {
-                  setDatabaseName(event.currentTarget.value);
-                  setSaved(false);
-                }}
+                description="Fixed at server/data/imgsorter.db."
+                value="server/data/imgsorter.db"
+                disabled
               />
               <TextInput
                 label="File extensions"
                 description="Comma-separated extensions to include."
-                value={extensions}
+                value={application.extensions}
                 onChange={(event) => {
-                  setExtensions(event.currentTarget.value);
+                  setApplication((current) => ({ ...current, extensions: event.currentTarget.value }));
                   setSaved(false);
                 }}
               />
@@ -230,8 +244,11 @@ export function PreferencesPage() {
                   </Text>
                 </div>
                 <Switch
-                  checked={processDirectories}
-                  onChange={(event) => setProcessDirectories(event.currentTarget.checked)}
+                  checked={application.processDirectories}
+                  onChange={(event) => {
+                    setApplication((current) => ({ ...current, processDirectories: event.currentTarget.checked }));
+                    setSaved(false);
+                  }}
                   aria-label="Process configured directories"
                 />
               </div>
@@ -243,8 +260,11 @@ export function PreferencesPage() {
                   </Text>
                 </div>
                 <Switch
-                  checked={updateRecords}
-                  onChange={(event) => setUpdateRecords(event.currentTarget.checked)}
+                  checked={application.updateRecords}
+                  onChange={(event) => {
+                    setApplication((current) => ({ ...current, updateRecords: event.currentTarget.checked }));
+                    setSaved(false);
+                  }}
                   aria-label="Update duplicate records"
                 />
               </div>
@@ -256,15 +276,20 @@ export function PreferencesPage() {
                   </Text>
                 </div>
                 <Switch
-                  checked={resyncDirectories}
+                  checked={application.resyncDirectories}
                   onChange={(event) => {
-                    setResyncDirectories(event.currentTarget.checked);
-                    if (!event.currentTarget.checked) setVerifyFiles(false);
+                    const resyncDirectories = event.currentTarget.checked;
+                    setApplication((current) => ({
+                      ...current,
+                      resyncDirectories,
+                      verifyFiles: resyncDirectories ? current.verifyFiles : false,
+                    }));
+                    setSaved(false);
                   }}
                   aria-label="Resync directories"
                 />
               </div>
-              {resyncDirectories && (
+              {application.resyncDirectories && (
                 <div className="setting-row">
                   <div>
                     <Text size="sm">Verify actual files</Text>
@@ -273,8 +298,11 @@ export function PreferencesPage() {
                     </Text>
                   </div>
                   <Switch
-                    checked={verifyFiles}
-                    onChange={(event) => setVerifyFiles(event.currentTarget.checked)}
+                    checked={application.verifyFiles}
+                    onChange={(event) => {
+                      setApplication((current) => ({ ...current, verifyFiles: event.currentTarget.checked }));
+                      setSaved(false);
+                    }}
                     aria-label="Verify actual files"
                   />
                 </div>
@@ -284,7 +312,7 @@ export function PreferencesPage() {
               <Button variant="subtle" onClick={resetDefaults}>
                 Reset to defaults
               </Button>
-              <Button color="cyan" onClick={() => setSaved(true)}>
+              <Button color="cyan" onClick={() => void saveApplication()}>
                 Save preferences
               </Button>
             </Group>

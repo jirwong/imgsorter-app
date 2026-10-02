@@ -71,13 +71,3 @@ export const runSteps: [string, string][] = [
 ];
 
 export const largestFiles: Entry[] = entries.slice(0, 4);
-
-export const preferences = {
-  indexed: [
-    { path: 'C:/Media/2025', enabled: true, lastScan: 'Today, 09:42', files: '12,842' },
-    { path: 'D:/Camera Imports', enabled: true, lastScan: 'Today, 09:40', files: '5,584' },
-  ],
-  ignored: ['C:/Media/2025/Cache', 'C:/Media/2024/Exports'],
-  databaseName: 'local.db',
-  extensions: 'jpg, png, gif, jpeg, mp4, mov',
-};
