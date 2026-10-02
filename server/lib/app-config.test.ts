@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -61,6 +61,11 @@ describe('createAppConfigStore', () => {
     });
     expect(saved.directories.indexed).toEqual([]);
     expect(saved.directories.ignored).toEqual(['c:/media/keep']);
+  });
+
+  it('writes only to its own file', () => {
+    store.saveDirectories({ indexed: [], ignored: [] });
+    expect(readdirSync(dir)).toEqual(['app-config.db']);
   });
 
   it('falls back to defaults when stored JSON is invalid', () => {
