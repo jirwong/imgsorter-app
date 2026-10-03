@@ -30,6 +30,7 @@ spec → plan → PR loop):
   Spec: [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md). **Complete.**
 - **4b — Scan configured directories:** replace the fixture-driven scan source with the
   persisted `app_config` directories; surface real per-directory counts / last scan.
+  Spec: [2026-10-03-phase4b-real-scan-design.md](superpowers/specs/2026-10-03-phase4b-real-scan-design.md). **Complete.**
 - **4c — Native OS actions:** make `FilePreviewDrawer`'s **Reveal** / **Open file** real, and
   add a **server-side native folder picker** — a "Browse…" button next to the Preferences
   add-directory input that opens the OS folder dialog from the local server and returns the
@@ -65,6 +66,7 @@ spec → plan → PR loop):
 | 2 | [2026-09-08-phase2-real-data-design.md](superpowers/specs/2026-09-08-phase2-real-data-design.md) |
 | 3 | [2026-09-27-phase3a-duplicates-design.md](superpowers/specs/2026-09-27-phase3a-duplicates-design.md) · [2026-09-28-phase3b-scan-progress-design.md](superpowers/specs/2026-09-28-phase3b-scan-progress-design.md) |
 | 4a | [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md) |
+| 4b | [2026-10-03-phase4b-real-scan-design.md](superpowers/specs/2026-10-03-phase4b-real-scan-design.md) |
 
 ## How to add a phase
 
