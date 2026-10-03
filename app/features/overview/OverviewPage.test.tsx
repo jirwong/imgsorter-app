@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import type { LastScan } from '../../lib/types';
+import type { Entry, LastScan, OverviewData } from '../../lib/types';
 
 const shell = vi.hoisted(() => ({ lastScan: null as LastScan | null }));
 
@@ -15,8 +15,17 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 import { MantineProvider } from '@mantine/core';
 import { OverviewPage } from './OverviewPage';
-import { entries } from '../../lib/mock-data';
-import type { OverviewData } from '../../lib/types';
+
+const entries: Entry[] = [1, 2, 3, 4].map((id) => ({
+  id,
+  size: 6_400,
+  directory: 'C:/Media/2025',
+  extension: '.jpg',
+  filename: `file-${id}.jpg`,
+  birthtime: '2025-01-01T00:00:00Z',
+  hash: `h${id}`,
+  path: `C:/Media/2025/file-${id}.jpg`,
+}));
 
 const data: OverviewData = {
   totalFiles: 1272,
@@ -29,7 +38,7 @@ const data: OverviewData = {
     { path: 'C:/Media/2024', share: 30, size: 120_000_000 },
     { path: 'D:/Camera Imports', share: 18, size: 71_000_000 },
   ],
-  largestFiles: entries.slice(0, 4),
+  largestFiles: entries,
 };
 
 const scan: LastScan = {

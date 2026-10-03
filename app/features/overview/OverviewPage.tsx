@@ -6,7 +6,7 @@ import { MetricCard } from './MetricCard';
 import { StorageMap } from './StorageMap';
 import { LastRunCard } from './LastRunCard';
 import { formatBytes } from '../../lib/format';
-import { thumbs } from '../../lib/mock-data';
+import { thumbs } from '../../lib/placeholder-thumbs';
 import type { OverviewData } from '../../lib/types';
 
 export function OverviewPage({ data }: { data: OverviewData }) {
