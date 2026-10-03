@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Badge, Button, Card, Checkbox, Group, Switch, Tabs, Text, TextInput } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { FolderOpen, ShieldCheck } from 'lucide-react';
 import { useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
 import { normalizeDirectoryPath } from '../../lib/directory-path';
 import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
+import { pickDirectory } from '../../../server/routes/native';
 import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
 function metaKey(path: string): string {
@@ -27,6 +29,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   const [application, setApplication] = useState<ApplicationConfig>(config.application);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('application');
+  const [browsing, setBrowsing] = useState<'indexed' | 'ignored' | null>(null);
 
   const activeCount = useMemo(() => indexed.filter((item) => item.enabled).length, [indexed]);
 
@@ -70,6 +73,30 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   const resetDefaults = () => {
     setApplication(DEFAULT_APP_CONFIG.application);
     setSaved(false);
+  };
+
+  const browse = async (target: 'indexed' | 'ignored'): Promise<void> => {
+    setBrowsing(target);
+    try {
+      const result = await pickDirectory();
+      if (result.status === 'picked') {
+        if (target === 'indexed') setIndexedPath(result.path);
+        else setIgnoredPath(result.path);
+        return;
+      }
+      if (result.status === 'canceled') return;
+      const message =
+        result.status === 'busy'
+          ? 'A folder dialog is already open.'
+          : result.status === 'timeout'
+            ? 'The folder dialog timed out.'
+            : result.status === 'unsupported'
+              ? 'The folder picker is not available.'
+              : 'The folder picker failed.';
+      notifications.show({ color: 'red', message });
+    } finally {
+      setBrowsing(null);
+    }
   };
 
   const saveApplication = async (): Promise<void> => {
@@ -124,6 +151,14 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                     if (event.key === 'Enter') addIndexed();
                   }}
                 />
+                <Button
+                  variant="default"
+                  loading={browsing === 'indexed'}
+                  disabled={browsing !== null}
+                  onClick={() => void browse('indexed')}
+                >
+                  Browse…
+                </Button>
                 <Button onClick={addIndexed}>Add directory</Button>
               </Group>
               <div className="preference-list">
@@ -188,6 +223,14 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                     if (event.key === 'Enter') addIgnored();
                   }}
                 />
+                <Button
+                  variant="default"
+                  loading={browsing === 'ignored'}
+                  disabled={browsing !== null}
+                  onClick={() => void browse('ignored')}
+                >
+                  Browse…
+                </Button>
                 <Button onClick={addIgnored}>Add directory</Button>
               </Group>
               <div className="preference-list">
