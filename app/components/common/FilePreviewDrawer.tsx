@@ -1,11 +1,48 @@
+import { useEffect, useState } from 'react';
 import { Button, Drawer, Group, Table, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { FileImage, FolderOpen } from 'lucide-react';
 import { useApp } from '../../lib/app-context';
 import { thumbs } from '../../lib/mock-data';
 import { formatBytes } from '../../lib/format';
+import { openEntry, revealEntry } from '../../../server/routes/native';
+import type { NativeActionFailure } from '../../lib/types';
+
+const FAILURE_MESSAGES: Record<NativeActionFailure, string> = {
+  'not-found': 'File not found.',
+  missing: 'File not found.',
+  unsupported: 'This action is not supported here.',
+  error: 'The action failed.',
+};
 
 export function FilePreviewDrawer() {
   const { selectedFile, setSelectedFile } = useApp();
+  const [busy, setBusy] = useState<'reveal' | 'open' | null>(null);
+
+  useEffect(() => {
+    setBusy(null);
+  }, [selectedFile]);
+
+  const run = async (kind: 'reveal' | 'open'): Promise<void> => {
+    if (!selectedFile) return;
+    setBusy(kind);
+    try {
+      const result =
+        kind === 'reveal'
+          ? await revealEntry({ data: { id: selectedFile.id } })
+          : await openEntry({ data: { id: selectedFile.id } });
+      if (result.ok) {
+        notifications.show({
+          color: 'cyan',
+          message: kind === 'reveal' ? 'File shown in the file manager.' : 'Opened in the default application.',
+        });
+      } else {
+        notifications.show({ color: 'red', message: FAILURE_MESSAGES[result.reason] });
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <Drawer
@@ -45,10 +82,22 @@ export function FilePreviewDrawer() {
             </Table.Tbody>
           </Table>
           <Group mt="xl">
-            <Button leftSection={<FolderOpen size={15} />} color="cyan">
+            <Button
+              leftSection={<FolderOpen size={15} />}
+              color="cyan"
+              loading={busy === 'reveal'}
+              disabled={busy !== null}
+              onClick={() => void run('reveal')}
+            >
               Reveal
             </Button>
-            <Button variant="light" leftSection={<FileImage size={15} />}>
+            <Button
+              variant="light"
+              leftSection={<FileImage size={15} />}
+              loading={busy === 'open'}
+              disabled={busy !== null}
+              onClick={() => void run('open')}
+            >
               Open file
             </Button>
           </Group>
