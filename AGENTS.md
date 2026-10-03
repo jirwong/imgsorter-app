@@ -88,11 +88,15 @@ review`.
   Duplicates badge, and no dead mock plumbing in `app-context`.
 - Phase 4 (Preferences persistence via `app_config`, directory management, native OS
   actions, keeper persistence) — **in progress**, split into 4a–4d. **4a complete**
-  (`app_config` persistence + Preferences directory management) and **4b complete**
+  (`app_config` persistence + Preferences directory management), **4b complete**
   (real configured-directory scan; app DB local + committed `fixture.db`; per-directory
-  counts/last scan). Specs at `docs/superpowers/specs/2026-10-03-phase4a-app-config-design.md`
-  and `docs/superpowers/specs/2026-10-03-phase4b-real-scan-design.md`; plans at
-  `docs/superpowers/plans/2026-10-03-phase4a-app-config.md` and
-  `docs/superpowers/plans/2026-10-03-phase4b-real-scan.md`. Next: 4c (Reveal/Open plus a
-  server-side native folder picker); 4d adds keeper persistence.
+  counts/last scan), and **4c complete** (native Reveal / Open actions and a server-side
+  folder picker; toasts via `@mantine/notifications`). Specs at
+  `docs/superpowers/specs/2026-10-03-phase4a-app-config-design.md`,
+  `docs/superpowers/specs/2026-10-03-phase4b-real-scan-design.md`, and
+  `docs/superpowers/specs/2026-10-03-phase4c-native-actions-design.md`; plans at
+  `docs/superpowers/plans/2026-10-03-phase4a-app-config.md`,
+  `docs/superpowers/plans/2026-10-03-phase4b-real-scan.md`, and
+  `docs/superpowers/plans/2026-10-03-phase4c-native-actions.md`. Next: 4d (keeper
+  persistence).
 - Roadmap: `docs/ROADMAP.md`.

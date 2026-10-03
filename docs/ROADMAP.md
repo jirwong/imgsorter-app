@@ -35,6 +35,7 @@ spec → plan → PR loop):
   add a **server-side native folder picker** — a "Browse…" button next to the Preferences
   add-directory input that opens the OS folder dialog from the local server and returns the
   picked absolute path (Windows-first, with macOS/Linux fallbacks).
+  Spec: [2026-10-03-phase4c-native-actions-design.md](superpowers/specs/2026-10-03-phase4c-native-actions-design.md). **Complete.**
 - **4d — Keeper persistence:** persist the one-per-group keeper selection.
 
 ## Dependencies
@@ -67,6 +68,7 @@ spec → plan → PR loop):
 | 3 | [2026-09-27-phase3a-duplicates-design.md](superpowers/specs/2026-09-27-phase3a-duplicates-design.md) · [2026-09-28-phase3b-scan-progress-design.md](superpowers/specs/2026-09-28-phase3b-scan-progress-design.md) |
 | 4a | [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md) |
 | 4b | [2026-10-03-phase4b-real-scan-design.md](superpowers/specs/2026-10-03-phase4b-real-scan-design.md) |
+| 4c | [2026-10-03-phase4c-native-actions-design.md](superpowers/specs/2026-10-03-phase4c-native-actions-design.md) |
 
 ## How to add a phase
 
