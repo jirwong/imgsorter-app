@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { applyFilters } from '../../app/lib/filter-pipeline';
+import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
   DirectoryNode,
@@ -225,7 +226,7 @@ export function countEntriesByDirectory(root: string): number {
   const db = openReadonly();
   if (!db) return 0;
   try {
-    const normalized = root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    const normalized = normalizeDirectoryPath(root).toLowerCase();
     const escaped = normalized.replace(/[%_]/g, (ch) => `\\${ch}`);
     const row = db
       .prepare(
