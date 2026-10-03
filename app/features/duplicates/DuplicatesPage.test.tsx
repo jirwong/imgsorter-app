@@ -1,9 +1,25 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { AppProvider } from '../../lib/app-context';
+import type { DuplicateGroup, Entry, KeeperMap } from '../../lib/types';
+
+const mocks = vi.hoisted(() => ({
+  saveKeepers: vi.fn(),
+  clearStaleKeepers: vi.fn(),
+  notifyShow: vi.fn(),
+}));
+
+vi.mock('../../../server/routes/duplicates', () => ({
+  saveKeepers: mocks.saveKeepers,
+  clearStaleKeepers: mocks.clearStaleKeepers,
+}));
+
+vi.mock('@mantine/notifications', () => ({
+  notifications: { show: mocks.notifyShow },
+}));
+
 import { DuplicatesPage } from './DuplicatesPage';
-import type { DuplicateGroup, Entry } from '../../lib/types';
 
 const entry = (id: number, directory: string): Entry => ({
   id,
@@ -30,35 +46,58 @@ const groups: DuplicateGroup[] = [
   },
 ];
 
-function renderPage() {
+function renderPage(initialKeepers: KeeperMap = {}, initialStaleKeepers = 0) {
   render(
     <MantineProvider defaultColorScheme="dark">
       <AppProvider>
-        <DuplicatesPage groups={groups} />
+        <DuplicatesPage groups={groups} initialKeepers={initialKeepers} initialStaleKeepers={initialStaleKeepers} />
       </AppProvider>
     </MantineProvider>,
   );
 }
 
 describe('DuplicatesPage keepers', () => {
-  it('allows at most one keeper per group', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.saveKeepers.mockResolvedValue({ saved: 1 });
+    mocks.clearStaleKeepers.mockResolvedValue({ staleKeepers: 0 });
+  });
+
+  it('allows at most one keeper per group and saves on toggle', async () => {
     renderPage();
     expect(screen.getByText('1 groups · 2 files · 0 keepers')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('dup.jpg'));
-    expect(screen.getAllByRole('button', { name: 'Keep' })).toHaveLength(2);
-
     fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
     expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
-    expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
-    const libraryRow = screen.getByText('C:/Media/2025/Library').closest('tr') as HTMLElement;
-    expect(within(libraryRow).getByRole('button', { name: 'Keeper' })).toBeInTheDocument();
-    const tripsRow = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
-    expect(within(tripsRow).getByRole('button', { name: 'Keep' })).toBeInTheDocument();
+    await waitFor(() => expect(mocks.saveKeepers).toHaveBeenCalledTimes(1));
+    expect(mocks.saveKeepers.mock.calls[0][0].data.keepers['h1:dup.jpg']).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Keeper' }));
     expect(screen.getByText('1 groups · 2 files · 0 keepers')).toBeInTheDocument();
+  });
+
+  it('starts from supplied keepers', () => {
+    renderPage({ 'h1:dup.jpg': 2 });
+    expect(screen.getByText('1 groups · 2 files · 1 keepers')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('dup.jpg'));
+    const libraryRow = screen.getByText('C:/Media/2025/Library').closest('tr') as HTMLElement;
+    expect(within(libraryRow).getByRole('button', { name: 'Keeper' })).toBeInTheDocument();
+  });
+
+  it('shows an error toast when the save fails', async () => {
+    mocks.saveKeepers.mockRejectedValue(new Error('boom'));
+    renderPage();
+    fireEvent.click(screen.getByText('dup.jpg'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[0]);
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+  });
+
+  it('shows the stale warning and clears it', async () => {
+    renderPage({}, 2);
+    expect(screen.getByText('2 saved keepers no longer match a group.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear saved keepers' }));
+    await waitFor(() => expect(mocks.clearStaleKeepers).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText('2 saved keepers no longer match a group.')).not.toBeInTheDocument());
   });
 });
