@@ -56,7 +56,7 @@ export function buildRevealCommand(platform: Platform, filePath: string): Native
 export function buildOpenCommand(platform: Platform, filePath: string): NativeCommand | null {
   switch (platform) {
     case 'win32':
-      return { command: 'cmd', args: ['/c', 'start', '', filePath] };
+      return { command: 'explorer', args: [filePath] };
     case 'darwin':
       return { command: 'open', args: [filePath] };
     case 'linux':

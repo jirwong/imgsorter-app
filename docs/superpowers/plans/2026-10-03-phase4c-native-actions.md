@@ -151,7 +151,7 @@ describe('command builders', () => {
   });
 
   it('builds open commands per platform', () => {
-    expect(buildOpenCommand('win32', 'C:\\a.jpg')).toEqual({ command: 'cmd', args: ['/c', 'start', '', 'C:\\a.jpg'] });
+    expect(buildOpenCommand('win32', 'C:\\a&b.jpg')).toEqual({ command: 'explorer', args: ['C:\\a&b.jpg'] });
     expect(buildOpenCommand('darwin', '/a.jpg')).toEqual({ command: 'open', args: ['/a.jpg'] });
     expect(buildOpenCommand('linux', '/a.jpg')).toEqual({ command: 'xdg-open', args: ['/a.jpg'] });
     expect(buildOpenCommand('freebsd', '/a.jpg')).toBeNull();
@@ -193,7 +193,7 @@ describe('createNativeActions reveal and open', () => {
     const deps = makeDeps();
     const actions = createNativeActions(deps);
     expect(await actions.open(1)).toEqual({ ok: true });
-    expect(deps.spawned).toEqual([{ command: 'cmd', args: ['/c', 'start', '', 'C:/Media/2025/a.jpg'] }]);
+    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['C:/Media/2025/a.jpg'] }]);
   });
 
   it('maps fixture paths before the existence check', async () => {
@@ -260,6 +260,16 @@ describe('createNativeActions pickDirectory', () => {
     expect(await actions.pickDirectory()).toEqual({ status: 'busy' });
     resolveCapture(picked);
     expect(await first).toEqual({ status: 'picked', path: 'C:/Media/Picked' });
+  });
+
+  it('returns error when the picker throws', async () => {
+    const runAndCapture = vi.fn(
+      async (): Promise<RunCaptureResult> => {
+        throw new Error('picker failed');
+      },
+    );
+    const actions = createNativeActions(makeDeps({ runAndCapture }));
+    expect(await actions.pickDirectory()).toEqual({ status: 'error' });
   });
 });
 ```
@@ -330,7 +340,7 @@ export function buildRevealCommand(platform: Platform, filePath: string): Native
 export function buildOpenCommand(platform: Platform, filePath: string): NativeCommand | null {
   switch (platform) {
     case 'win32':
-      return { command: 'cmd', args: ['/c', 'start', '', filePath] };
+      return { command: 'explorer', args: [filePath] };
     case 'darwin':
       return { command: 'open', args: [filePath] };
     case 'linux':

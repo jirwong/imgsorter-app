@@ -164,13 +164,14 @@ The module is built from small, testable pieces:
 
 | Platform | Reveal | Open |
 | --- | --- | --- |
-| Windows | `explorer /select,<path>` (one arg) | `cmd /c start "" "<path>"` |
+| Windows | `explorer /select,<path>` (one arg) | `explorer <path>` |
 | macOS | `open -R <path>` | `open <path>` |
 | Linux | `xdg-open <parent dir>` | `xdg-open <path>` |
 
-- Commands run with `spawn(command, args)` and `{ windowsHide: true }`. No shell.
-- On Windows, `start` is a `cmd` builtin, so the `cmd /c` wrapper is required. Node quotes the
-  path argument; a Windows path cannot contain `"`.
+- Commands run with `spawn(command, args)` and `{ windowsHide: true }`. The code never uses a
+  shell. The command name and each argument go to the process as separate values.
+- On Windows, both actions call `explorer` directly. The path is one argument. The code does
+  not use Windows `cmd`, so `&`, `^`, `%`, and `!` in a file name have no special meaning.
 - On Linux, "Reveal" cannot reliably select a file across file managers, so it opens the
   parent directory.
 - On any other platform, the builders return `null`. Reveal/Open then return
@@ -268,7 +269,9 @@ All three import the server-only library **inside the handler**.
 
 - **`server/lib/native-actions.test.ts` (node, injected deps):**
   - `buildRevealCommand` / `buildOpenCommand` / `buildFolderPickerCommand` for `win32`,
-    `darwin`, and `linux` return the expected command and argument list.
+    `darwin`, and `linux` return the expected command and argument list. The Windows Open
+    case uses a path with `&` and asserts the `explorer` command with the path as one
+    argument.
   - `reveal`/`open`: unknown id → `not-found`; missing file → `missing`; present file →
     `ok: true` and the injected spawn was called with the built command.
   - `pickDirectory`: picked path is trimmed and de-slashed; empty output → `canceled`;
