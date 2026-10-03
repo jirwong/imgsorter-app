@@ -147,6 +147,14 @@ describe('createAppConfigStore', () => {
     expect(store.getLastScan()).toBeNull();
   });
 
+  it('reads a wrong-shape last scan as null', () => {
+    store.getLastScan();
+    const raw = new Database(dbPath);
+    raw.prepare(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('last_scan', ?)`).run('{"finishedAt":1}');
+    raw.close();
+    expect(store.getLastScan()).toBeNull();
+  });
+
   it('falls back to defaults when stored JSON is invalid', () => {
     store.get();
     const raw = new Database(dbPath);

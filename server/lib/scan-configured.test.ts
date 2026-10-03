@@ -51,6 +51,7 @@ describe('createConfiguredScan', () => {
     expect(config.resync_directories).toBe(true);
     expect(config.resync_check_actual_file).toBe(true);
     expect(recordScanned).toHaveBeenCalledWith(['C:/Photos'], expect.any(String));
+    expect(recordLastScan).toHaveBeenCalledTimes(1);
     expect(recordLastScan).toHaveBeenCalledWith({
       finishedAt: expect.any(String),
       directories: 1,
