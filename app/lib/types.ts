@@ -112,3 +112,7 @@ export type FolderPickResult =
   | { status: 'timeout' }
   | { status: 'unsupported' }
   | { status: 'error' };
+
+export type KeeperMap = Record<string, number>;
+
+export type DuplicatesData = { groups: DuplicateGroup[]; keepers: KeeperMap; staleKeepers: number };
