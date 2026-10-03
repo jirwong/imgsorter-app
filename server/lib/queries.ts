@@ -226,7 +226,7 @@ export function countEntriesByDirectory(root: string): number {
   if (!db) return 0;
   try {
     const normalized = root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-    const escaped = normalized.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const escaped = normalized.replace(/[%_]/g, (ch) => `\\${ch}`);
     const row = db
       .prepare(
         `SELECT COUNT(*) AS n FROM entries

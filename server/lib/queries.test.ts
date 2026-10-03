@@ -109,8 +109,25 @@ describe('queries against the committed sample db', () => {
     try {
       expect(getShellData()).toEqual({ files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 });
       expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] })).toEqual([]);
+      expect(getDirectoryTree()).toEqual([]);
+      expect(getDuplicateGroups()).toEqual([]);
+      expect(getAnalyticsData()).toEqual({ rankedBySize: [], rankedByCopies: [] });
+      expect(getOverviewStats()).toEqual({
+        totalFiles: 0,
+        totalSize: 0,
+        duplicateGroups: 0,
+        redundantSpace: 0,
+        uniqueFiles: 0,
+        storageMap: [],
+        largestFiles: [],
+      });
+      expect(countEntriesByDirectory('C:/Photos')).toBe(0);
     } finally {
-      process.env.IMGSORTER_DB_PATH = previous;
+      if (previous === undefined) {
+        delete process.env.IMGSORTER_DB_PATH;
+      } else {
+        process.env.IMGSORTER_DB_PATH = previous;
+      }
     }
   });
 });
