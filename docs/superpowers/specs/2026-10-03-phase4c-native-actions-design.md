@@ -153,11 +153,12 @@ The module is built from small, testable pieces:
     captures stdout/stderr, and kills the child on timeout. `spawnFailed` is true when the
     program cannot start (for example, `ENOENT`). Used by the picker.
 - **Factory:** `createNativeActions(deps?: NativeActionDeps): NativeActions`, where
-  `deps` may inject `platform`, `fileExists`, `spawnDetached`, and `runAndCapture`. Mirrors
-  `createScanService`.
+  `deps` may inject `platform`, `fileExists`, `getEntryPath`, `spawnDetached`, and
+  `runAndCapture`. Mirrors `createScanService`.
 - **Singleton:** `export const nativeActions = createNativeActions();`
-- **Single-flight picker guard:** a module-level boolean. A second `pickDirectory` while one is
-  open returns `{ status: 'busy' }`. The flag clears in a `finally`.
+- **Single-flight picker guard:** a boolean scoped to the created instance. A second
+  `pickDirectory` while one is open returns `{ status: 'busy' }`. The flag clears in a
+  `finally`.
 
 ### 7.2 Command table
 
@@ -185,14 +186,16 @@ The module is built from small, testable pieces:
 
 - The picker waits for process exit, up to **300000 ms (5 minutes)**.
 - On timeout: kill the child, return `{ status: 'timeout' }`.
-- If the picker command cannot start (`spawnFailed`, for example no `zenity`/`kdialog` on
-  Linux, or an unknown platform): return `{ status: 'unsupported' }`.
+- If the picker command cannot start (`spawnFailed`, for example no `zenity` on Linux, or an
+  unknown platform): on Linux try `kdialog` next; if that also cannot start, return
+  `{ status: 'unsupported' }`.
 - On a normal exit:
   - a non-empty path → `{ status: 'picked', path }`;
-  - an empty path → `{ status: 'canceled' }` (macOS non-zero exit and Windows empty stdout both
-    mean cancel);
-  - any other non-zero exit → `{ status: 'error' }`.
-- The returned path is trimmed and stripped of one trailing separator (`/` or `\`).
+  - an empty path → `{ status: 'canceled' }` (macOS/Linux non-zero exit and Windows empty
+    stdout both mean cancel);
+  - a thrown error → `{ status: 'error' }`.
+- The returned path is trimmed and stripped of one trailing separator (`/` or `\`), except for
+  a drive root such as `C:\` or the filesystem root `/`.
 - `pickDirectory()` returns the `FolderPickResult` union.
 
 ### 7.4 Action methods
@@ -218,7 +221,7 @@ Shared logic:
 - `revealEntry` (POST, `data: { id: number }`) → `await import('../lib/native-actions')` →
   `nativeActions.reveal(data.id)`
 - `openEntry` (POST, `data: { id: number }`) → `nativeActions.open(data.id)`
-- `pickDirectory` (POST, no data) → `nativeActions.pickDirectory()`
+- `pickDirectory` (GET, no data) → `nativeActions.pickDirectory()`
 
 All three import the server-only library **inside the handler**.
 
@@ -269,7 +272,7 @@ All three import the server-only library **inside the handler**.
   - `reveal`/`open`: unknown id → `not-found`; missing file → `missing`; present file →
     `ok: true` and the injected spawn was called with the built command.
   - `pickDirectory`: picked path is trimmed and de-slashed; empty output → `canceled`;
-    spawn failure → `unsupported`; other non-zero exit → `error`; a second concurrent call →
+    spawn failure → `unsupported`; a thrown error → `error`; a second concurrent call →
     `busy`; timeout → `timeout` and the child is killed.
 - **`server/lib/queries.test.ts`:** `getEntryPathById` returns a known fixture row's raw path
   and `null` for an unknown id.
