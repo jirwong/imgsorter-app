@@ -240,3 +240,14 @@ export function countEntriesByDirectory(root: string): number {
     db.close();
   }
 }
+
+export function getEntryPathById(id: number): string | null {
+  const db = openReadonly();
+  if (!db) return null;
+  try {
+    const row = db.prepare(`SELECT path FROM entries WHERE id = ?`).get(id) as { path: string } | undefined;
+    return row?.path ?? null;
+  } finally {
+    db.close();
+  }
+}
