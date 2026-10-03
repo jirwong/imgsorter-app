@@ -85,6 +85,12 @@ review`.
   `docs/superpowers/plans/2026-09-28-phase3b-scan-progress.md`. Drives the vendored
   engine from the UI ("Scan library") with in-memory progress polling, cancel, a real
   Duplicates badge, and no dead mock plumbing in `app-context`.
-- Phase 4 (Preferences persistence via `app_config`, directory management, Reveal/Open +
-  keeper actions) — next; begins with Phase 0 (brainstorm → spec → plan → approval).
+- Phase 4 (Preferences persistence via `app_config`, directory management, native OS
+  actions, keeper persistence) — **in progress**, split into 4a–4d. **4a complete**
+  (`app_config` persistence + Preferences directory management): spec at
+  `docs/superpowers/specs/2026-10-03-phase4a-app-config-design.md`, plan at
+  `docs/superpowers/plans/2026-10-03-phase4a-app-config.md`; store in
+  `server/lib/app-config.ts` backed by scan/seed-proof `server/data/app-config.db`.
+  Next: 4b (scan configured directories). 4c adds Reveal/Open plus a server-side native
+  folder picker; 4d adds keeper persistence.
 - Roadmap: `docs/ROADMAP.md`.

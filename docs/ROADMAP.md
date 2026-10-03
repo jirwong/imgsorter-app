@@ -14,11 +14,27 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 1 | TanStack Start UI recreation (mock data) | Modular, URL-routed UI; parity with imgsorter-ui-v1 prototype | `[x]` |
 | 2 | Vendor engine server-side; wire read-only pages (Overview, Unique Files, Browse, Analytics) + shell totals to real SQLite data | Real data on read-only pages | `[x]` |
 | 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[x]` |
-| 4 | Preferences persistence (`app_config`) + directory management + Reveal/Open/keeper actions | Full config persistence + actions | `[ ]` |
+| 4 | Preferences persistence (`app_config`) + directory management + native OS actions (Reveal/Open, folder picker) + keeper persistence | Full config persistence + actions | `[~]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[ ]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
+
+## Phase 4 sub-phases
+
+Phase 4 is split into four independently shippable sub-phases (each gets its own
+spec → plan → PR loop):
+
+- **4a — `app_config` persistence + Preferences directory management:** a dedicated,
+  scan-proof `app-config.db` store, and the Preferences page wired to load/save it.
+  Spec: [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md). **Complete.**
+- **4b — Scan configured directories:** replace the fixture-driven scan source with the
+  persisted `app_config` directories; surface real per-directory counts / last scan.
+- **4c — Native OS actions:** make `FilePreviewDrawer`'s **Reveal** / **Open file** real, and
+  add a **server-side native folder picker** — a "Browse…" button next to the Preferences
+  add-directory input that opens the OS folder dialog from the local server and returns the
+  picked absolute path (Windows-first, with macOS/Linux fallbacks).
+- **4d — Keeper persistence:** persist the one-per-group keeper selection.
 
 ## Dependencies
 
@@ -33,8 +49,10 @@ phase's brainstorm runs.*
 - **Engine integration:** imgsorter-v2 source is copied/vendored into this repo's
   server side (Phase 2). It is Node-only (better-sqlite3 native module) and must
   live on the server, never leaked into client bundles.
-- **Persistence:** SQLite `app_config` table managed by the engine (single source
-  of truth) for preferences, indexed/ignored directories, scan history (Phase 4).
+- **Persistence:** preferences and indexed/ignored directories live in a dedicated,
+  app-owned SQLite store (`server/data/app-config.db`, Phase 4a), kept separate from the
+  engine's photo DB so scans/`pnpm seed` cannot wipe it. (Supersedes the earlier
+  "engine-managed `app_config`" proposal.)
 - **State management:** no TanStack Store. Local `useState` + TanStack Router
   search params + one context. Revisit `useSyncExternalStore`/store in Phase 3 for
   the scan-progress stream.
@@ -46,6 +64,7 @@ phase's brainstorm runs.*
 | 1 | [2026-09-02-phase1-ui-recreation-design.md](superpowers/specs/2026-09-02-phase1-ui-recreation-design.md) |
 | 2 | [2026-09-08-phase2-real-data-design.md](superpowers/specs/2026-09-08-phase2-real-data-design.md) |
 | 3 | [2026-09-27-phase3a-duplicates-design.md](superpowers/specs/2026-09-27-phase3a-duplicates-design.md) · [2026-09-28-phase3b-scan-progress-design.md](superpowers/specs/2026-09-28-phase3b-scan-progress-design.md) |
+| 4a | [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md) |
 
 ## How to add a phase
 
