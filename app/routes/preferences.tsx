@@ -1,13 +1,13 @@
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
 import { PreferencesPage } from '../features/preferences/PreferencesPage';
-import { getAppConfig } from '../../server/routes/preferences';
+import { getPreferencesData } from '../../server/routes/preferences';
 
 export const Route = createFileRoute('/preferences')({
-  loader: async () => getAppConfig(),
+  loader: async () => getPreferencesData(),
   component: PreferencesRoute,
 });
 
 function PreferencesRoute() {
-  const config = useLoaderData({ from: '/preferences' });
-  return <PreferencesPage config={config} />;
+  const { config, counts } = useLoaderData({ from: '/preferences' });
+  return <PreferencesPage config={config} counts={counts} />;
 }

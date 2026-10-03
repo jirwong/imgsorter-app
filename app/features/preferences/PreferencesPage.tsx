@@ -4,10 +4,20 @@ import { FolderOpen, ShieldCheck } from 'lucide-react';
 import { useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
+import { normalizeDirectoryPath } from '../../lib/directory-path';
 import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
 import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
-export function PreferencesPage({ config }: { config: AppConfig }) {
+function metaKey(path: string): string {
+  return normalizeDirectoryPath(path).toLowerCase();
+}
+
+function formatScanTime(iso: string | undefined): string {
+  if (!iso) return 'Not scanned yet';
+  return `Last scan ${new Date(iso).toLocaleString()}`;
+}
+
+export function PreferencesPage({ config, counts }: { config: AppConfig; counts: Record<string, number> }) {
   const router = useRouter();
   const [indexed, setIndexed] = useState<IndexedDirectory[]>(config.directories.indexed);
   const [ignored, setIgnored] = useState<string[]>(config.directories.ignored);
@@ -135,7 +145,8 @@ export function PreferencesPage({ config }: { config: AppConfig }) {
                     <div className="preference-path">
                       <Text size="sm">{item.path}</Text>
                       <Text size="xs" c="dimmed">
-                        — files · Not scanned yet
+                        {counts[item.path] ?? 0} files ·{' '}
+                        {formatScanTime(config.directoryMeta[metaKey(item.path)]?.lastScannedAt)}
                       </Text>
                     </div>
                     <Button

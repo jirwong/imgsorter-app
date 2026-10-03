@@ -22,13 +22,22 @@ import { PreferencesPage } from './PreferencesPage';
 
 const config = {
   ...DEFAULT_APP_CONFIG,
-  directories: { indexed: [{ path: 'C:/Media/2025', enabled: true }], ignored: [] },
+  directories: {
+    indexed: [
+      { path: 'C:/Media/2025', enabled: true },
+      { path: 'D:/Camera Imports', enabled: true },
+    ],
+    ignored: [],
+  },
+  directoryMeta: { 'c:/media/2025': { lastScannedAt: '2026-10-03T12:00:00.000Z' } },
 };
+
+const counts = { 'C:/Media/2025': 42, 'D:/Camera Imports': 0 };
 
 function renderPage() {
   render(
     <MantineProvider defaultColorScheme="dark">
-      <PreferencesPage config={config} />
+      <PreferencesPage config={config} counts={counts} />
     </MantineProvider>,
   );
 }
@@ -49,6 +58,9 @@ describe('PreferencesPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
     expect(screen.getByText('Directories included in scans')).toBeInTheDocument();
     expect(screen.getByText('C:/Media/2025')).toBeInTheDocument();
+    expect(screen.getByText(/42 files/)).toBeInTheDocument();
+    expect(screen.getByText(/Last scan/)).toBeInTheDocument();
+    expect(screen.getByText(/Not scanned yet/)).toBeInTheDocument();
   });
 
   it('saves a new indexed directory', async () => {
