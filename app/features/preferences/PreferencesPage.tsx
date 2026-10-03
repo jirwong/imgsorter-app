@@ -4,11 +4,12 @@ import { FolderOpen, ShieldCheck } from 'lucide-react';
 import { useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
+import { normalizeDirectoryPath } from '../../lib/directory-path';
 import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
 import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
 function metaKey(path: string): string {
-  return path.trim().replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  return normalizeDirectoryPath(path).toLowerCase();
 }
 
 function formatScanTime(iso: string | undefined): string {

@@ -9,6 +9,7 @@ import type {
   DirectoryMeta,
   IndexedDirectory,
 } from '../../app/lib/types';
+import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigDbPath } from './db-path';
 
 const DIRECTORY_KEY = 'directories';
@@ -22,15 +23,11 @@ export type AppConfigStore = {
   recordScannedDirectories: (paths: string[], at: string) => AppConfig;
 };
 
-function normalizePath(value: string): string {
-  return value.trim().replace(/\\/g, '/').replace(/\/+$/, '');
-}
-
 function dedupePaths(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const value of values) {
-    const path = normalizePath(value);
+    const path = normalizeDirectoryPath(value);
     if (path.length === 0) continue;
     const key = path.toLowerCase();
     if (seen.has(key)) continue;
@@ -46,7 +43,7 @@ function normalizeDirectories(input: DirectoriesConfig): DirectoriesConfig {
   const indexed: IndexedDirectory[] = [];
   const seen = new Set<string>();
   for (const entry of input.indexed) {
-    const path = normalizePath(entry.path);
+    const path = normalizeDirectoryPath(entry.path);
     if (path.length === 0) continue;
     const key = path.toLowerCase();
     if (seen.has(key) || ignoredKeys.has(key)) continue;
@@ -169,7 +166,7 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
         const meta = readKey(db, DIRECTORY_META_KEY, DEFAULT_APP_CONFIG.directoryMeta, isDirectoryMeta);
         const next: DirectoryMeta = { ...meta };
         for (const path of paths) {
-          next[normalizePath(path).toLowerCase()] = { lastScannedAt: at };
+          next[normalizeDirectoryPath(path).toLowerCase()] = { lastScannedAt: at };
         }
         writeKey(db, DIRECTORY_META_KEY, next);
         return readConfig(db);
