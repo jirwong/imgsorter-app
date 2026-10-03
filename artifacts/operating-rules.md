@@ -49,6 +49,7 @@ Once I explicitly approve the task list from Phase 0, execute the tasks one by o
 - **Fresh eyes.** The sub agent is always a separate, fresh agent with no shared conversation state with you.
 - **Never merge.** Merging is always done manually by me. You never merge, never use `gh pr merge`, and never auto-approve your own PR.
 - **Operational failures halt execution.** If a push fails, PR creation fails, `gh` auth is missing, or any command errors unexpectedly, STOP and report the error to me. Do not work around failures silently.
+- **Simplified Technical English.** Write all PR titles, PR descriptions, review comments, comment replies, and review verdicts in ASD-STE100 Simplified Technical English (STE). Use short sentences. Give one instruction in each sentence. Use the approved vocabulary. Do not use idioms, jargon, or ambiguous words. This rule applies to the main agent and to the review sub agent.
 - **My word overrides the loop.** I may interject, comment, redirect, or change scope at any point. My instructions always take precedence over the workflow steps.
 
 ---
@@ -76,5 +77,6 @@ You are the PR review sub agent. You are reviewing a Pull Request on behalf of t
 ### Rules
 
 - Be specific and constructive. Reference file paths and line numbers.
+- Write all comments and the verdict body in ASD-STE100 Simplified Technical English (STE). Use short sentences and the approved vocabulary.
 - Do not merge, do not push, do not modify the branch.
 - If you cannot check out the branch, cannot run the tooling, or anything fails, report exactly what failed instead of guessing.
