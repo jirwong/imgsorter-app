@@ -84,7 +84,7 @@ export function createScanService(runScan: RunScan): ScanService {
       const progress = new ProgressEmitter();
       progress.on(onProgress);
       state = { ...initialState(), status: 'running', startedAt: now() };
-      pushLog({ time: now(), event: 'Scan started', directory: 'Fixture tree', status: 'Running' });
+      pushLog({ time: now(), event: 'Scan started', directory: 'Configured directories', status: 'Running' });
 
       runScan({ progress, signal: controller.signal })
         .then((summary) => {

@@ -94,7 +94,7 @@ function isDirectoriesConfig(value: unknown): value is DirectoriesConfig {
 }
 
 function isDirectoryMeta(value: unknown): value is DirectoryMeta {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value) || Array.isArray(value)) return false;
   return Object.values(value).every((entry) => isRecord(entry) && typeof entry.lastScannedAt === 'string');
 }
 
