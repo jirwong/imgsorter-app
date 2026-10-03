@@ -68,6 +68,26 @@ describe('createAppConfigStore', () => {
     expect(readdirSync(dir)).toEqual(['app-config.db']);
   });
 
+  it('records last-scanned metadata per directory', () => {
+    const saved = store.recordScannedDirectories(['C:\\Photos\\'], '2026-10-03T12:00:00.000Z');
+    expect(saved.directoryMeta['c:/photos']).toEqual({ lastScannedAt: '2026-10-03T12:00:00.000Z' });
+    expect(store.get().directoryMeta['c:/photos']).toEqual({ lastScannedAt: '2026-10-03T12:00:00.000Z' });
+  });
+
+  it('keeps directory metadata when directories are saved', () => {
+    store.recordScannedDirectories(['C:/Photos'], '2026-10-03T12:00:00.000Z');
+    const saved = store.saveDirectories({ indexed: [], ignored: [] });
+    expect(saved.directoryMeta['c:/photos']).toEqual({ lastScannedAt: '2026-10-03T12:00:00.000Z' });
+  });
+
+  it('ignores an invalid directory_meta value', () => {
+    store.get();
+    const raw = new Database(dbPath);
+    raw.prepare(`UPDATE app_config SET value = '[]' WHERE key = 'directory_meta'`).run();
+    raw.close();
+    expect(store.get().directoryMeta).toEqual({});
+  });
+
   it('falls back to defaults when stored JSON is invalid', () => {
     store.get();
     const raw = new Database(dbPath);
