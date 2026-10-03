@@ -102,4 +102,10 @@ review`.
   `docs/superpowers/plans/2026-10-03-phase4c-native-actions.md`, and
   `docs/superpowers/plans/2026-10-03-phase4d-keeper.md`. Next: Phase 5 (real
   thumbnails/previews, optional).
+- Post-Phase-4 cleanup A — **complete**: one persisted `last_scan` record in `app-config.db`
+  drives the footer, the Overview `LastRunCard`, and the Activity fallback; the static
+  "Not backed up" metric is removed; dead mock data is deleted. Spec at
+  `docs/superpowers/specs/2026-10-04-overview-footer-real-data-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-overview-footer-real-data.md`. Cleanup B (keeper delete
+  non-keepers) is next.
 - Roadmap: `docs/ROADMAP.md`.
