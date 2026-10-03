@@ -85,7 +85,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
         return;
       }
       if (result.status === 'canceled') return;
-      const message =
+      const pickerMessage =
         result.status === 'busy'
           ? 'A folder dialog is already open.'
           : result.status === 'timeout'
@@ -93,7 +93,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
             : result.status === 'unsupported'
               ? 'The folder picker is not available.'
               : 'The folder picker failed.';
-      notifications.show({ color: 'red', message });
+      notifications.show({ color: 'red', message: pickerMessage });
     } finally {
       setBrowsing(null);
     }
@@ -155,6 +155,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                   variant="default"
                   loading={browsing === 'indexed'}
                   disabled={browsing !== null}
+                  aria-label="Browse for indexed directory"
                   onClick={() => void browse('indexed')}
                 >
                   Browse…
@@ -227,6 +228,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                   variant="default"
                   loading={browsing === 'ignored'}
                   disabled={browsing !== null}
+                  aria-label="Browse for ignored directory"
                   onClick={() => void browse('ignored')}
                 >
                   Browse…
