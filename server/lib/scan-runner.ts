@@ -13,17 +13,21 @@ import { removeFixtureTree, writeFixtureTree } from './fixtures';
 
 const silentReporter: Reporter = { debug() {}, info() {}, warn() {}, error() {}, printSummary() {} };
 
-export type RunFixtureScanDeps = { progress: ProgressSink; signal: AbortSignal };
+export type RunFixtureScanDeps = { progress: ProgressSink; signal: AbortSignal; dbPath?: string };
 
-export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): Promise<RunSummary> {
+export async function runFixtureScan({
+  progress,
+  signal,
+  dbPath = sampleDbPath(),
+}: RunFixtureScanDeps): Promise<RunSummary> {
   writeFixtureTree();
-  rmSync(sampleDbPath(), { force: true });
-  rmSync(`${sampleDbPath()}-wal`, { force: true });
-  rmSync(`${sampleDbPath()}-shm`, { force: true });
-  mkdirSync(dirname(sampleDbPath()), { recursive: true });
+  rmSync(dbPath, { force: true });
+  rmSync(`${dbPath}-wal`, { force: true });
+  rmSync(`${dbPath}-shm`, { force: true });
+  mkdirSync(dirname(dbPath), { recursive: true });
 
   const config: RunConfiguration = {
-    dbName: sampleDbPath(),
+    dbName: dbPath,
     extensions: ['.jpg', '.png', '.gif'],
     directories: [...FIXTURE_ROOTS].map(virtualToReal),
     ignore_directories: [],
@@ -47,7 +51,7 @@ export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): 
   }
 
   try {
-    const db = new Database(sampleDbPath());
+    const db = new Database(dbPath);
     try {
       db.prepare(
         `UPDATE entries SET
@@ -59,7 +63,7 @@ export async function runFixtureScan({ progress, signal }: RunFixtureScanDeps): 
       db.close();
     }
 
-    const service = new DbService(sampleDbPath());
+    const service = new DbService(dbPath);
     try {
       service.updateFileRecords();
     } finally {

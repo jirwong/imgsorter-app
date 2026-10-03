@@ -7,6 +7,10 @@ export function sampleDbPath(): string {
   return join(serverDir, 'data', 'imgsorter.db');
 }
 
+export function fixtureDbPath(): string {
+  return join(serverDir, 'data', 'fixture.db');
+}
+
 export function appConfigDbPath(): string {
   return join(serverDir, 'data', 'app-config.db');
 }
