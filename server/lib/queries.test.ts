@@ -135,6 +135,16 @@ describe('queries against the committed sample db', () => {
     expect(getKeeperData([])).toEqual({ keepers: {}, stale: [] });
   });
 
+  it('matches saved keeper paths case- and separator-insensitively', () => {
+    const [group] = getDuplicateGroups();
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    const variant = `${raw.toUpperCase().replace(/\//g, '\\')}\\`;
+    const { keepers, stale } = getKeeperData([variant]);
+    expect(keepers[group.key]).toBe(id);
+    expect(stale).toEqual([]);
+  });
+
   it('returns empty shapes when the db is missing', () => {
     const previous = process.env.IMGSORTER_DB_PATH;
     process.env.IMGSORTER_DB_PATH = join(tmpdir(), 'imgsorter-missing-xyz.db');
