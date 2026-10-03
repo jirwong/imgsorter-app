@@ -6,11 +6,21 @@ import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
 const mocks = vi.hoisted(() => ({
   saveDirectories: vi.fn(),
   saveApplicationSettings: vi.fn(),
+  pickDirectory: vi.fn(),
+  notifyShow: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/preferences', () => ({
   saveDirectories: mocks.saveDirectories,
   saveApplicationSettings: mocks.saveApplicationSettings,
+}));
+
+vi.mock('../../../server/routes/native', () => ({
+  pickDirectory: mocks.pickDirectory,
+}));
+
+vi.mock('@mantine/notifications', () => ({
+  notifications: { show: mocks.notifyShow },
 }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
@@ -89,5 +99,31 @@ describe('PreferencesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
     await waitFor(() => expect(mocks.saveApplicationSettings).toHaveBeenCalledTimes(1));
     expect(mocks.saveApplicationSettings.mock.calls[0][0].data.extensions).toBe('png');
+  });
+
+  it('fills the indexed input with the picked folder', async () => {
+    mocks.pickDirectory.mockResolvedValue({ status: 'picked', path: 'C:/Media/Picked' });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse for indexed directory' }));
+    await waitFor(() => expect(screen.getByLabelText('Add indexed directory')).toHaveValue('C:/Media/Picked'));
+  });
+
+  it('does not change the input when the picker is canceled', async () => {
+    mocks.pickDirectory.mockResolvedValue({ status: 'canceled' });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse for indexed directory' }));
+    await waitFor(() => expect(mocks.pickDirectory).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Add indexed directory')).toHaveValue('');
+    expect(mocks.notifyShow).not.toHaveBeenCalled();
+  });
+
+  it('fills the ignored input with the picked folder', async () => {
+    mocks.pickDirectory.mockResolvedValue({ status: 'picked', path: 'C:/Media/Cache' });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse for ignored directory' }));
+    await waitFor(() => expect(screen.getByLabelText('Add globally ignored directory')).toHaveValue('C:/Media/Cache'));
   });
 });
