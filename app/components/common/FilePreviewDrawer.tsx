@@ -3,7 +3,7 @@ import { Button, Drawer, Group, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { FileImage, FolderOpen } from 'lucide-react';
 import { useApp } from '../../lib/app-context';
-import { thumbs } from '../../lib/mock-data';
+import { thumbs } from '../../lib/placeholder-thumbs';
 import { formatBytes } from '../../lib/format';
 import { openEntry, revealEntry } from '../../../server/routes/native';
 import type { NativeActionFailure } from '../../lib/types';
