@@ -42,7 +42,9 @@ describe('command builders', () => {
   });
 
   it('builds folder picker commands per platform', () => {
-    expect(buildFolderPickerCommand('win32')?.command).toBe('powershell');
+    const windows = buildFolderPickerCommand('win32');
+    expect(windows?.command).toBe('powershell');
+    expect(windows?.args.join(' ')).toContain('[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;');
     expect(buildFolderPickerCommand('darwin')).toEqual({
       command: 'osascript',
       args: ['-e', 'POSIX path of (choose folder)'],

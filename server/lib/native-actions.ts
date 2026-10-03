@@ -34,6 +34,7 @@ export type NativeActions = {
 const PICKER_TIMEOUT_MS = 300000;
 
 const WINDOWS_FOLDER_SCRIPT = [
+  '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
   'Add-Type -AssemblyName System.Windows.Forms;',
   '$dialog = New-Object System.Windows.Forms.FolderBrowserDialog;',
   "$dialog.Description = 'Select a folder';",
@@ -101,28 +102,34 @@ function defaultSpawnDetached(command: NativeCommand): void {
 function defaultRunAndCapture(command: NativeCommand, timeoutMs: number): Promise<RunCaptureResult> {
   return new Promise((resolve) => {
     let settled = false;
-    let stdout = '';
-    let stderr = '';
     let timedOut = false;
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
     const child = spawn(command.command, command.args, { windowsHide: true });
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill();
     }, timeoutMs);
-    const finish = (result: RunCaptureResult): void => {
+    const finish = (code: number | null, spawnFailed: boolean): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(result);
+      resolve({
+        code,
+        stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf8'),
+        spawnFailed,
+        timedOut,
+      });
     };
     child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
+      stdoutChunks.push(chunk);
     });
     child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
+      stderrChunks.push(chunk);
     });
-    child.on('error', () => finish({ code: null, stdout, stderr, spawnFailed: true, timedOut: false }));
-    child.on('close', (code) => finish({ code, stdout, stderr, spawnFailed: false, timedOut }));
+    child.on('error', () => finish(null, true));
+    child.on('close', (code) => finish(code, false));
   });
 }
 

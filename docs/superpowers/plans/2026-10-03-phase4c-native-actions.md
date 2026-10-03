@@ -158,7 +158,9 @@ describe('command builders', () => {
   });
 
   it('builds folder picker commands per platform', () => {
-    expect(buildFolderPickerCommand('win32')?.command).toBe('powershell');
+    const windows = buildFolderPickerCommand('win32');
+    expect(windows?.command).toBe('powershell');
+    expect(windows?.args.join(' ')).toContain('[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;');
     expect(buildFolderPickerCommand('darwin')).toEqual({
       command: 'osascript',
       args: ['-e', 'POSIX path of (choose folder)'],
@@ -318,6 +320,7 @@ export type NativeActions = {
 const PICKER_TIMEOUT_MS = 300000;
 
 const WINDOWS_FOLDER_SCRIPT = [
+  '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;',
   'Add-Type -AssemblyName System.Windows.Forms;',
   '$dialog = New-Object System.Windows.Forms.FolderBrowserDialog;',
   "$dialog.Description = 'Select a folder';",

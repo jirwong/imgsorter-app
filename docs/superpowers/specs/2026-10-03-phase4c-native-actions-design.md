@@ -186,6 +186,9 @@ The module is built from small, testable pieces:
 | Linux | `zenity --file-selection --directory` | Falls back to `kdialog --getexistingdirectory` if `zenity` is missing |
 
 - The picker waits for process exit, up to **300000 ms (5 minutes)**.
+- On Windows, the PowerShell script sets `[Console]::OutputEncoding` to UTF-8 before it prints.
+  Windows PowerShell 5.1 writes redirected output in the OEM code page. Without this line, a
+  picked path with non-ASCII characters is decoded incorrectly.
 - On timeout: kill the child, return `{ status: 'timeout' }`.
 - If the picker command cannot start (`spawnFailed`, for example no `zenity` on Linux, or an
   unknown platform): on Linux try `kdialog` next; if that also cannot start, return
@@ -271,7 +274,7 @@ All three import the server-only library **inside the handler**.
   - `buildRevealCommand` / `buildOpenCommand` / `buildFolderPickerCommand` for `win32`,
     `darwin`, and `linux` return the expected command and argument list. The Windows Open
     case uses a path with `&` and asserts the `explorer` command with the path as one
-    argument.
+    argument. The Windows picker case asserts the UTF-8 output setting.
   - `reveal`/`open`: unknown id → `not-found`; missing file → `missing`; present file →
     `ok: true` and the injected spawn was called with the built command.
   - `pickDirectory`: picked path is trimmed and de-slashed; empty output → `canceled`;
