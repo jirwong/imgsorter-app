@@ -4,6 +4,7 @@ import {
   buildOpenCommand,
   buildRevealCommand,
   createNativeActions,
+  detachedSpawnOptions,
   type NativeActionDeps,
   type NativeCommand,
   type RunCaptureResult,
@@ -28,10 +29,21 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
 
 describe('command builders', () => {
   it('builds reveal commands per platform', () => {
-    expect(buildRevealCommand('win32', 'C:\\a.jpg')).toEqual({ command: 'explorer', args: ['/select,C:\\a.jpg'] });
+    expect(buildRevealCommand('win32', 'C:\\My Photos\\a,b.jpg')).toEqual({
+      command: 'explorer',
+      args: ['/select,"C:\\My Photos\\a,b.jpg"'],
+      verbatim: true,
+    });
     expect(buildRevealCommand('darwin', '/a.jpg')).toEqual({ command: 'open', args: ['-R', '/a.jpg'] });
     expect(buildRevealCommand('linux', '/dir/a.jpg')).toEqual({ command: 'xdg-open', args: ['/dir'] });
     expect(buildRevealCommand('freebsd', '/a.jpg')).toBeNull();
+  });
+
+  it('sets verbatim arguments only for the Windows reveal command', () => {
+    expect(detachedSpawnOptions({ command: 'explorer', args: ['x'] }).windowsVerbatimArguments).toBe(false);
+    const reveal = buildRevealCommand('win32', 'C:\\My Photos\\a.jpg');
+    expect(reveal?.verbatim).toBe(true);
+    expect(reveal && detachedSpawnOptions(reveal).windowsVerbatimArguments).toBe(true);
   });
 
   it('builds open commands per platform', () => {
@@ -72,7 +84,7 @@ describe('createNativeActions reveal and open', () => {
     const deps = makeDeps();
     const actions = createNativeActions(deps);
     expect(await actions.reveal(1)).toEqual({ ok: true });
-    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['/select,C:/Media/2025/a.jpg'] }]);
+    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['/select,"C:/Media/2025/a.jpg"'], verbatim: true }]);
   });
 
   it('opens a present file', async () => {

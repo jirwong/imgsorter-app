@@ -7,7 +7,7 @@ import { virtualToReal } from './db-path';
 import { getEntryPathById } from './queries';
 
 export type Platform = string;
-export type NativeCommand = { command: string; args: string[] };
+export type NativeCommand = { command: string; args: string[]; verbatim?: boolean };
 
 export type RunCaptureResult = {
   code: number | null;
@@ -44,7 +44,7 @@ const WINDOWS_FOLDER_SCRIPT = [
 export function buildRevealCommand(platform: Platform, filePath: string): NativeCommand | null {
   switch (platform) {
     case 'win32':
-      return { command: 'explorer', args: [`/select,${filePath}`] };
+      return { command: 'explorer', args: [`/select,"${filePath}"`], verbatim: true };
     case 'darwin':
       return { command: 'open', args: ['-R', filePath] };
     case 'linux':
@@ -93,8 +93,16 @@ function toPickResult(result: RunCaptureResult): FolderPickResult {
   return { status: 'picked', path: stripTrailingSeparator(path) };
 }
 
+export function detachedSpawnOptions(command: NativeCommand): {
+  windowsHide: boolean;
+  detached: boolean;
+  windowsVerbatimArguments: boolean;
+} {
+  return { windowsHide: true, detached: true, windowsVerbatimArguments: command.verbatim === true };
+}
+
 function defaultSpawnDetached(command: NativeCommand): void {
-  const child = spawn(command.command, command.args, { windowsHide: true, detached: true });
+  const child = spawn(command.command, command.args, detachedSpawnOptions(command));
   child.on('error', () => {});
   child.unref();
 }

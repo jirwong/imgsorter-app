@@ -139,7 +139,7 @@ These types are client-safe. Importing them does not pull in any server code.
 The module is built from small, testable pieces:
 
 - **Platform type:** `type Platform = 'win32' | 'darwin' | 'linux' | string`.
-- **Command shape:** `type NativeCommand = { command: string; args: string[] }`.
+- **Command shape:** `type NativeCommand = { command: string; args: string[]; verbatim?: boolean }`.
 - **Pure builders** (no side effects, return `null` for an unknown platform):
   - `buildRevealCommand(platform: Platform, filePath: string): NativeCommand | null`
   - `buildOpenCommand(platform: Platform, filePath: string): NativeCommand | null`
@@ -164,14 +164,18 @@ The module is built from small, testable pieces:
 
 | Platform | Reveal | Open |
 | --- | --- | --- |
-| Windows | `explorer /select,<path>` (one arg) | `explorer <path>` |
+| Windows | `explorer /select,"<path>"` (one arg, verbatim) | `explorer <path>` |
 | macOS | `open -R <path>` | `open <path>` |
 | Linux | `xdg-open <parent dir>` | `xdg-open <path>` |
 
 - Commands run with `spawn(command, args)` and `{ windowsHide: true }`. The code never uses a
   shell. The command name and each argument go to the process as separate values.
-- On Windows, both actions call `explorer` directly. The path is one argument. The code does
-  not use Windows `cmd`, so `&`, `^`, `%`, and `!` in a file name have no special meaning.
+- On Windows, both actions call `explorer` directly. The code does not use Windows `cmd`, so
+  `&`, `^`, `%`, and `!` in a file name have no special meaning.
+- On Windows, "Reveal" puts the path in quotes and sets `windowsVerbatimArguments: true`.
+  Without the flag, Node quotes the whole `/select,<path>` argument when the path has a space.
+  Explorer then reads one field and ignores the switch. The quoted form also protects a comma
+  in the path. "Open" passes the path as one argument and does not use the flag.
 - On Linux, "Reveal" cannot reliably select a file across file managers, so it opens the
   parent directory.
 - On any other platform, the builders return `null`. Reveal/Open then return
@@ -274,7 +278,9 @@ All three import the server-only library **inside the handler**.
   - `buildRevealCommand` / `buildOpenCommand` / `buildFolderPickerCommand` for `win32`,
     `darwin`, and `linux` return the expected command and argument list. The Windows Open
     case uses a path with `&` and asserts the `explorer` command with the path as one
-    argument. The Windows picker case asserts the UTF-8 output setting.
+    argument. The Windows Reveal case uses a path with a space and a comma and asserts the
+    quoted argument, the verbatim flag, and the spawn option. The Windows picker case asserts
+    the UTF-8 output setting.
   - `reveal`/`open`: unknown id → `not-found`; missing file → `missing`; present file →
     `ok: true` and the injected spawn was called with the built command.
   - `pickDirectory`: picked path is trimmed and de-slashed; empty output → `canceled`;

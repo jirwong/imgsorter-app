@@ -120,6 +120,7 @@ import {
   buildOpenCommand,
   buildRevealCommand,
   createNativeActions,
+  detachedSpawnOptions,
   type NativeActionDeps,
   type NativeCommand,
   type RunCaptureResult,
@@ -144,10 +145,21 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
 
 describe('command builders', () => {
   it('builds reveal commands per platform', () => {
-    expect(buildRevealCommand('win32', 'C:\\a.jpg')).toEqual({ command: 'explorer', args: ['/select,C:\\a.jpg'] });
+    expect(buildRevealCommand('win32', 'C:\\My Photos\\a,b.jpg')).toEqual({
+      command: 'explorer',
+      args: ['/select,"C:\\My Photos\\a,b.jpg"'],
+      verbatim: true,
+    });
     expect(buildRevealCommand('darwin', '/a.jpg')).toEqual({ command: 'open', args: ['-R', '/a.jpg'] });
     expect(buildRevealCommand('linux', '/dir/a.jpg')).toEqual({ command: 'xdg-open', args: ['/dir'] });
     expect(buildRevealCommand('freebsd', '/a.jpg')).toBeNull();
+  });
+
+  it('sets verbatim arguments only for the Windows reveal command', () => {
+    expect(detachedSpawnOptions({ command: 'explorer', args: ['x'] }).windowsVerbatimArguments).toBe(false);
+    const reveal = buildRevealCommand('win32', 'C:\\My Photos\\a.jpg');
+    expect(reveal?.verbatim).toBe(true);
+    expect(reveal && detachedSpawnOptions(reveal).windowsVerbatimArguments).toBe(true);
   });
 
   it('builds open commands per platform', () => {
@@ -188,7 +200,7 @@ describe('createNativeActions reveal and open', () => {
     const deps = makeDeps();
     const actions = createNativeActions(deps);
     expect(await actions.reveal(1)).toEqual({ ok: true });
-    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['/select,C:/Media/2025/a.jpg'] }]);
+    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['/select,"C:/Media/2025/a.jpg"'], verbatim: true }]);
   });
 
   it('opens a present file', async () => {
@@ -293,7 +305,7 @@ import { virtualToReal } from './db-path';
 import { getEntryPathById } from './queries';
 
 export type Platform = string;
-export type NativeCommand = { command: string; args: string[] };
+export type NativeCommand = { command: string; args: string[]; verbatim?: boolean };
 
 export type RunCaptureResult = {
   code: number | null;
@@ -330,7 +342,7 @@ const WINDOWS_FOLDER_SCRIPT = [
 export function buildRevealCommand(platform: Platform, filePath: string): NativeCommand | null {
   switch (platform) {
     case 'win32':
-      return { command: 'explorer', args: [`/select,${filePath}`] };
+      return { command: 'explorer', args: [`/select,"${filePath}"`], verbatim: true };
     case 'darwin':
       return { command: 'open', args: ['-R', filePath] };
     case 'linux':
@@ -379,8 +391,16 @@ function toPickResult(result: RunCaptureResult): FolderPickResult {
   return { status: 'picked', path: stripTrailingSeparator(path) };
 }
 
+export function detachedSpawnOptions(command: NativeCommand): {
+  windowsHide: boolean;
+  detached: boolean;
+  windowsVerbatimArguments: boolean;
+} {
+  return { windowsHide: true, detached: true, windowsVerbatimArguments: command.verbatim === true };
+}
+
 function defaultSpawnDetached(command: NativeCommand): void {
-  const child = spawn(command.command, command.args, { windowsHide: true, detached: true });
+  const child = spawn(command.command, command.args, detachedSpawnOptions(command));
   child.on('error', () => {});
   child.unref();
 }
@@ -1003,4 +1023,4 @@ git commit -m "docs: record Phase 4c complete"
    - Verification + docs → Task 4.
 2. **Placeholder scan:** every step has full code or an exact command; no TBD/TODO.
 3. **Type consistency:** `NativeActionResult` / `FolderPickResult` / `NativeActionFailure` defined in Task 1 and used in Tasks 2–3; `createNativeActions` / `buildRevealCommand` / `buildOpenCommand` / `buildFolderPickerCommand` / `RunCaptureResult` / `NativeActionDeps` names match between module and tests; `revealEntry` / `openEntry` / `pickDirectory` consistent between routes and clients; `getEntryPathById` consistent between queries and tests.
-4. **Risk notes:** `pnpm add` updates `pnpm-lock.yaml`. `buildRevealCommand` uses `dirname`, so the Linux reveal test uses a POSIX path. The Windows PowerShell picker and fire-and-forget spawns are not unit-tested against real processes; the command builders and injected seams are the tested boundary.
+4. **Risk notes:** `pnpm add` updates `pnpm-lock.yaml`. `buildRevealCommand` uses `dirname`, so the Linux reveal test uses a POSIX path. The Windows reveal command quotes the path and sets `windowsVerbatimArguments`; the builder and `detachedSpawnOptions` are unit-tested, and the manual smoke verifies Explorer. The Windows PowerShell picker and fire-and-forget spawns are not unit-tested against real processes; the command builders and injected seams are the tested boundary.
