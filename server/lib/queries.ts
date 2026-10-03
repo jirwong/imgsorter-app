@@ -10,6 +10,7 @@ import type {
   DuplicateGroup,
   Entry,
   FilesInput,
+  KeeperMap,
   OverviewData,
   ShellData,
 } from '../../app/lib/types';
@@ -247,6 +248,55 @@ export function getEntryPathById(id: number): string | null {
   try {
     const row = db.prepare(`SELECT path FROM entries WHERE id = ?`).get(id) as { path: string } | undefined;
     return row?.path ?? null;
+  } finally {
+    db.close();
+  }
+}
+
+export function getEntryPathsByIds(ids: number[]): string[] {
+  if (ids.length === 0) return [];
+  const db = openReadonly();
+  if (!db) return [];
+  try {
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = db.prepare(`SELECT path FROM entries WHERE id IN (${placeholders})`).all(...ids) as {
+      path: string;
+    }[];
+    return rows.map((row) => row.path);
+  } finally {
+    db.close();
+  }
+}
+
+export function getKeeperData(paths: string[]): { keepers: KeeperMap; stale: string[] } {
+  const keepers: KeeperMap = {};
+  if (paths.length === 0) return { keepers, stale: [] };
+  const db = openReadonly();
+  if (!db) return { keepers, stale: [] };
+  try {
+    const storedByKey = new Map<string, string>();
+    for (const path of paths) {
+      storedByKey.set(normalizeDirectoryPath(path).toLowerCase(), path);
+    }
+    const keys = [...storedByKey.keys()];
+    const placeholders = keys.map(() => '?').join(', ');
+    const rows = db
+      .prepare(
+        `SELECT e.id AS id, e.path AS path, e.hash AS hash, e.filename AS filename, r.count AS count
+         FROM entries e
+         LEFT JOIN records r ON r.hash = e.hash AND r.filename = e.filename
+         WHERE lower(replace(e.path, char(92), '/')) IN (${placeholders})`,
+      )
+      .all(...keys) as { id: number; path: string; hash: string; filename: string; count: number | null }[];
+    const matched = new Set<string>();
+    for (const row of rows) {
+      if (row.count !== null && row.count > 1) {
+        keepers[`${row.hash}:${row.filename}`] = row.id;
+        matched.add(normalizeDirectoryPath(row.path).toLowerCase());
+      }
+    }
+    const stale = paths.filter((path) => !matched.has(normalizeDirectoryPath(path).toLowerCase()));
+    return { keepers, stale };
   } finally {
     db.close();
   }

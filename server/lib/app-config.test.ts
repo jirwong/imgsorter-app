@@ -88,6 +88,31 @@ describe('createAppConfigStore', () => {
     expect(store.get().directoryMeta).toEqual({});
   });
 
+  it('defaults keepers to an empty list', () => {
+    expect(store.getKeepers()).toEqual([]);
+  });
+
+  it('normalizes, de-duplicates, and round-trips keepers', () => {
+    const saved = store.setKeepers([' C:\\Media\\A.jpg ', 'c:/media/a.jpg', '', 'C:\\Media\\B.jpg\\']);
+    expect(saved).toEqual(['C:/Media/A.jpg', 'C:/Media/B.jpg']);
+    expect(store.getKeepers()).toEqual(['C:/Media/A.jpg', 'C:/Media/B.jpg']);
+  });
+
+  it('keeps keepers when directories and settings are saved', () => {
+    store.setKeepers(['C:/Media/A.jpg']);
+    store.saveDirectories({ indexed: [], ignored: [] });
+    store.saveApplication({ ...DEFAULT_APP_CONFIG.application, extensions: 'png' });
+    expect(store.getKeepers()).toEqual(['C:/Media/A.jpg']);
+  });
+
+  it('ignores an invalid keepers value', () => {
+    store.getKeepers();
+    const raw = new Database(dbPath);
+    raw.prepare(`UPDATE app_config SET value = '{}' WHERE key = 'keepers'`).run();
+    raw.close();
+    expect(store.getKeepers()).toEqual([]);
+  });
+
   it('falls back to defaults when stored JSON is invalid', () => {
     store.get();
     const raw = new Database(dbPath);

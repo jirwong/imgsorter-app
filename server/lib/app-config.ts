@@ -15,12 +15,15 @@ import { appConfigDbPath } from './db-path';
 const DIRECTORY_KEY = 'directories';
 const APPLICATION_KEY = 'application';
 const DIRECTORY_META_KEY = 'directory_meta';
+const KEEPERS_KEY = 'keepers';
 
 export type AppConfigStore = {
   get: () => AppConfig;
   saveApplication: (input: ApplicationConfig) => AppConfig;
   saveDirectories: (input: DirectoriesConfig) => AppConfig;
   recordScannedDirectories: (paths: string[], at: string) => AppConfig;
+  getKeepers: () => string[];
+  setKeepers: (paths: string[]) => string[];
 };
 
 function dedupePaths(values: string[]): string[] {
@@ -64,6 +67,20 @@ function normalizeApplication(input: ApplicationConfig): ApplicationConfig {
   };
 }
 
+function normalizeKeepers(paths: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of paths) {
+    const path = normalizeDirectoryPath(value);
+    if (path.length === 0) continue;
+    const key = path.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(path);
+  }
+  return result;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -93,6 +110,10 @@ function isDirectoriesConfig(value: unknown): value is DirectoriesConfig {
 function isDirectoryMeta(value: unknown): value is DirectoryMeta {
   if (!isRecord(value) || Array.isArray(value)) return false;
   return Object.values(value).every((entry) => isRecord(entry) && typeof entry.lastScannedAt === 'string');
+}
+
+function isKeeperPaths(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
 function openStore(dbPath: string): DatabaseType {
@@ -170,6 +191,24 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
         }
         writeKey(db, DIRECTORY_META_KEY, next);
         return readConfig(db);
+      } finally {
+        db.close();
+      }
+    },
+    getKeepers: () => {
+      const db = openStore(dbPath);
+      try {
+        return readKey<string[]>(db, KEEPERS_KEY, [], isKeeperPaths);
+      } finally {
+        db.close();
+      }
+    },
+    setKeepers: (paths) => {
+      const db = openStore(dbPath);
+      try {
+        const next = normalizeKeepers(paths);
+        writeKey(db, KEEPERS_KEY, next);
+        return next;
       } finally {
         db.close();
       }

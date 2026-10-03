@@ -8,6 +8,8 @@ import {
   getDirectoryTree,
   getDuplicateGroups,
   getEntryPathById,
+  getEntryPathsByIds,
+  getKeeperData,
   getOverviewStats,
   getShellData,
   listEntries,
@@ -110,6 +112,27 @@ describe('queries against the committed sample db', () => {
     expect(typeof path).toBe('string');
     expect(path).toContain('@fixtures');
     expect(getEntryPathById(99999999)).toBeNull();
+  });
+
+  it('maps entry ids to raw paths and drops unknown ids', () => {
+    const [group] = getDuplicateGroups();
+    const id = group.files[0].id;
+    const paths = getEntryPathsByIds([id, 99999999]);
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toContain('@fixtures');
+  });
+
+  it('resolves saved keeper paths and reports stale paths', () => {
+    const [group] = getDuplicateGroups();
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    const { keepers, stale } = getKeeperData([raw, '@fixtures/does/not/exist.jpg']);
+    expect(keepers[group.key]).toBe(id);
+    expect(stale).toEqual(['@fixtures/does/not/exist.jpg']);
+  });
+
+  it('returns empty keeper data for empty input', () => {
+    expect(getKeeperData([])).toEqual({ keepers: {}, stale: [] });
   });
 
   it('returns empty shapes when the db is missing', () => {
