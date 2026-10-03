@@ -14,7 +14,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 1 | TanStack Start UI recreation (mock data) | Modular, URL-routed UI; parity with imgsorter-ui-v1 prototype | `[x]` |
 | 2 | Vendor engine server-side; wire read-only pages (Overview, Unique Files, Browse, Analytics) + shell totals to real SQLite data | Real data on read-only pages | `[x]` |
 | 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[x]` |
-| 4 | Preferences persistence (`app_config`) + directory management + native OS actions (Reveal/Open, folder picker) + keeper persistence | Full config persistence + actions | `[~]` |
+| 4 | Preferences persistence (`app_config`) + directory management + native OS actions (Reveal/Open, folder picker) + keeper persistence | Full config persistence + actions | `[x]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[ ]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
@@ -37,6 +37,7 @@ spec → plan → PR loop):
   picked absolute path (Windows-first, with macOS/Linux fallbacks).
   Spec: [2026-10-03-phase4c-native-actions-design.md](superpowers/specs/2026-10-03-phase4c-native-actions-design.md). **Complete.**
 - **4d — Keeper persistence:** persist the one-per-group keeper selection.
+  Spec: [2026-10-03-phase4d-keeper-design.md](superpowers/specs/2026-10-03-phase4d-keeper-design.md). **Complete.**
 
 ## Dependencies
 
@@ -69,6 +70,7 @@ spec → plan → PR loop):
 | 4a | [2026-10-03-phase4a-app-config-design.md](superpowers/specs/2026-10-03-phase4a-app-config-design.md) |
 | 4b | [2026-10-03-phase4b-real-scan-design.md](superpowers/specs/2026-10-03-phase4b-real-scan-design.md) |
 | 4c | [2026-10-03-phase4c-native-actions-design.md](superpowers/specs/2026-10-03-phase4c-native-actions-design.md) |
+| 4d | [2026-10-03-phase4d-keeper-design.md](superpowers/specs/2026-10-03-phase4d-keeper-design.md) |
 
 ## How to add a phase
 

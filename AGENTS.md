@@ -87,16 +87,19 @@ review`.
   engine from the UI ("Scan library") with in-memory progress polling, cancel, a real
   Duplicates badge, and no dead mock plumbing in `app-context`.
 - Phase 4 (Preferences persistence via `app_config`, directory management, native OS
-  actions, keeper persistence) — **in progress**, split into 4a–4d. **4a complete**
-  (`app_config` persistence + Preferences directory management), **4b complete**
+  actions, keeper persistence) — **complete**, split into 4a–4d. **4a**
+  (`app_config` persistence + Preferences directory management), **4b**
   (real configured-directory scan; app DB local + committed `fixture.db`; per-directory
-  counts/last scan), and **4c complete** (native Reveal / Open actions and a server-side
-  folder picker; toasts via `@mantine/notifications`). Specs at
+  counts/last scan), **4c** (native Reveal / Open actions and a server-side folder picker;
+  toasts via `@mantine/notifications`), and **4d** (keeper persistence in `app-config.db`,
+  a keeper filter, and a stale-keeper warning). Specs at
   `docs/superpowers/specs/2026-10-03-phase4a-app-config-design.md`,
-  `docs/superpowers/specs/2026-10-03-phase4b-real-scan-design.md`, and
-  `docs/superpowers/specs/2026-10-03-phase4c-native-actions-design.md`; plans at
+  `docs/superpowers/specs/2026-10-03-phase4b-real-scan-design.md`,
+  `docs/superpowers/specs/2026-10-03-phase4c-native-actions-design.md`, and
+  `docs/superpowers/specs/2026-10-03-phase4d-keeper-design.md`; plans at
   `docs/superpowers/plans/2026-10-03-phase4a-app-config.md`,
-  `docs/superpowers/plans/2026-10-03-phase4b-real-scan.md`, and
-  `docs/superpowers/plans/2026-10-03-phase4c-native-actions.md`. Next: 4d (keeper
-  persistence).
+  `docs/superpowers/plans/2026-10-03-phase4b-real-scan.md`,
+  `docs/superpowers/plans/2026-10-03-phase4c-native-actions.md`, and
+  `docs/superpowers/plans/2026-10-03-phase4d-keeper.md`. Next: Phase 5 (real
+  thumbnails/previews, optional).
 - Roadmap: `docs/ROADMAP.md`.
