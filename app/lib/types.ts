@@ -100,3 +100,15 @@ export type AppConfig = {
   application: ApplicationConfig;
   directoryMeta: DirectoryMeta;
 };
+
+export type NativeActionFailure = 'not-found' | 'missing' | 'unsupported' | 'error';
+
+export type NativeActionResult = { ok: true } | { ok: false; reason: NativeActionFailure };
+
+export type FolderPickResult =
+  | { status: 'picked'; path: string }
+  | { status: 'canceled' }
+  | { status: 'busy' }
+  | { status: 'timeout' }
+  | { status: 'unsupported' }
+  | { status: 'error' };

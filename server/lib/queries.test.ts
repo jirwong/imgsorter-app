@@ -7,6 +7,7 @@ import {
   getAnalyticsData,
   getDirectoryTree,
   getDuplicateGroups,
+  getEntryPathById,
   getOverviewStats,
   getShellData,
   listEntries,
@@ -101,6 +102,14 @@ describe('queries against the committed sample db', () => {
     expect(media).toBeGreaterThan(trips);
     expect(countEntriesByDirectory('@FIXTURES/media/2025')).toBe(media);
     expect(countEntriesByDirectory('@fixtures/Media/2025/nope')).toBe(0);
+  });
+
+  it('reads the raw stored path for an entry id', () => {
+    const [entry] = getOverviewStats().largestFiles;
+    const path = getEntryPathById(entry.id);
+    expect(typeof path).toBe('string');
+    expect(path).toContain('@fixtures');
+    expect(getEntryPathById(99999999)).toBeNull();
   });
 
   it('returns empty shapes when the db is missing', () => {
