@@ -49,8 +49,10 @@ spec → plan → PR loop):
 - **Engine integration:** imgsorter-v2 source is copied/vendored into this repo's
   server side (Phase 2). It is Node-only (better-sqlite3 native module) and must
   live on the server, never leaked into client bundles.
-- **Persistence:** SQLite `app_config` table managed by the engine (single source
-  of truth) for preferences, indexed/ignored directories, scan history (Phase 4).
+- **Persistence:** preferences and indexed/ignored directories live in a dedicated,
+  app-owned SQLite store (`server/data/app-config.db`, Phase 4a), kept separate from the
+  engine's photo DB so scans/`pnpm seed` cannot wipe it. (Supersedes the earlier
+  "engine-managed `app_config`" proposal.)
 - **State management:** no TanStack Store. Local `useState` + TanStack Router
   search params + one context. Revisit `useSyncExternalStore`/store in Phase 3 for
   the scan-progress stream.
