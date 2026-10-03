@@ -4,7 +4,7 @@ import type { Reporter } from '../engine/output/reporter';
 import type { ProgressSink } from '../engine/types/progress';
 import type { RunConfiguration } from '../engine/types/configuration';
 import type { RunSummary } from '../engine/types/run-summary';
-import type { AppConfig } from '../../app/lib/types';
+import type { AppConfig, LastScan } from '../../app/lib/types';
 import { appConfigStore } from './app-config';
 import { sampleDbPath } from './db-path';
 
@@ -15,6 +15,7 @@ export type RunConfiguredScanDeps = { progress: ProgressSink; signal: AbortSigna
 export type ConfiguredScanDeps = {
   getConfig: () => AppConfig;
   recordScanned: (paths: string[], at: string) => void;
+  recordLastScan: (scan: LastScan) => void;
   run: (config: RunConfiguration, deps: RunConfiguredScanDeps) => Promise<RunSummary>;
 };
 
@@ -58,7 +59,17 @@ export function createConfiguredScan(deps: ConfiguredScanDeps): (deps: RunConfig
     };
 
     const summary = await deps.run(runConfig, { progress, signal });
-    deps.recordScanned(directories, new Date().toISOString());
+    const at = new Date().toISOString();
+    deps.recordScanned(directories, at);
+    deps.recordLastScan({
+      finishedAt: at,
+      directories: directories.length,
+      filesScanned: summary.filesScanned,
+      entriesWritten: summary.entriesWritten,
+      duplicateGroups: summary.duplicateGroups,
+      duplicateFiles: summary.duplicateFiles,
+      errors: summary.errors.length,
+    });
     return summary;
   };
 }
@@ -67,6 +78,9 @@ export const runConfiguredScan = createConfiguredScan({
   getConfig: () => appConfigStore.get(),
   recordScanned: (paths, at) => {
     appConfigStore.recordScannedDirectories(paths, at);
+  },
+  recordLastScan: (scan) => {
+    appConfigStore.recordLastScan(scan);
   },
   run: async (config, { progress, signal }) => {
     const runner = new Runner(config, { reporter: silentReporter, progress, signal });

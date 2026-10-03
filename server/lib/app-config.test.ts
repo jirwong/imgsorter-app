@@ -113,6 +113,40 @@ describe('createAppConfigStore', () => {
     expect(store.getKeepers()).toEqual([]);
   });
 
+  it('defaults the last scan to null', () => {
+    expect(store.getLastScan()).toBeNull();
+  });
+
+  it('round-trips the last scan', () => {
+    const scan = {
+      finishedAt: '2026-10-04T08:00:00.000Z',
+      directories: 2,
+      filesScanned: 100,
+      entriesWritten: 98,
+      duplicateGroups: 5,
+      duplicateFiles: 12,
+      errors: 2,
+    };
+    expect(store.recordLastScan(scan)).toEqual(scan);
+    expect(store.getLastScan()).toEqual(scan);
+  });
+
+  it('reads a malformed last scan as null', () => {
+    store.recordLastScan({
+      finishedAt: '2026-10-04T08:00:00.000Z',
+      directories: 1,
+      filesScanned: 1,
+      entriesWritten: 1,
+      duplicateGroups: 0,
+      duplicateFiles: 0,
+      errors: 0,
+    });
+    const raw = new Database(dbPath);
+    raw.prepare(`UPDATE app_config SET value = 'nope' WHERE key = 'last_scan'`).run();
+    raw.close();
+    expect(store.getLastScan()).toBeNull();
+  });
+
   it('falls back to defaults when stored JSON is invalid', () => {
     store.get();
     const raw = new Database(dbPath);

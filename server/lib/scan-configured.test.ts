@@ -36,7 +36,8 @@ describe('createConfiguredScan', () => {
   it('builds the run configuration from app config and records the scan', async () => {
     const run = vi.fn(async (_config: RunConfiguration, _deps: RunConfiguredScanDeps) => summary);
     const recordScanned = vi.fn();
-    const scan = createConfiguredScan({ getConfig: () => baseConfig(), recordScanned, run });
+    const recordLastScan = vi.fn();
+    const scan = createConfiguredScan({ getConfig: () => baseConfig(), recordScanned, recordLastScan, run });
 
     const result = await scan({ progress: sink, signal });
 
@@ -50,27 +51,42 @@ describe('createConfiguredScan', () => {
     expect(config.resync_directories).toBe(true);
     expect(config.resync_check_actual_file).toBe(true);
     expect(recordScanned).toHaveBeenCalledWith(['C:/Photos'], expect.any(String));
+    expect(recordLastScan).toHaveBeenCalledWith({
+      finishedAt: expect.any(String),
+      directories: 1,
+      filesScanned: 0,
+      entriesWritten: 0,
+      duplicateGroups: 0,
+      duplicateFiles: 0,
+      errors: 0,
+    });
   });
 
   it('refuses when no directories are enabled', async () => {
     const run = vi.fn(async () => summary);
+    const recordLastScan = vi.fn();
     const scan = createConfiguredScan({
       getConfig: () => baseConfig({ directories: { indexed: [{ path: 'C:/Photos', enabled: false }], ignored: [] } }),
       recordScanned: vi.fn(),
+      recordLastScan,
       run,
     });
     await expect(scan({ progress: sink, signal })).rejects.toBeInstanceOf(NoDirectoriesConfiguredError);
     expect(run).not.toHaveBeenCalled();
+    expect(recordLastScan).not.toHaveBeenCalled();
   });
 
   it('refuses when no extensions are configured', async () => {
     const run = vi.fn(async () => summary);
+    const recordLastScan = vi.fn();
     const scan = createConfiguredScan({
       getConfig: () => baseConfig({ application: { ...baseConfig().application, extensions: '  ' } }),
       recordScanned: vi.fn(),
+      recordLastScan,
       run,
     });
     await expect(scan({ progress: sink, signal })).rejects.toBeInstanceOf(NoDirectoriesConfiguredError);
     expect(run).not.toHaveBeenCalled();
+    expect(recordLastScan).not.toHaveBeenCalled();
   });
 });
