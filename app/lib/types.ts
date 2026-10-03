@@ -116,3 +116,13 @@ export type FolderPickResult =
 export type KeeperMap = Record<string, number>;
 
 export type DuplicatesData = { groups: DuplicateGroup[]; keepers: KeeperMap; staleKeepers: number };
+
+export type LastScan = {
+  finishedAt: string;
+  directories: number;
+  filesScanned: number;
+  entriesWritten: number;
+  duplicateGroups: number;
+  duplicateFiles: number;
+  errors: number;
+};

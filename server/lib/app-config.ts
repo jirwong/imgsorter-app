@@ -8,6 +8,7 @@ import type {
   DirectoriesConfig,
   DirectoryMeta,
   IndexedDirectory,
+  LastScan,
 } from '../../app/lib/types';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigDbPath } from './db-path';
@@ -16,6 +17,7 @@ const DIRECTORY_KEY = 'directories';
 const APPLICATION_KEY = 'application';
 const DIRECTORY_META_KEY = 'directory_meta';
 const KEEPERS_KEY = 'keepers';
+const LAST_SCAN_KEY = 'last_scan';
 
 export type AppConfigStore = {
   get: () => AppConfig;
@@ -24,6 +26,8 @@ export type AppConfigStore = {
   recordScannedDirectories: (paths: string[], at: string) => AppConfig;
   getKeepers: () => string[];
   setKeepers: (paths: string[]) => string[];
+  getLastScan: () => LastScan | null;
+  recordLastScan: (scan: LastScan) => LastScan;
 };
 
 function dedupePaths(values: string[]): string[] {
@@ -114,6 +118,19 @@ function isDirectoryMeta(value: unknown): value is DirectoryMeta {
 
 function isKeeperPaths(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isLastScan(value: unknown): value is LastScan {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.finishedAt === 'string' &&
+    typeof value.directories === 'number' &&
+    typeof value.filesScanned === 'number' &&
+    typeof value.entriesWritten === 'number' &&
+    typeof value.duplicateGroups === 'number' &&
+    typeof value.duplicateFiles === 'number' &&
+    typeof value.errors === 'number'
+  );
 }
 
 function openStore(dbPath: string): DatabaseType {
@@ -209,6 +226,31 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
         const next = normalizeKeepers(paths);
         writeKey(db, KEEPERS_KEY, next);
         return next;
+      } finally {
+        db.close();
+      }
+    },
+    getLastScan: () => {
+      const db = openStore(dbPath);
+      try {
+        const row = db.prepare(`SELECT value FROM app_config WHERE key = ?`).get(LAST_SCAN_KEY) as
+          { value: string } | undefined;
+        if (!row) return null;
+        try {
+          const parsed = JSON.parse(row.value) as unknown;
+          return isLastScan(parsed) ? parsed : null;
+        } catch {
+          return null;
+        }
+      } finally {
+        db.close();
+      }
+    },
+    recordLastScan: (scan) => {
+      const db = openStore(dbPath);
+      try {
+        writeKey(db, LAST_SCAN_KEY, scan);
+        return scan;
       } finally {
         db.close();
       }
