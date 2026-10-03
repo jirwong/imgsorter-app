@@ -1,8 +1,13 @@
 import { expectedFixtureStats } from '../server/lib/fixture-plan';
+import { fixtureDbPath } from '../server/lib/db-path';
 import { runFixtureScan } from '../server/lib/scan-runner';
 
 async function main(): Promise<void> {
-  const summary = await runFixtureScan({ progress: silentProgress(), signal: new AbortController().signal });
+  const summary = await runFixtureScan({
+    progress: silentProgress(),
+    signal: new AbortController().signal,
+    dbPath: fixtureDbPath(),
+  });
 
   const expected = expectedFixtureStats();
   console.log(

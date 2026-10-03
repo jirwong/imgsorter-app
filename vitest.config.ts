@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -21,6 +22,9 @@ export default defineConfig({
           environment: 'node',
           globals: true,
           include: ['server/**/*.test.{ts,tsx}'],
+          env: {
+            IMGSORTER_DB_PATH: fileURLToPath(new URL('./server/data/fixture.db', import.meta.url)),
+          },
         },
       },
     ],

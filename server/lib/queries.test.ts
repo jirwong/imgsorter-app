@@ -1,6 +1,9 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
 import {
+  countEntriesByDirectory,
   getAnalyticsData,
   getDirectoryTree,
   getDuplicateGroups,
@@ -90,5 +93,41 @@ describe('queries against the committed sample db', () => {
     }
     const totalRedundant = groups.reduce((sum, g) => sum + g.redundantSpace, 0);
     expect(totalRedundant).toBe(expected.redundantSpace);
+  });
+
+  it('counts entries under a root case- and separator-insensitively', () => {
+    const trips = countEntriesByDirectory('@fixtures/Media/2025/Trips');
+    const media = countEntriesByDirectory('@fixtures/Media/2025');
+    expect(media).toBeGreaterThan(trips);
+    expect(countEntriesByDirectory('@FIXTURES/media/2025')).toBe(media);
+    expect(countEntriesByDirectory('@fixtures/Media/2025/nope')).toBe(0);
+  });
+
+  it('returns empty shapes when the db is missing', () => {
+    const previous = process.env.IMGSORTER_DB_PATH;
+    process.env.IMGSORTER_DB_PATH = join(tmpdir(), 'imgsorter-missing-xyz.db');
+    try {
+      expect(getShellData()).toEqual({ files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 });
+      expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] })).toEqual([]);
+      expect(getDirectoryTree()).toEqual([]);
+      expect(getDuplicateGroups()).toEqual([]);
+      expect(getAnalyticsData()).toEqual({ rankedBySize: [], rankedByCopies: [] });
+      expect(getOverviewStats()).toEqual({
+        totalFiles: 0,
+        totalSize: 0,
+        duplicateGroups: 0,
+        redundantSpace: 0,
+        uniqueFiles: 0,
+        storageMap: [],
+        largestFiles: [],
+      });
+      expect(countEntriesByDirectory('C:/Photos')).toBe(0);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.IMGSORTER_DB_PATH;
+      } else {
+        process.env.IMGSORTER_DB_PATH = previous;
+      }
+    }
   });
 });

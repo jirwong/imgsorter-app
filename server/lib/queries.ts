@@ -1,5 +1,7 @@
 import '@tanstack/react-start/server-only';
+import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import { applyFilters } from '../../app/lib/filter-pipeline';
 import type {
   AnalyticsData,
@@ -25,8 +27,14 @@ type EntryRow = {
   path: string;
 };
 
-function openReadonly() {
-  return new Database(sampleDbPath(), { readonly: true });
+function dbPath(): string {
+  return process.env.IMGSORTER_DB_PATH ?? sampleDbPath();
+}
+
+function openReadonly(): DatabaseType | null {
+  const path = dbPath();
+  if (!existsSync(path)) return null;
+  return new Database(path, { readonly: true });
 }
 
 function toEntry(row: EntryRow): Entry {
@@ -44,6 +52,17 @@ function toEntry(row: EntryRow): Entry {
 
 export function getOverviewStats(): OverviewData {
   const db = openReadonly();
+  if (!db) {
+    return {
+      totalFiles: 0,
+      totalSize: 0,
+      duplicateGroups: 0,
+      redundantSpace: 0,
+      uniqueFiles: 0,
+      storageMap: [],
+      largestFiles: [],
+    };
+  }
   try {
     const totals = db.prepare(`SELECT COUNT(*) AS files, COALESCE(SUM(size), 0) AS size FROM entries`).get() as {
       files: number;
@@ -99,6 +118,7 @@ export function getOverviewStats(): OverviewData {
 
 export function listEntries(input: FilesInput): Entry[] {
   const db = openReadonly();
+  if (!db) return [];
   try {
     const rows = db
       .prepare(`SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries`)
@@ -111,6 +131,7 @@ export function listEntries(input: FilesInput): Entry[] {
 
 export function getDirectoryTree(): DirectoryNode[] {
   const db = openReadonly();
+  if (!db) return [];
   try {
     const rows = db.prepare(`SELECT DISTINCT directory FROM entries`).all() as { directory: string }[];
     return buildDirectoryTree(rows.map((row) => mapPathToDisplay(row.directory)));
@@ -121,6 +142,7 @@ export function getDirectoryTree(): DirectoryNode[] {
 
 export function getAnalyticsData(): AnalyticsData {
   const db = openReadonly();
+  if (!db) return { rankedBySize: [], rankedByCopies: [] };
   try {
     const rankedBySize = db.prepare(`SELECT filename, size FROM entries ORDER BY size DESC`).all() as {
       filename: string;
@@ -137,6 +159,7 @@ export function getAnalyticsData(): AnalyticsData {
 
 export function getShellData(): ShellData {
   const db = openReadonly();
+  if (!db) return { files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 };
   try {
     const totals = db.prepare(`SELECT COUNT(*) AS files, COALESCE(SUM(size), 0) AS size FROM entries`).get() as {
       files: number;
@@ -162,6 +185,7 @@ export function getShellData(): ShellData {
 
 export function getDuplicateGroups(): DuplicateGroup[] {
   const db = openReadonly();
+  if (!db) return [];
   try {
     const rows = db
       .prepare(
@@ -192,6 +216,25 @@ export function getDuplicateGroups(): DuplicateGroup[] {
         files: files.map(toEntry),
       };
     });
+  } finally {
+    db.close();
+  }
+}
+
+export function countEntriesByDirectory(root: string): number {
+  const db = openReadonly();
+  if (!db) return 0;
+  try {
+    const normalized = root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    const escaped = normalized.replace(/[%_]/g, (ch) => `\\${ch}`);
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM entries
+         WHERE lower(replace(directory, char(92), '/')) = ?
+            OR lower(replace(directory, char(92), '/')) LIKE ? ESCAPE '\\'`,
+      )
+      .get(normalized, `${escaped}/%`) as { n: number };
+    return row.n;
   } finally {
     db.close();
   }

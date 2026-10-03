@@ -68,8 +68,9 @@ review`.
   `pnpm build` must succeed at the end of an implementation task.
 - Engine code (`server/engine/`) is vendored verbatim from imgsorter-v2 and is
   server-only. `better-sqlite3` must never enter a client bundle.
-- `pnpm seed` regenerates the committed sample DB (`server/data/imgsorter.db`).
-  Run manually only; never run it casually.
+- `pnpm seed` regenerates the committed test fixture DB (`server/data/fixture.db`).
+  The app DB (`server/data/imgsorter.db`) is gitignored local state. Run manually only;
+  never run it casually.
 - Fixture files under `server/.fixtures/` are gitignored; the committed DB is not.
 
 ## Current Plan State
