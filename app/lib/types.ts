@@ -93,7 +93,10 @@ export type ApplicationConfig = {
   verifyFiles: boolean;
 };
 
+export type DirectoryMeta = Record<string, { lastScannedAt: string }>;
+
 export type AppConfig = {
   directories: DirectoriesConfig;
   application: ApplicationConfig;
+  directoryMeta: DirectoryMeta;
 };

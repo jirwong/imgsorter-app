@@ -4,7 +4,7 @@ import { ProgressEmitter } from '../engine/output/progress';
 import type { ProgressEvent } from '../engine/types/progress';
 import type { RunSummary } from '../engine/types/run-summary';
 import type { LogEntry, ScanState } from '../../app/lib/types';
-import { runFixtureScan } from './scan-runner';
+import { runConfiguredScan } from './scan-configured';
 
 const MAX_LOG = 50;
 
@@ -127,4 +127,4 @@ export function createScanService(runScan: RunScan): ScanService {
   };
 }
 
-export const scanService = createScanService(({ progress, signal }) => runFixtureScan({ progress, signal }));
+export const scanService = createScanService(({ progress, signal }) => runConfiguredScan({ progress, signal }));

@@ -20,10 +20,15 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 import { PreferencesPage } from './PreferencesPage';
 
+const config = {
+  ...DEFAULT_APP_CONFIG,
+  directories: { indexed: [{ path: 'C:/Media/2025', enabled: true }], ignored: [] },
+};
+
 function renderPage() {
   render(
     <MantineProvider defaultColorScheme="dark">
-      <PreferencesPage config={DEFAULT_APP_CONFIG} />
+      <PreferencesPage config={config} />
     </MantineProvider>,
   );
 }

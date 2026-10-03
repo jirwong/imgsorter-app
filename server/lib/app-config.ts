@@ -2,16 +2,24 @@ import '@tanstack/react-start/server-only';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { DEFAULT_APP_CONFIG } from '../../app/lib/app-config-defaults';
-import type { AppConfig, ApplicationConfig, DirectoriesConfig, IndexedDirectory } from '../../app/lib/types';
+import type {
+  AppConfig,
+  ApplicationConfig,
+  DirectoriesConfig,
+  DirectoryMeta,
+  IndexedDirectory,
+} from '../../app/lib/types';
 import { appConfigDbPath } from './db-path';
 
 const DIRECTORY_KEY = 'directories';
 const APPLICATION_KEY = 'application';
+const DIRECTORY_META_KEY = 'directory_meta';
 
 export type AppConfigStore = {
   get: () => AppConfig;
   saveApplication: (input: ApplicationConfig) => AppConfig;
   saveDirectories: (input: DirectoriesConfig) => AppConfig;
+  recordScannedDirectories: (paths: string[], at: string) => AppConfig;
 };
 
 function normalizePath(value: string): string {
@@ -85,6 +93,11 @@ function isDirectoriesConfig(value: unknown): value is DirectoriesConfig {
   );
 }
 
+function isDirectoryMeta(value: unknown): value is DirectoryMeta {
+  if (!isRecord(value)) return false;
+  return Object.values(value).every((entry) => isRecord(entry) && typeof entry.lastScannedAt === 'string');
+}
+
 function openStore(dbPath: string): DatabaseType {
   const db = new Database(dbPath);
   db.prepare(`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
@@ -118,6 +131,7 @@ function readConfig(db: DatabaseType): AppConfig {
   return {
     directories: readKey(db, DIRECTORY_KEY, DEFAULT_APP_CONFIG.directories, isDirectoriesConfig),
     application: readKey(db, APPLICATION_KEY, DEFAULT_APP_CONFIG.application, isApplicationConfig),
+    directoryMeta: readKey(db, DIRECTORY_META_KEY, DEFAULT_APP_CONFIG.directoryMeta, isDirectoryMeta),
   };
 }
 
@@ -144,6 +158,20 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
       const db = openStore(dbPath);
       try {
         writeKey(db, DIRECTORY_KEY, normalizeDirectories(input));
+        return readConfig(db);
+      } finally {
+        db.close();
+      }
+    },
+    recordScannedDirectories: (paths, at) => {
+      const db = openStore(dbPath);
+      try {
+        const meta = readKey(db, DIRECTORY_META_KEY, DEFAULT_APP_CONFIG.directoryMeta, isDirectoryMeta);
+        const next: DirectoryMeta = { ...meta };
+        for (const path of paths) {
+          next[normalizePath(path).toLowerCase()] = { lastScannedAt: at };
+        }
+        writeKey(db, DIRECTORY_META_KEY, next);
         return readConfig(db);
       } finally {
         db.close();
