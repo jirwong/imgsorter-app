@@ -1,11 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { LastScan } from '../../lib/types';
+
+const shell = vi.hoisted(() => ({ lastScan: null as LastScan | null }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
   return {
     ...actual,
     useRouter: () => ({ navigate: vi.fn() }),
+    useLoaderData: () => ({ lastScan: shell.lastScan }),
   };
 });
 
@@ -28,20 +32,52 @@ const data: OverviewData = {
   largestFiles: entries.slice(0, 4),
 };
 
+const scan: LastScan = {
+  finishedAt: new Date().toISOString(),
+  directories: 2,
+  filesScanned: 1272,
+  entriesWritten: 1272,
+  duplicateGroups: 24,
+  duplicateFiles: 60,
+  errors: 3,
+};
+
+function renderPage() {
+  render(
+    <MantineProvider defaultColorScheme="dark">
+      <OverviewPage data={data} />
+    </MantineProvider>,
+  );
+}
+
 describe('OverviewPage', () => {
+  beforeEach(() => {
+    shell.lastScan = null;
+  });
+
   it('renders heading, real metrics, and largest files', () => {
-    render(
-      <MantineProvider defaultColorScheme="dark">
-        <OverviewPage data={data} />
-      </MantineProvider>,
-    );
+    renderPage();
     expect(
       screen.getByText('A quiet view of what your library is keeping, duplicating, and missing.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Total files')).toBeInTheDocument();
     expect(screen.getByText('1,272')).toBeInTheDocument();
-    expect(screen.getByText('Not backed up')).toBeInTheDocument();
+    expect(screen.queryByText('Not backed up')).not.toBeInTheDocument();
     expect(screen.getAllByText('C:/Media/2025').length).toBeGreaterThan(0);
     expect(screen.getByText('Largest files')).toBeInTheDocument();
+  });
+
+  it('shows the last run summary and errors', () => {
+    shell.lastScan = scan;
+    renderPage();
+    expect(screen.getByText(/Last scan /)).toBeInTheDocument();
+    expect(screen.getByText('Directories')).toBeInTheDocument();
+    expect(screen.getByText('Files scanned')).toBeInTheDocument();
+    expect(screen.getByText(/3 errors during the scan/)).toBeInTheDocument();
+  });
+
+  it('shows no scan yet without a record', () => {
+    renderPage();
+    expect(screen.getByText('No scan yet')).toBeInTheDocument();
   });
 });

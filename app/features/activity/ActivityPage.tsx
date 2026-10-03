@@ -1,6 +1,8 @@
 import { Badge, Button, Card, Group, Progress, Text } from '@mantine/core';
+import { useLoaderData } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
 import { cancelScan, useScanStatus } from '../../lib/scan-store';
+import { formatRelativeTime } from '../../lib/format';
 
 const STATUS_LABEL: Record<string, string> = {
   idle: 'No active scan',
@@ -12,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ActivityPage() {
   const scan = useScanStatus();
+  const { lastScan } = useLoaderData({ from: '__root__' });
 
   const running = scan.status === 'running';
   const percent =
@@ -30,7 +33,9 @@ export function ActivityPage() {
       ? `${scan.summary.filesScanned.toLocaleString('en-US')} files scanned · ${scan.summary.entriesWritten.toLocaleString('en-US')} written · ${scan.summary.duplicateGroups} duplicate groups · ${scan.summary.errors} errors`
       : scan.error
         ? scan.error
-        : 'Last run completed today';
+        : lastScan
+          ? `Last scan ${formatRelativeTime(lastScan.finishedAt)}`
+          : 'No scan has run yet';
 
   return (
     <>

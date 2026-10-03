@@ -1,6 +1,6 @@
 import { Button, Card, Group, Text } from '@mantine/core';
 import { ChevronRight } from 'lucide-react';
-import { useRouter } from '@tanstack/react-router';
+import { useLoaderData, useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
 import { MetricCard } from './MetricCard';
 import { StorageMap } from './StorageMap';
@@ -9,10 +9,9 @@ import { formatBytes } from '../../lib/format';
 import { thumbs } from '../../lib/mock-data';
 import type { OverviewData } from '../../lib/types';
 
-const STATIC_METRIC: [string, string, string] = ['Not backed up', '2,184', 'attention'];
-
 export function OverviewPage({ data }: { data: OverviewData }) {
   const router = useRouter();
+  const { lastScan } = useLoaderData({ from: '__root__' });
 
   const metrics: [string, string, string][] = [
     ['Total files', data.totalFiles.toLocaleString('en-US'), ''],
@@ -20,7 +19,6 @@ export function OverviewPage({ data }: { data: OverviewData }) {
     ['Duplicate groups', String(data.duplicateGroups), ''],
     ['Redundant space', formatBytes(data.redundantSpace), ''],
     ['Unique files', data.uniqueFiles.toLocaleString('en-US'), ''],
-    STATIC_METRIC,
   ];
 
   return (
@@ -38,7 +36,7 @@ export function OverviewPage({ data }: { data: OverviewData }) {
       </div>
       <div className="two-col">
         <StorageMap rows={data.storageMap} />
-        <LastRunCard />
+        <LastRunCard lastScan={lastScan} />
       </div>
       <Card className="compact-list">
         <Group justify="space-between">

@@ -1,10 +1,13 @@
 import { Group } from '@mantine/core';
 import { Database, HardDrive } from 'lucide-react';
 import { useLoaderData } from '@tanstack/react-router';
-import { formatBytes } from '../../lib/format';
+import { formatBytes, formatRelativeTime } from '../../lib/format';
 
 export function AppFooter() {
-  const { files, size } = useLoaderData({ from: '__root__' });
+  const { files, size, lastScan } = useLoaderData({ from: '__root__' });
+  const scanText = lastScan
+    ? `Last scan ${formatRelativeTime(lastScan.finishedAt)}${lastScan.errors > 0 ? ` · ${lastScan.errors} errors` : ''}`
+    : 'No scan yet';
 
   return (
     <footer>
@@ -16,7 +19,7 @@ export function AppFooter() {
           <HardDrive size={13} /> {formatBytes(size)} indexed
         </span>
       </Group>
-      <span>Last scan 2 minutes ago · 4 warnings</span>
+      <span>{scanText}</span>
     </footer>
   );
 }
