@@ -16,7 +16,15 @@ const files: Entry[] = [1, 2].map((id) => ({
   path: `C:/Media/2025/file-${id}.jpg`,
 }));
 
-const tree: DirectoryNode[] = [{ label: 'Media (C:)', path: 'C:/Media', fileCount: 2, size: 12_800, children: [] }];
+const tree: DirectoryNode[] = [
+  {
+    label: 'C:\\',
+    path: 'C:',
+    fileCount: 2,
+    size: 12_800,
+    children: [{ label: 'Media', path: 'C:/Media', fileCount: 2, size: 12_800, children: [] }],
+  },
+];
 
 describe('BrowsePage', () => {
   it('renders directory filter and results', () => {
