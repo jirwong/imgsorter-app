@@ -4,6 +4,7 @@ import {
   buildOpenCommand,
   buildRevealCommand,
   buildRevealFolderCommand,
+  buildWindowsRevealScript,
   createNativeActions,
   detachedSpawnOptions,
   type NativeActionDeps,
@@ -50,6 +51,16 @@ describe('command builders', () => {
     expect(buildRevealFolderCommand('darwin', '/media')).toEqual({ command: 'open', args: ['/media'] });
     expect(buildRevealFolderCommand('linux', '/media')).toEqual({ command: 'xdg-open', args: ['/media'] });
     expect(buildRevealFolderCommand('freebsd', '/media')).toBeNull();
+  });
+
+  it('forces the containing folder window when revealing a file', () => {
+    const script = buildWindowsRevealScript('C:\\Media\\2025\\a.jpg', 'select');
+    expect(script).toContain("$leaf = '2025'");
+  });
+
+  it('forces the folder window when revealing a folder', () => {
+    const script = buildWindowsRevealScript('C:\\Media\\2025', 'open');
+    expect(script).toContain("$leaf = '2025'");
   });
 
   it('does not use verbatim arguments', () => {
@@ -123,6 +134,13 @@ describe('createNativeActions revealFolder', () => {
     const deps = makeDeps();
     const actions = createNativeActions(deps);
     expect(await actions.revealFolder('C:/Elsewhere')).toEqual({ ok: false, reason: 'not-found' });
+    expect(deps.spawned).toEqual([]);
+  });
+
+  it('rejects a path traversing outside the configured roots', async () => {
+    const deps = makeDeps();
+    const actions = createNativeActions(deps);
+    expect(await actions.revealFolder('C:/Media/../Elsewhere')).toEqual({ ok: false, reason: 'not-found' });
     expect(deps.spawned).toEqual([]);
   });
 

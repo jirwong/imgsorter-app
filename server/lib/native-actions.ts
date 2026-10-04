@@ -1,7 +1,7 @@
 import '@tanstack/react-start/server-only';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import type { FolderPickResult, NativeActionResult } from '../../app/lib/types';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigStore } from './app-config';
@@ -51,10 +51,12 @@ function encodePowerShell(script: string): string {
 
 export function buildWindowsRevealScript(targetPath: string, mode: 'select' | 'open'): string {
   const literal = targetPath.replace(/'/g, "''");
+  const leaf = mode === 'select' ? basename(dirname(targetPath)) : basename(targetPath);
+  const leafLiteral = leaf.replace(/'/g, "''");
   return `
 $ErrorActionPreference = 'SilentlyContinue'
 $target = '${literal}'
-$leaf = Split-Path -Leaf $target
+$leaf = '${leafLiteral}'
 Add-Type @"
 using System;
 using System.Text;
@@ -259,7 +261,9 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
   };
 
   const isWithinRoots = (path: string): boolean => {
-    const target = normalizeDirectoryPath(path).toLowerCase();
+    const normalized = normalizeDirectoryPath(path);
+    if (normalized.split('/').some((segment) => segment === '..')) return false;
+    const target = normalized.toLowerCase();
     return deps.getConfiguredRoots().some((root) => {
       const scope = normalizeDirectoryPath(root).toLowerCase();
       return target === scope || target.startsWith(`${scope}/`);
