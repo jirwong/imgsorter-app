@@ -33,6 +33,12 @@ describe('DirectoryTree', () => {
     expect(screen.queryByLabelText('Collapse directory filter')).not.toBeInTheDocument();
   });
 
+  it('does not render an expand button for leaf nodes', () => {
+    renderTree();
+    expect(screen.queryByLabelText('Expand Media')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Collapse Media')).not.toBeInTheDocument();
+  });
+
   it('toggles a directory into the filter', () => {
     renderTree();
     fireEvent.click(screen.getByLabelText('Filter C:\\'));

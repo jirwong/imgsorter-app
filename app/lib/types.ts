@@ -16,6 +16,7 @@ export type DirectoryNode = {
   size: number;
   lastScannedAt?: string;
   isRoot?: boolean;
+  inLibrary?: boolean;
   children: DirectoryNode[];
 };
 
