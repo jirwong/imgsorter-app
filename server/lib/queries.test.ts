@@ -1,8 +1,11 @@
+import { copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { fixtureDbPath } from './db-path';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
 import {
+  clearIndex,
   countEntriesByDirectory,
   getAnalyticsData,
   getDirectoryStats,
@@ -172,6 +175,25 @@ describe('queries against the committed sample db', () => {
       } else {
         process.env.IMGSORTER_DB_PATH = previous;
       }
+    }
+  });
+
+  it('clears every entry and record and returns the counts', () => {
+    const copy = join(tmpdir(), `imgsorter-clear-${Date.now()}.db`);
+    copyFileSync(fixtureDbPath(), copy);
+    const previous = process.env.IMGSORTER_DB_PATH;
+    process.env.IMGSORTER_DB_PATH = copy;
+    try {
+      expect(getDirectoryStats().length).toBeGreaterThan(0);
+      const result = clearIndex();
+      expect(result.entries).toBeGreaterThan(0);
+      expect(result.records).toBeGreaterThan(0);
+      expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] })).toEqual([]);
+      expect(getDirectoryStats()).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.IMGSORTER_DB_PATH;
+      else process.env.IMGSORTER_DB_PATH = previous;
+      rmSync(copy, { force: true });
     }
   });
 });

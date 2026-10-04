@@ -38,6 +38,12 @@ function openReadonly(): DatabaseType | null {
   return new Database(path, { readonly: true });
 }
 
+function openWritable(): DatabaseType | null {
+  const path = dbPath();
+  if (!existsSync(path)) return null;
+  return new Database(path);
+}
+
 function toEntry(row: EntryRow): Entry {
   return {
     id: row.id,
@@ -302,6 +308,21 @@ export function getKeeperData(paths: string[]): { keepers: KeeperMap; stale: str
     }
     const stale = paths.filter((path) => !matched.has(normalizeDirectoryPath(path).toLowerCase()));
     return { keepers, stale };
+  } finally {
+    db.close();
+  }
+}
+
+export function clearIndex(): { entries: number; records: number } {
+  const db = openWritable();
+  if (!db) return { entries: 0, records: 0 };
+  try {
+    const clear = db.transaction(() => {
+      const records = db.prepare(`DELETE FROM records`).run().changes;
+      const entries = db.prepare(`DELETE FROM entries`).run().changes;
+      return { entries, records };
+    });
+    return clear();
   } finally {
     db.close();
   }

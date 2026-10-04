@@ -28,6 +28,7 @@ export type AppConfigStore = {
   setKeepers: (paths: string[]) => string[];
   getLastScan: () => LastScan | null;
   recordLastScan: (scan: LastScan) => LastScan;
+  resetScanMetadata: () => void;
 };
 
 function dedupePaths(values: string[]): string[] {
@@ -255,6 +256,15 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
       try {
         writeKey(db, LAST_SCAN_KEY, scan);
         return scan;
+      } finally {
+        db.close();
+      }
+    },
+    resetScanMetadata: () => {
+      const db = openStore(dbPath);
+      try {
+        writeKey(db, DIRECTORY_META_KEY, {});
+        db.prepare(`DELETE FROM app_config WHERE key = ?`).run(LAST_SCAN_KEY);
       } finally {
         db.close();
       }

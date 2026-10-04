@@ -138,3 +138,9 @@ export type LastScan = {
 };
 
 export type ThumbnailMap = Record<number, string>;
+
+export type ResetResult = {
+  entries: number;
+  records: number;
+  thumbnails: number;
+};
