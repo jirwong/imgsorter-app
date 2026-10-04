@@ -195,4 +195,24 @@ describe('createAppConfigStore', () => {
     raw.close();
     expect(store.get().application).toEqual(DEFAULT_APP_CONFIG.application);
   });
+
+  it('resets the scan metadata', () => {
+    store.recordLastScan({
+      finishedAt: '2026-10-04T08:00:00.000Z',
+      directories: 1,
+      filesScanned: 5,
+      entriesWritten: 5,
+      duplicateGroups: 1,
+      duplicateFiles: 2,
+      errors: 0,
+    });
+    store.recordScannedDirectories(['C:/Media'], '2026-10-04T08:00:00.000Z');
+    expect(store.getLastScan()).not.toBeNull();
+    expect(Object.keys(store.get().directoryMeta).length).toBeGreaterThan(0);
+
+    store.resetScanMetadata();
+
+    expect(store.getLastScan()).toBeNull();
+    expect(store.get().directoryMeta).toEqual({});
+  });
 });
