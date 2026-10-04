@@ -15,6 +15,10 @@ export function appConfigDbPath(): string {
   return join(serverDir, 'data', 'app-config.db');
 }
 
+export function thumbCacheDir(): string {
+  return join(serverDir, 'data', 'thumb-cache');
+}
+
 export function fixturesDir(): string {
   return join(serverDir, '.fixtures');
 }
