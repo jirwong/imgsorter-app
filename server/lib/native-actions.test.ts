@@ -63,6 +63,15 @@ describe('command builders', () => {
     expect(script).toContain("$leaf = '2025'");
   });
 
+  it('converts forward slashes to backslashes for the Explorer target', () => {
+    const folder = buildWindowsRevealScript('C:/Media/2025', 'open');
+    expect(folder).toContain("$target = 'C:\\Media\\2025'");
+    expect(folder).toContain("$leaf = '2025'");
+    const file = buildWindowsRevealScript('C:/Media/2025/a.jpg', 'select');
+    expect(file).toContain("$target = 'C:\\Media\\2025\\a.jpg'");
+    expect(file).toContain("$leaf = '2025'");
+  });
+
   it('does not use verbatim arguments', () => {
     expect(detachedSpawnOptions({ command: 'explorer', args: ['x'] }).windowsVerbatimArguments).toBe(false);
   });

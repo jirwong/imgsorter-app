@@ -1,7 +1,7 @@
 import '@tanstack/react-start/server-only';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import type { FolderPickResult, NativeActionResult } from '../../app/lib/types';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigStore } from './app-config';
@@ -49,9 +49,24 @@ function encodePowerShell(script: string): string {
   return Buffer.from(script, 'utf16le').toString('base64');
 }
 
+function pathSegments(path: string): string[] {
+  return path.replace(/\\/g, '/').split('/').filter(Boolean);
+}
+
+function leafName(path: string): string {
+  const segments = pathSegments(path);
+  return segments[segments.length - 1] ?? '';
+}
+
+function parentLeafName(path: string): string {
+  const segments = pathSegments(path);
+  return segments[segments.length - 2] ?? '';
+}
+
 export function buildWindowsRevealScript(targetPath: string, mode: 'select' | 'open'): string {
-  const literal = targetPath.replace(/'/g, "''");
-  const leaf = mode === 'select' ? basename(dirname(targetPath)) : basename(targetPath);
+  const windowsPath = targetPath.replace(/\//g, '\\');
+  const literal = windowsPath.replace(/'/g, "''");
+  const leaf = mode === 'select' ? parentLeafName(targetPath) : leafName(targetPath);
   const leafLiteral = leaf.replace(/'/g, "''");
   return `
 $ErrorActionPreference = 'SilentlyContinue'
