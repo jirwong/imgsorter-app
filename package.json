@@ -22,13 +22,13 @@
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
-    "@mantine/core": "^9.5.2",
-    "@mantine/hooks": "^9.5.2",
+    "@mantine/core": "^9.6.3",
+    "@mantine/hooks": "^9.6.3",
     "@mantine/notifications": "^9.6.3",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "better-sqlite3": "^13.0.3",
-    "lucide-react": "^1.16.0",
+    "lucide-react": "^1.49.0",
     "react": "^19",
     "react-dom": "^19",
     "sharp": "^0.35.5"
@@ -45,14 +45,14 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^27.0.0",
-    "lefthook": "^2.1.10",
-    "lint-staged": "^17.3.0",
-    "oxlint": "^1.79.0",
-    "prettier": "^3.9.6",
+    "lefthook": "^2.1.15",
+    "lint-staged": "^17.6.0",
+    "oxlint": "^1.86.0",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2",
+    "vite": "^8.3.2",
     "vitest": "^4.1.11"
   }
 }
