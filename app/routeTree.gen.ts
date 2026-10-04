@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as BrowseRouteImport } from './routes/browse'
+import { Route as DirectoriesRouteImport } from './routes/directories'
 import { Route as DuplicatesRouteImport } from './routes/duplicates'
 import { Route as PreferencesRouteImport } from './routes/preferences'
 import { Route as UniqueFilesRouteImport } from './routes/unique-files'
@@ -37,6 +38,11 @@ const BrowseRoute = BrowseRouteImport.update({
   path: '/browse',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DirectoriesRoute = DirectoriesRouteImport.update({
+  id: '/directories',
+  path: '/directories',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DuplicatesRoute = DuplicatesRouteImport.update({
   id: '/duplicates',
   path: '/duplicates',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
+  '/directories': typeof DirectoriesRoute
   '/duplicates': typeof DuplicatesRoute
   '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
+  '/directories': typeof DirectoriesRoute
   '/duplicates': typeof DuplicatesRoute
   '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/analytics': typeof AnalyticsRoute
   '/browse': typeof BrowseRoute
+  '/directories': typeof DirectoriesRoute
   '/duplicates': typeof DuplicatesRoute
   '/preferences': typeof PreferencesRoute
   '/unique-files': typeof UniqueFilesRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/analytics'
     | '/browse'
+    | '/directories'
     | '/duplicates'
     | '/preferences'
     | '/unique-files'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/analytics'
     | '/browse'
+    | '/directories'
     | '/duplicates'
     | '/preferences'
     | '/unique-files'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/analytics'
     | '/browse'
+    | '/directories'
     | '/duplicates'
     | '/preferences'
     | '/unique-files'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BrowseRoute: typeof BrowseRoute
+  DirectoriesRoute: typeof DirectoriesRoute
   DuplicatesRoute: typeof DuplicatesRoute
   PreferencesRoute: typeof PreferencesRoute
   UniqueFilesRoute: typeof UniqueFilesRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BrowseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/directories': {
+      id: '/directories'
+      path: '/directories'
+      fullPath: '/directories'
+      preLoaderRoute: typeof DirectoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/duplicates': {
       id: '/duplicates'
       path: '/duplicates'
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   AnalyticsRoute: AnalyticsRoute,
   BrowseRoute: BrowseRoute,
+  DirectoriesRoute: DirectoriesRoute,
   DuplicatesRoute: DuplicatesRoute,
   PreferencesRoute: PreferencesRoute,
   UniqueFilesRoute: UniqueFilesRoute,
