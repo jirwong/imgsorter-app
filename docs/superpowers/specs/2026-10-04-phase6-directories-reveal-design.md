@@ -250,7 +250,8 @@ avoid quoting problems.
    `/select,"<file>"` for `mode = 'select'` and `"<folder>"` for `mode = 'open'`.
 2. Sleeps briefly.
 3. Finds the top-level window of class `CabinetWClass` whose title contains the
-   target's leaf name.
+   relevant folder's leaf name: for `select` mode the containing folder, for
+   `open` mode the folder itself.
 4. Forces it forward with `ShowWindow(SW_RESTORE)` +
    `AttachThreadInput(fgThread, targetThread, true)` + `SetForegroundWindow` +
    `AttachThreadInput(..., false)`.

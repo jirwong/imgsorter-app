@@ -112,4 +112,11 @@ review`.
   Overview largest-files list behind the opt-in `generatePreviews` setting (off by default).
   Spec at `docs/superpowers/specs/2026-10-04-phase5-thumbnails-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-phase5-thumbnails.md`.
+- Phase 6 (library directories + native reveal) — **complete**: a drive-rooted,
+  index-derived Directories page with subtree counts and Reveal / Filter Browse /
+  Copy path actions; Browse's directory filter is drive-rooted and its dead
+  collapse button is removed; Windows Reveal forces the file-manager window to
+  the front. Spec at
+  `docs/superpowers/specs/2026-10-04-phase6-directories-reveal-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-phase6-directories-reveal.md`.
 - Roadmap: `docs/ROADMAP.md`.
