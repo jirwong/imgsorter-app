@@ -6,7 +6,7 @@ import {
   buildRevealFolderCommand,
   buildWindowsRevealScript,
   createNativeActions,
-  detachedSpawnOptions,
+  spawnOptions,
   type NativeActionDeps,
   type NativeCommand,
   type RunCaptureResult,
@@ -21,7 +21,7 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
     fileExists: () => true,
     getEntryPath: () => 'C:/Media/2025/a.jpg',
     getConfiguredRoots: () => ['C:/Media'],
-    spawnDetached: (command: NativeCommand) => {
+    spawn: (command: NativeCommand) => {
       spawned.push(command);
     },
     runAndCapture: vi.fn(async () => idle),
@@ -72,8 +72,11 @@ describe('command builders', () => {
     expect(file).toContain("$leaf = '2025'");
   });
 
-  it('does not use verbatim arguments', () => {
-    expect(detachedSpawnOptions({ command: 'explorer', args: ['x'] }).windowsVerbatimArguments).toBe(false);
+  it('spawns reveal and open without detaching', () => {
+    const options = spawnOptions({ command: 'powershell', args: ['x'] });
+    expect(options.detached).toBe(false);
+    expect(options.stdio).toBe('ignore');
+    expect(options.windowsVerbatimArguments).toBe(false);
   });
 
   it('builds open commands per platform', () => {

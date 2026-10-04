@@ -1,5 +1,5 @@
 import '@tanstack/react-start/server-only';
-import { spawn } from 'node:child_process';
+import { spawn, type SpawnOptions } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { FolderPickResult, NativeActionResult } from '../../app/lib/types';
@@ -24,7 +24,7 @@ export type NativeActionDeps = {
   fileExists: (path: string) => boolean;
   getEntryPath: (id: number) => string | null;
   getConfiguredRoots: () => string[];
-  spawnDetached: (command: NativeCommand) => void;
+  spawn: (command: NativeCommand) => void;
   runAndCapture: (command: NativeCommand, timeoutMs: number) => Promise<RunCaptureResult>;
 };
 
@@ -191,16 +191,17 @@ function toPickResult(result: RunCaptureResult): FolderPickResult {
   return { status: 'picked', path: stripTrailingSeparator(path) };
 }
 
-export function detachedSpawnOptions(command: NativeCommand): {
-  windowsHide: boolean;
-  detached: boolean;
-  windowsVerbatimArguments: boolean;
-} {
-  return { windowsHide: true, detached: true, windowsVerbatimArguments: command.verbatim === true };
+export function spawnOptions(command: NativeCommand): SpawnOptions {
+  return {
+    windowsHide: true,
+    detached: false,
+    stdio: 'ignore',
+    windowsVerbatimArguments: command.verbatim === true,
+  };
 }
 
-function defaultSpawnDetached(command: NativeCommand): void {
-  const child = spawn(command.command, command.args, detachedSpawnOptions(command));
+function defaultSpawn(command: NativeCommand): void {
+  const child = spawn(command.command, command.args, spawnOptions(command));
   child.on('error', () => {});
   child.unref();
 }
@@ -249,7 +250,7 @@ function defaultDeps(): NativeActionDeps {
         .get()
         .directories.indexed.filter((entry) => entry.enabled)
         .map((entry) => entry.path),
-    spawnDetached: defaultSpawnDetached,
+    spawn: defaultSpawn,
     runAndCapture: defaultRunAndCapture,
   };
 }
@@ -267,7 +268,7 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
       const command =
         kind === 'reveal' ? buildRevealCommand(deps.platform, realPath) : buildOpenCommand(deps.platform, realPath);
       if (!command) return { ok: false, reason: 'unsupported' };
-      deps.spawnDetached(command);
+      deps.spawn(command);
       return { ok: true };
     } catch (error) {
       console.error('Native action failed', error);
@@ -292,7 +293,7 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
       if (!deps.fileExists(realPath)) return { ok: false, reason: 'missing' };
       const command = buildRevealFolderCommand(deps.platform, realPath);
       if (!command) return { ok: false, reason: 'unsupported' };
-      deps.spawnDetached(command);
+      deps.spawn(command);
       return { ok: true };
     } catch (error) {
       console.error('Reveal folder failed', error);
