@@ -1,8 +1,10 @@
 import '@tanstack/react-start/server-only';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { basename, dirname } from 'node:path';
 import type { FolderPickResult, NativeActionResult } from '../../app/lib/types';
+import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { appConfigStore } from './app-config';
 import { virtualToReal } from './db-path';
 import { getEntryPathById } from './queries';
 
@@ -21,6 +23,7 @@ export type NativeActionDeps = {
   platform: Platform;
   fileExists: (path: string) => boolean;
   getEntryPath: (id: number) => string | null;
+  getConfiguredRoots: () => string[];
   spawnDetached: (command: NativeCommand) => void;
   runAndCapture: (command: NativeCommand, timeoutMs: number) => Promise<RunCaptureResult>;
 };
@@ -28,6 +31,7 @@ export type NativeActionDeps = {
 export type NativeActions = {
   reveal: (id: number) => Promise<NativeActionResult>;
   open: (id: number) => Promise<NativeActionResult>;
+  revealFolder: (path: string) => Promise<NativeActionResult>;
   pickDirectory: () => Promise<FolderPickResult>;
 };
 
@@ -41,14 +45,93 @@ const WINDOWS_FOLDER_SCRIPT = [
   'if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $dialog.SelectedPath }',
 ].join(' ');
 
+function encodePowerShell(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64');
+}
+
+export function buildWindowsRevealScript(targetPath: string, mode: 'select' | 'open'): string {
+  const literal = targetPath.replace(/'/g, "''");
+  const leaf = mode === 'select' ? basename(dirname(targetPath)) : basename(targetPath);
+  const leafLiteral = leaf.replace(/'/g, "''");
+  return `
+$ErrorActionPreference = 'SilentlyContinue'
+$target = '${literal}'
+$leaf = '${leafLiteral}'
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public class ImgSorterReveal {
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr l);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool f);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  public static IntPtr Find(string leaf) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((h, l) => {
+      if (!IsWindowVisible(h)) return true;
+      var cls = new StringBuilder(256);
+      GetClassName(h, cls, 256);
+      if (cls.ToString() != "CabinetWClass") return true;
+      var title = new StringBuilder(512);
+      GetWindowText(h, title, 512);
+      if (title.ToString().Contains(leaf)) { found = h; return false; }
+      return true;
+    }, IntPtr.Zero);
+    return found;
+  }
+  public static void Force(IntPtr h) {
+    uint p1, p2;
+    var fg = GetForegroundWindow();
+    uint t1 = GetWindowThreadProcessId(fg, out p1);
+    uint t2 = GetWindowThreadProcessId(h, out p2);
+    AttachThreadInput(t1, t2, true);
+    ShowWindow(h, 9);
+    SetForegroundWindow(h);
+    AttachThreadInput(t1, t2, false);
+  }
+}
+"@
+if ('${mode}' -eq 'select') { Start-Process explorer -ArgumentList ('/select,"' + $target + '"') } else { Start-Process explorer -ArgumentList ('"' + $target + '"') }
+Start-Sleep -Milliseconds 900
+$h = [ImgSorterReveal]::Find($leaf)
+if ($h -ne [IntPtr]::Zero) { [ImgSorterReveal]::Force($h) }
+`;
+}
+
 export function buildRevealCommand(platform: Platform, filePath: string): NativeCommand | null {
   switch (platform) {
     case 'win32':
-      return { command: 'explorer', args: [`/select,"${filePath}"`], verbatim: true };
+      return {
+        command: 'powershell',
+        args: ['-NoProfile', '-EncodedCommand', encodePowerShell(buildWindowsRevealScript(filePath, 'select'))],
+      };
     case 'darwin':
       return { command: 'open', args: ['-R', filePath] };
     case 'linux':
       return { command: 'xdg-open', args: [dirname(filePath)] };
+    default:
+      return null;
+  }
+}
+
+export function buildRevealFolderCommand(platform: Platform, folderPath: string): NativeCommand | null {
+  switch (platform) {
+    case 'win32':
+      return {
+        command: 'powershell',
+        args: ['-NoProfile', '-EncodedCommand', encodePowerShell(buildWindowsRevealScript(folderPath, 'open'))],
+      };
+    case 'darwin':
+      return { command: 'open', args: [folderPath] };
+    case 'linux':
+      return { command: 'xdg-open', args: [folderPath] };
     default:
       return null;
   }
@@ -146,6 +229,11 @@ function defaultDeps(): NativeActionDeps {
     platform: process.platform,
     fileExists: (path) => existsSync(path),
     getEntryPath: (id) => getEntryPathById(id),
+    getConfiguredRoots: () =>
+      appConfigStore
+        .get()
+        .directories.indexed.filter((entry) => entry.enabled)
+        .map((entry) => entry.path),
     spawnDetached: defaultSpawnDetached,
     runAndCapture: defaultRunAndCapture,
   };
@@ -168,6 +256,31 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
       return { ok: true };
     } catch (error) {
       console.error('Native action failed', error);
+      return { ok: false, reason: 'error' };
+    }
+  };
+
+  const isWithinRoots = (path: string): boolean => {
+    const normalized = normalizeDirectoryPath(path);
+    if (normalized.split('/').some((segment) => segment === '..')) return false;
+    const target = normalized.toLowerCase();
+    return deps.getConfiguredRoots().some((root) => {
+      const scope = normalizeDirectoryPath(root).toLowerCase();
+      return target === scope || target.startsWith(`${scope}/`);
+    });
+  };
+
+  const revealFolder = async (path: string): Promise<NativeActionResult> => {
+    try {
+      if (!isWithinRoots(path)) return { ok: false, reason: 'not-found' };
+      const realPath = path.startsWith('@fixtures') ? virtualToReal(path) : path;
+      if (!deps.fileExists(realPath)) return { ok: false, reason: 'missing' };
+      const command = buildRevealFolderCommand(deps.platform, realPath);
+      if (!command) return { ok: false, reason: 'unsupported' };
+      deps.spawnDetached(command);
+      return { ok: true };
+    } catch (error) {
+      console.error('Reveal folder failed', error);
       return { ok: false, reason: 'error' };
     }
   };
@@ -196,6 +309,7 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
   return {
     reveal: (id) => runAction(id, 'reveal'),
     open: (id) => runAction(id, 'open'),
+    revealFolder,
     pickDirectory,
   };
 }
