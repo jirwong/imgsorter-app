@@ -295,7 +295,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 description="Comma-separated extensions to include."
                 value={application.extensions}
                 onChange={(event) => {
-                  setApplication((current) => ({ ...current, extensions: event.currentTarget.value }));
+                  const extensions = event.currentTarget.value;
+                  setApplication((current) => ({ ...current, extensions }));
                   setSaved(false);
                 }}
               />
@@ -311,7 +312,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 <Switch
                   checked={application.processDirectories}
                   onChange={(event) => {
-                    setApplication((current) => ({ ...current, processDirectories: event.currentTarget.checked }));
+                    const processDirectories = event.currentTarget.checked;
+                    setApplication((current) => ({ ...current, processDirectories }));
                     setSaved(false);
                   }}
                   aria-label="Process configured directories"
@@ -327,7 +329,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 <Switch
                   checked={application.updateRecords}
                   onChange={(event) => {
-                    setApplication((current) => ({ ...current, updateRecords: event.currentTarget.checked }));
+                    const updateRecords = event.currentTarget.checked;
+                    setApplication((current) => ({ ...current, updateRecords }));
                     setSaved(false);
                   }}
                   aria-label="Update duplicate records"
@@ -365,7 +368,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                   <Switch
                     checked={application.verifyFiles}
                     onChange={(event) => {
-                      setApplication((current) => ({ ...current, verifyFiles: event.currentTarget.checked }));
+                      const verifyFiles = event.currentTarget.checked;
+                      setApplication((current) => ({ ...current, verifyFiles }));
                       setSaved(false);
                     }}
                     aria-label="Verify actual files"
@@ -383,7 +387,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 <Switch
                   checked={application.generatePreviews}
                   onChange={(event) => {
-                    setApplication((current) => ({ ...current, generatePreviews: event.currentTarget.checked }));
+                    const generatePreviews = event.currentTarget.checked;
+                    setApplication((current) => ({ ...current, generatePreviews }));
                     setSaved(false);
                   }}
                   aria-label="Generate thumbnail previews"
