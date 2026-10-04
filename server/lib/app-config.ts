@@ -68,6 +68,7 @@ function normalizeApplication(input: ApplicationConfig): ApplicationConfig {
     updateRecords: Boolean(input.updateRecords),
     resyncDirectories,
     verifyFiles: resyncDirectories && Boolean(input.verifyFiles),
+    generatePreviews: Boolean(input.generatePreviews),
   };
 }
 
@@ -96,7 +97,8 @@ function isApplicationConfig(value: unknown): value is ApplicationConfig {
     typeof value.processDirectories === 'boolean' &&
     typeof value.updateRecords === 'boolean' &&
     typeof value.resyncDirectories === 'boolean' &&
-    typeof value.verifyFiles === 'boolean'
+    typeof value.verifyFiles === 'boolean' &&
+    (value.generatePreviews === undefined || typeof value.generatePreviews === 'boolean')
   );
 }
 
@@ -165,7 +167,9 @@ function readKey<T>(db: DatabaseType, key: string, fallback: T, is: (value: unkn
 function readConfig(db: DatabaseType): AppConfig {
   return {
     directories: readKey(db, DIRECTORY_KEY, DEFAULT_APP_CONFIG.directories, isDirectoriesConfig),
-    application: readKey(db, APPLICATION_KEY, DEFAULT_APP_CONFIG.application, isApplicationConfig),
+    application: normalizeApplication(
+      readKey(db, APPLICATION_KEY, DEFAULT_APP_CONFIG.application, isApplicationConfig),
+    ),
     directoryMeta: readKey(db, DIRECTORY_META_KEY, DEFAULT_APP_CONFIG.directoryMeta, isDirectoryMeta),
   };
 }

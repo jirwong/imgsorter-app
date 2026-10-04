@@ -11,6 +11,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     updateRecords: true,
     resyncDirectories: false,
     verifyFiles: false,
+    generatePreviews: false,
   },
   directoryMeta: {},
 };

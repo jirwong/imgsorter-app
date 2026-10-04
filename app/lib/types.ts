@@ -91,6 +91,7 @@ export type ApplicationConfig = {
   updateRecords: boolean;
   resyncDirectories: boolean;
   verifyFiles: boolean;
+  generatePreviews: boolean;
 };
 
 export type DirectoryMeta = Record<string, { lastScannedAt: string }>;
