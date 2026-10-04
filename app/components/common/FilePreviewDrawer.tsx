@@ -3,9 +3,9 @@ import { Button, Drawer, Group, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { FileImage, FolderOpen } from 'lucide-react';
 import { useApp } from '../../lib/app-context';
-import { thumbs } from '../../lib/placeholder-thumbs';
 import { formatBytes } from '../../lib/format';
 import { openEntry, revealEntry } from '../../../server/routes/native';
+import { getThumbnails } from '../../../server/routes/thumbnails';
 import type { NativeActionFailure } from '../../lib/types';
 
 const FAILURE_MESSAGES: Record<NativeActionFailure, string> = {
@@ -18,9 +18,29 @@ const FAILURE_MESSAGES: Record<NativeActionFailure, string> = {
 export function FilePreviewDrawer() {
   const { selectedFile, setSelectedFile } = useApp();
   const [busy, setBusy] = useState<'reveal' | 'open' | null>(null);
+  const [thumb, setThumb] = useState<string | null>(null);
 
   useEffect(() => {
     setBusy(null);
+  }, [selectedFile]);
+
+  useEffect(() => {
+    const id = selectedFile?.id;
+    if (!id) {
+      setThumb(null);
+      return;
+    }
+    let active = true;
+    getThumbnails({ data: { ids: [id] } })
+      .then((map) => {
+        if (active) setThumb(map[id] ?? null);
+      })
+      .catch(() => {
+        if (active) setThumb(null);
+      });
+    return () => {
+      active = false;
+    };
   }, [selectedFile]);
 
   const run = async (kind: 'reveal' | 'open'): Promise<void> => {
@@ -54,10 +74,13 @@ export function FilePreviewDrawer() {
     >
       {selectedFile && (
         <>
-          <div
-            className="drawer-thumb"
-            style={{ backgroundImage: `url(${thumbs[(selectedFile.id || 1) % thumbs.length]})` }}
-          />
+          {thumb ? (
+            <div className="drawer-thumb" style={{ backgroundImage: `url(${thumb})` }} />
+          ) : (
+            <div className="drawer-thumb drawer-thumb-empty">
+              <FileImage size={40} />
+            </div>
+          )}
           <Text className="eyebrow" mt="lg">
             PATH
           </Text>

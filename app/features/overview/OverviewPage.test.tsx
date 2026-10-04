@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { Entry, LastScan, OverviewData } from '../../lib/types';
 
 const shell = vi.hoisted(() => ({ lastScan: null as LastScan | null }));
+const mocks = vi.hoisted(() => ({ getThumbnails: vi.fn() }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
@@ -12,6 +13,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
     useLoaderData: () => ({ lastScan: shell.lastScan }),
   };
 });
+
+vi.mock('../../../server/routes/thumbnails', () => ({ getThumbnails: mocks.getThumbnails }));
 
 import { MantineProvider } from '@mantine/core';
 import { OverviewPage } from './OverviewPage';
@@ -52,7 +55,7 @@ const scan: LastScan = {
 };
 
 function renderPage() {
-  render(
+  return render(
     <MantineProvider defaultColorScheme="dark">
       <OverviewPage data={data} />
     </MantineProvider>,
@@ -62,6 +65,8 @@ function renderPage() {
 describe('OverviewPage', () => {
   beforeEach(() => {
     shell.lastScan = null;
+    vi.clearAllMocks();
+    mocks.getThumbnails.mockResolvedValue({});
   });
 
   it('renders heading, real metrics, and largest files', () => {
@@ -88,5 +93,17 @@ describe('OverviewPage', () => {
   it('shows no scan yet without a record', () => {
     renderPage();
     expect(screen.getByText('No scan yet')).toBeInTheDocument();
+  });
+
+  it('renders fetched previews', async () => {
+    mocks.getThumbnails.mockResolvedValue({ 1: 'data:image/webp;base64,AAAA' });
+    const { container } = renderPage();
+    await waitFor(() => expect(mocks.getThumbnails).toHaveBeenCalledWith({ data: { ids: [1, 2, 3, 4] } }));
+    await waitFor(() => expect(container.querySelector('.file-row img')).toBeInTheDocument());
+  });
+
+  it('shows placeholders when there is no preview', () => {
+    const { container } = renderPage();
+    expect(container.querySelectorAll('.thumb-placeholder')).toHaveLength(4);
   });
 });
