@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Entry, LastScan, OverviewData } from '../../lib/types';
 
 const shell = vi.hoisted(() => ({ lastScan: null as LastScan | null }));
-const mocks = vi.hoisted(() => ({ getThumbnails: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getThumbnails: vi.fn(), setPreviewsEnabled: vi.fn() }));
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
@@ -15,6 +15,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 });
 
 vi.mock('../../../server/routes/thumbnails', () => ({ getThumbnails: mocks.getThumbnails }));
+vi.mock('../../../server/routes/preferences', () => ({ setPreviewsEnabled: mocks.setPreviewsEnabled }));
 
 import { MantineProvider } from '@mantine/core';
 import { OverviewPage } from './OverviewPage';
@@ -54,10 +55,10 @@ const scan: LastScan = {
   errors: 3,
 };
 
-function renderPage() {
+function renderPage(previewsEnabled = false) {
   return render(
     <MantineProvider defaultColorScheme="dark">
-      <OverviewPage data={data} />
+      <OverviewPage data={data} previewsEnabled={previewsEnabled} />
     </MantineProvider>,
   );
 }
@@ -67,6 +68,7 @@ describe('OverviewPage', () => {
     shell.lastScan = null;
     vi.clearAllMocks();
     mocks.getThumbnails.mockResolvedValue({});
+    mocks.setPreviewsEnabled.mockResolvedValue({ enabled: true });
   });
 
   it('renders heading, real metrics, and largest files', () => {
@@ -105,5 +107,11 @@ describe('OverviewPage', () => {
   it('shows placeholders when there is no preview', () => {
     const { container } = renderPage();
     expect(container.querySelectorAll('.thumb-placeholder')).toHaveLength(4);
+  });
+
+  it('toggles previews from the Overview switch', async () => {
+    renderPage(false);
+    fireEvent.click(screen.getByRole('switch', { name: 'Generate thumbnail previews' }));
+    await waitFor(() => expect(mocks.setPreviewsEnabled).toHaveBeenCalledWith({ data: { enabled: true } }));
   });
 });

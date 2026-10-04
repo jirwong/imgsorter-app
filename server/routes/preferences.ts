@@ -25,3 +25,12 @@ export const saveDirectories = createServerFn({ method: 'POST' })
     const { appConfigStore } = await import('../lib/app-config');
     return appConfigStore.saveDirectories(data);
   });
+
+export const setPreviewsEnabled = createServerFn({ method: 'POST' })
+  .validator((input: { enabled: boolean }) => input)
+  .handler(async ({ data }) => {
+    const { appConfigStore } = await import('../lib/app-config');
+    const config = appConfigStore.get();
+    const saved = appConfigStore.saveApplication({ ...config.application, generatePreviews: data.enabled });
+    return { enabled: saved.application.generatePreviews };
+  });

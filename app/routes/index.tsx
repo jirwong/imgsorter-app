@@ -8,6 +8,6 @@ export const Route = createFileRoute('/')({
 });
 
 function IndexComponent() {
-  const data = useLoaderData({ from: '/' });
-  return <OverviewPage data={data} />;
+  const { data, previewsEnabled } = useLoaderData({ from: '/' });
+  return <OverviewPage data={data} previewsEnabled={previewsEnabled} />;
 }

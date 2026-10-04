@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   saveDirectories: vi.fn(),
   saveApplicationSettings: vi.fn(),
   pickDirectory: vi.fn(),
+  clearThumbnailCache: vi.fn(),
   notifyShow: vi.fn(),
 }));
 
@@ -17,6 +18,10 @@ vi.mock('../../../server/routes/preferences', () => ({
 
 vi.mock('../../../server/routes/native', () => ({
   pickDirectory: mocks.pickDirectory,
+}));
+
+vi.mock('../../../server/routes/thumbnails', () => ({
+  clearThumbnailCache: mocks.clearThumbnailCache,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -55,6 +60,7 @@ function renderPage() {
 describe('PreferencesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.clearThumbnailCache.mockResolvedValue({ removed: 2 });
   });
 
   it('renders the application tab with a disabled database name', () => {
@@ -125,5 +131,24 @@ describe('PreferencesPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
     fireEvent.click(screen.getByRole('button', { name: 'Browse for ignored directory' }));
     await waitFor(() => expect(screen.getByLabelText('Add globally ignored directory')).toHaveValue('C:/Media/Cache'));
+  });
+
+  it('saves the preview setting with the application form', async () => {
+    mocks.saveApplicationSettings.mockResolvedValue({
+      directories: DEFAULT_APP_CONFIG.directories,
+      application: { ...DEFAULT_APP_CONFIG.application, generatePreviews: true },
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('switch', { name: 'Generate thumbnail previews' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+    await waitFor(() => expect(mocks.saveApplicationSettings).toHaveBeenCalledTimes(1));
+    expect(mocks.saveApplicationSettings.mock.calls[0][0].data.generatePreviews).toBe(true);
+  });
+
+  it('clears the preview cache', async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear preview cache' }));
+    await waitFor(() => expect(mocks.clearThumbnailCache).toHaveBeenCalledTimes(1));
+    expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
   });
 });

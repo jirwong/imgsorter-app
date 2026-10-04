@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Group, Text } from '@mantine/core';
+import { Button, Card, Group, Switch, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { ChevronRight, ImageIcon } from 'lucide-react';
 import { useLoaderData, useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
@@ -8,11 +9,13 @@ import { StorageMap } from './StorageMap';
 import { LastRunCard } from './LastRunCard';
 import { formatBytes } from '../../lib/format';
 import { getThumbnails } from '../../../server/routes/thumbnails';
+import { setPreviewsEnabled } from '../../../server/routes/preferences';
 import type { OverviewData, ThumbnailMap } from '../../lib/types';
 
-export function OverviewPage({ data }: { data: OverviewData }) {
+export function OverviewPage({ data, previewsEnabled }: { data: OverviewData; previewsEnabled: boolean }) {
   const router = useRouter();
   const { lastScan } = useLoaderData({ from: '__root__' });
+  const [enabled, setEnabled] = useState(previewsEnabled);
   const [thumbById, setThumbById] = useState<ThumbnailMap>({});
   const ids = useMemo(() => data.largestFiles.map((entry) => entry.id), [data.largestFiles]);
 
@@ -28,7 +31,13 @@ export function OverviewPage({ data }: { data: OverviewData }) {
     return () => {
       active = false;
     };
-  }, [ids]);
+  }, [ids, enabled]);
+
+  const togglePreviews = (value: boolean) => {
+    void setPreviewsEnabled({ data: { enabled: value } })
+      .then((result) => setEnabled(result.enabled))
+      .catch(() => notifications.show({ color: 'red', message: 'Could not update the preview setting.' }));
+  };
 
   const metrics: [string, string, string][] = [
     ['Total files', data.totalFiles.toLocaleString('en-US'), ''],
@@ -61,9 +70,17 @@ export function OverviewPage({ data }: { data: OverviewData }) {
             <Text className="eyebrow">AT A GLANCE</Text>
             <h2>Largest files</h2>
           </div>
-          <Button variant="subtle" size="xs" onClick={() => router.navigate({ to: '/analytics' })}>
-            View analytics <ChevronRight size={14} />
-          </Button>
+          <Group gap="sm">
+            <Switch
+              size="xs"
+              checked={enabled}
+              onChange={(event) => togglePreviews(event.currentTarget.checked)}
+              aria-label="Generate thumbnail previews"
+            />
+            <Button variant="subtle" size="xs" onClick={() => router.navigate({ to: '/analytics' })}>
+              View analytics <ChevronRight size={14} />
+            </Button>
+          </Group>
         </Group>
         {data.largestFiles.map((entry) => (
           <Group justify="space-between" className="file-row" key={entry.id}>

@@ -7,6 +7,7 @@ import { PageHeading } from '../../components/common/PageHeading';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
 import { normalizeDirectoryPath } from '../../lib/directory-path';
 import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
+import { clearThumbnailCache } from '../../../server/routes/thumbnails';
 import { pickDirectory } from '../../../server/routes/native';
 import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
@@ -104,6 +105,14 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
     setApplication(result.application);
     setSaved(true);
     await router.invalidate();
+  };
+
+  const clearCache = () => {
+    void clearThumbnailCache()
+      .then((result) =>
+        notifications.show({ color: 'cyan', message: `Preview cache cleared (${result.removed} files).` }),
+      )
+      .catch(() => notifications.show({ color: 'red', message: 'Could not clear the preview cache.' }));
   };
 
   return (
@@ -363,8 +372,28 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                   />
                 </div>
               )}
+              <div className="setting-row">
+                <div>
+                  <Text size="sm">Generate thumbnail previews</Text>
+                  <Text size="xs" c="dimmed">
+                    Build small preview images for the drawer and Overview. Off by default. Cached previews still show
+                    when off.
+                  </Text>
+                </div>
+                <Switch
+                  checked={application.generatePreviews}
+                  onChange={(event) => {
+                    setApplication((current) => ({ ...current, generatePreviews: event.currentTarget.checked }));
+                    setSaved(false);
+                  }}
+                  aria-label="Generate thumbnail previews"
+                />
+              </div>
             </div>
             <Group justify="flex-end" mt="md">
+              <Button variant="subtle" color="orange" onClick={clearCache}>
+                Clear preview cache
+              </Button>
               <Button variant="subtle" onClick={resetDefaults}>
                 Reset to defaults
               </Button>
