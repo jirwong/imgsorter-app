@@ -4,6 +4,7 @@ import {
   Archive,
   BarChart3,
   FileImage,
+  FolderTree,
   LayoutGrid,
   Settings2,
   Sparkles,
@@ -20,6 +21,7 @@ const navItems: { label: string; to: string; icon: LucideIcon }[] = [
   { label: 'Unique Files', to: '/unique-files', icon: Sparkles },
   { label: 'Analytics', to: '/analytics', icon: BarChart3 },
   { label: 'Browse', to: '/browse', icon: LayoutGrid },
+  { label: 'Directories', to: '/directories', icon: FolderTree },
   { label: 'Activity', to: '/activity', icon: Activity },
 ];
 
