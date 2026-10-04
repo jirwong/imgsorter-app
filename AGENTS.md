@@ -119,4 +119,10 @@ review`.
   the front. Spec at
   `docs/superpowers/specs/2026-10-04-phase6-directories-reveal-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-phase6-directories-reveal.md`.
+- CI — **added**: a GitHub Actions `CI` workflow runs `generate-routes`, typecheck,
+  lint, format check, tests, coverage, and a build on every push to `main` and every
+  PR; a `Secret scanning` gitleaks workflow, a Dependabot config, and a PR template
+  are also in place. Spec at
+  `docs/superpowers/specs/2026-10-04-github-actions-ci-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-github-actions-ci.md`.
 - Roadmap: `docs/ROADMAP.md`.
