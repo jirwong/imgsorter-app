@@ -5,7 +5,7 @@ import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
 import {
   countEntriesByDirectory,
   getAnalyticsData,
-  getDirectoryTree,
+  getDirectoryStats,
   getDuplicateGroups,
   getEntryPathById,
   getEntryPathsByIds,
@@ -59,10 +59,12 @@ describe('queries against the committed sample db', () => {
     expect(scoped.every((e) => e.directory.startsWith('C:/Media/2025'))).toBe(true);
   });
 
-  it('builds a directory tree from real directories', () => {
-    const tree = getDirectoryTree();
-    expect(tree.length).toBeGreaterThanOrEqual(2);
-    expect(tree[0].label).toBe('Media (C:)');
+  it('returns one stat row per directory with counts and sizes', () => {
+    const stats = getDirectoryStats();
+    expect(stats.length).toBeGreaterThanOrEqual(2);
+    const media = stats.find((row) => row.path === 'C:/Media/2025/Library');
+    expect(media?.fileCount).toBeGreaterThan(0);
+    expect(media?.size).toBeGreaterThan(0);
   });
 
   it('returns analytics rankings', () => {
@@ -151,7 +153,7 @@ describe('queries against the committed sample db', () => {
     try {
       expect(getShellData()).toEqual({ files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 });
       expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] })).toEqual([]);
-      expect(getDirectoryTree()).toEqual([]);
+      expect(getDirectoryStats()).toEqual([]);
       expect(getDuplicateGroups()).toEqual([]);
       expect(getAnalyticsData()).toEqual({ rankedBySize: [], rankedByCopies: [] });
       expect(getOverviewStats()).toEqual({

@@ -6,7 +6,7 @@ import { applyFilters } from '../../app/lib/filter-pipeline';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
-  DirectoryNode,
+  DirectoryStat,
   DuplicateGroup,
   Entry,
   FilesInput,
@@ -15,7 +15,6 @@ import type {
   ShellData,
 } from '../../app/lib/types';
 import { mapPathToDisplay, rootLabelOf } from './labels';
-import { buildDirectoryTree } from './tree';
 import { sampleDbPath } from './db-path';
 
 type EntryRow = {
@@ -131,12 +130,18 @@ export function listEntries(input: FilesInput): Entry[] {
   }
 }
 
-export function getDirectoryTree(): DirectoryNode[] {
+export function getDirectoryStats(): DirectoryStat[] {
   const db = openReadonly();
   if (!db) return [];
   try {
-    const rows = db.prepare(`SELECT DISTINCT directory FROM entries`).all() as { directory: string }[];
-    return buildDirectoryTree(rows.map((row) => mapPathToDisplay(row.directory)));
+    const rows = db
+      .prepare(`SELECT directory, COUNT(*) AS fileCount, SUM(size) AS size FROM entries GROUP BY directory`)
+      .all() as { directory: string; fileCount: number; size: number }[];
+    return rows.map((row) => ({
+      path: mapPathToDisplay(row.directory),
+      fileCount: row.fileCount,
+      size: row.size,
+    }));
   } finally {
     db.close();
   }
