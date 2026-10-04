@@ -16,9 +16,17 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 3 | Duplicates feature (groups, filters, keepers) + real scan with progress streaming (Activity) | Working duplicate detection + live scan | `[x]` |
 | 4 | Preferences persistence (`app_config`) + directory management + native OS actions (Reveal/Open, folder picker) + keeper persistence | Full config persistence + actions | `[x]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[x]` |
+| 6 | Indexed directory tree page + drive-rooted Browse filter + native Reveal foreground fix | Directories page + working Reveal | `[x]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
+
+- **6 — Library directories + native reveal:** a drive-rooted, index-derived
+  **Directories** page with per-folder subtree counts and actions (Reveal /
+  Filter Browse / Copy path); Browse's filter tree becomes drive-rooted and
+  loses its dead collapse button; Windows **Reveal** forces the file-manager
+  window to the front. Spec:
+  [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md).
 
 ## Phase 4 sub-phases
 
@@ -72,6 +80,7 @@ spec → plan → PR loop):
 | 4c | [2026-10-03-phase4c-native-actions-design.md](superpowers/specs/2026-10-03-phase4c-native-actions-design.md) |
 | 4d | [2026-10-03-phase4d-keeper-design.md](superpowers/specs/2026-10-03-phase4d-keeper-design.md) |
 | 5 | [2026-10-04-phase5-thumbnails-design.md](superpowers/specs/2026-10-04-phase5-thumbnails-design.md) |
+| 6 | [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md) |
 
 ## How to add a phase
 
