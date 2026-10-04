@@ -12,8 +12,16 @@ export type Entry = {
 export type DirectoryNode = {
   label: string;
   path: string;
-  children?: DirectoryNode[];
+  fileCount: number;
+  size: number;
+  lastScannedAt?: string;
+  isRoot?: boolean;
+  children: DirectoryNode[];
 };
+
+export type DirectoryStat = { path: string; fileCount: number; size: number };
+
+export type ConfiguredRoot = { path: string; lastScannedAt?: string };
 
 export type DuplicateGroup = {
   key: string;
