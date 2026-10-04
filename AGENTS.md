@@ -108,4 +108,9 @@ review`.
   `docs/superpowers/specs/2026-10-04-overview-footer-real-data-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-overview-footer-real-data.md`. Cleanup B (keeper delete
   non-keepers) is next.
+- Phase 5 (real thumbnails/previews) — **complete**: `sharp` generates small WebP previews,
+  cached in the gitignored `server/data/thumb-cache/`, shown in the file drawer and the
+  Overview largest-files list behind the opt-in `generatePreviews` setting (off by default).
+  Spec at `docs/superpowers/specs/2026-10-04-phase5-thumbnails-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-phase5-thumbnails.md`.
 - Roadmap: `docs/ROADMAP.md`.
