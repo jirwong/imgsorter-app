@@ -18,3 +18,10 @@ export const pickDirectory = createServerFn({ method: 'GET' }).handler(async () 
   const { nativeActions } = await import('../lib/native-actions');
   return nativeActions.pickDirectory();
 });
+
+export const revealFolder = createServerFn({ method: 'POST' })
+  .validator((input: { path: string }) => input)
+  .handler(async ({ data }) => {
+    const { nativeActions } = await import('../lib/native-actions');
+    return nativeActions.revealFolder(data.path);
+  });

@@ -3,6 +3,7 @@ import {
   buildFolderPickerCommand,
   buildOpenCommand,
   buildRevealCommand,
+  buildRevealFolderCommand,
   createNativeActions,
   detachedSpawnOptions,
   type NativeActionDeps,
@@ -18,6 +19,7 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
     platform: 'win32',
     fileExists: () => true,
     getEntryPath: () => 'C:/Media/2025/a.jpg',
+    getConfiguredRoots: () => ['C:/Media'],
     spawnDetached: (command: NativeCommand) => {
       spawned.push(command);
     },
@@ -28,22 +30,30 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
 }
 
 describe('command builders', () => {
-  it('builds reveal commands per platform', () => {
-    expect(buildRevealCommand('win32', 'C:\\My Photos\\a,b.jpg')).toEqual({
-      command: 'explorer',
-      args: ['/select,"C:\\My Photos\\a,b.jpg"'],
-      verbatim: true,
-    });
+  it('builds a Windows reveal as an encoded PowerShell command', () => {
+    const command = buildRevealCommand('win32', 'C:\\My Photos\\a,b.jpg');
+    expect(command?.command).toBe('powershell');
+    expect(command?.args.slice(0, 2)).toEqual(['-NoProfile', '-EncodedCommand']);
+    const script = Buffer.from(command!.args[2], 'base64').toString('utf16le');
+    expect(script).toContain('Start-Process explorer');
+    expect(script).toContain('/select,"');
     expect(buildRevealCommand('darwin', '/a.jpg')).toEqual({ command: 'open', args: ['-R', '/a.jpg'] });
     expect(buildRevealCommand('linux', '/dir/a.jpg')).toEqual({ command: 'xdg-open', args: ['/dir'] });
     expect(buildRevealCommand('freebsd', '/a.jpg')).toBeNull();
   });
 
-  it('sets verbatim arguments only for the Windows reveal command', () => {
+  it('builds reveal-folder commands per platform', () => {
+    const windows = buildRevealFolderCommand('win32', 'C:\\Media');
+    expect(windows?.command).toBe('powershell');
+    const script = Buffer.from(windows!.args[2], 'base64').toString('utf16le');
+    expect(script).toContain('Start-Process explorer');
+    expect(buildRevealFolderCommand('darwin', '/media')).toEqual({ command: 'open', args: ['/media'] });
+    expect(buildRevealFolderCommand('linux', '/media')).toEqual({ command: 'xdg-open', args: ['/media'] });
+    expect(buildRevealFolderCommand('freebsd', '/media')).toBeNull();
+  });
+
+  it('does not use verbatim arguments', () => {
     expect(detachedSpawnOptions({ command: 'explorer', args: ['x'] }).windowsVerbatimArguments).toBe(false);
-    const reveal = buildRevealCommand('win32', 'C:\\My Photos\\a.jpg');
-    expect(reveal?.verbatim).toBe(true);
-    expect(reveal && detachedSpawnOptions(reveal).windowsVerbatimArguments).toBe(true);
   });
 
   it('builds open commands per platform', () => {
@@ -84,7 +94,8 @@ describe('createNativeActions reveal and open', () => {
     const deps = makeDeps();
     const actions = createNativeActions(deps);
     expect(await actions.reveal(1)).toEqual({ ok: true });
-    expect(deps.spawned).toEqual([{ command: 'explorer', args: ['/select,"C:/Media/2025/a.jpg"'], verbatim: true }]);
+    expect(deps.spawned[0].command).toBe('powershell');
+    expect(deps.spawned[0].args[1]).toBe('-EncodedCommand');
   });
 
   it('opens a present file', async () => {
@@ -104,6 +115,32 @@ describe('createNativeActions reveal and open', () => {
   it('returns unsupported on an unknown platform', async () => {
     const actions = createNativeActions(makeDeps({ platform: 'freebsd' }));
     expect(await actions.reveal(1)).toEqual({ ok: false, reason: 'unsupported' });
+  });
+});
+
+describe('createNativeActions revealFolder', () => {
+  it('rejects a folder outside the configured roots', async () => {
+    const deps = makeDeps();
+    const actions = createNativeActions(deps);
+    expect(await actions.revealFolder('C:/Elsewhere')).toEqual({ ok: false, reason: 'not-found' });
+    expect(deps.spawned).toEqual([]);
+  });
+
+  it('returns missing when the folder is absent', async () => {
+    const actions = createNativeActions(makeDeps({ fileExists: () => false }));
+    expect(await actions.revealFolder('C:/Media')).toEqual({ ok: false, reason: 'missing' });
+  });
+
+  it('reveals a configured folder', async () => {
+    const deps = makeDeps();
+    const actions = createNativeActions(deps);
+    expect(await actions.revealFolder('C:/Media/2025')).toEqual({ ok: true });
+    expect(deps.spawned[0].command).toBe('powershell');
+  });
+
+  it('returns unsupported on an unknown platform', async () => {
+    const actions = createNativeActions(makeDeps({ platform: 'freebsd' }));
+    expect(await actions.revealFolder('C:/Media')).toEqual({ ok: false, reason: 'unsupported' });
   });
 });
 
