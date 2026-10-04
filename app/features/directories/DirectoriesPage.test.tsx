@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import type { DirectoryNode } from '../../lib/types';
 
@@ -32,8 +32,9 @@ const tree: DirectoryNode[] = [
         fileCount: 7,
         size: 7_000,
         isRoot: true,
+        inLibrary: true,
         lastScannedAt: '2026-10-04T08:00:00.000Z',
-        children: [{ label: '2025', path: 'C:/Media/2025', fileCount: 7, size: 7_000, children: [] }],
+        children: [{ label: '2025', path: 'C:/Media/2025', fileCount: 7, size: 7_000, inLibrary: true, children: [] }],
       },
     ],
   },
@@ -45,6 +46,10 @@ function renderPage() {
       <DirectoriesPage tree={tree} />
     </MantineProvider>,
   );
+}
+
+function rowFor(label: string): HTMLElement {
+  return screen.getByText(label).closest('tr') as HTMLElement;
 }
 
 describe('DirectoriesPage', () => {
@@ -63,21 +68,37 @@ describe('DirectoriesPage', () => {
     expect(screen.getAllByText('7').length).toBeGreaterThan(0);
   });
 
-  it('reveals a folder', async () => {
+  it('does not offer Reveal outside the library', () => {
     renderPage();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Reveal' })[0]);
-    await waitFor(() => expect(mocks.revealFolder).toHaveBeenCalledWith({ data: { path: 'C:' } }));
+    expect(within(rowFor('C:\\')).queryByRole('button', { name: 'Reveal' })).not.toBeInTheDocument();
+  });
+
+  it('reveals a library folder', async () => {
+    renderPage();
+    fireEvent.click(within(rowFor('Media')).getByRole('button', { name: 'Reveal' }));
+    await waitFor(() => expect(mocks.revealFolder).toHaveBeenCalledWith({ data: { path: 'C:/Media' } }));
   });
 
   it('filters Browse by a folder', () => {
     renderPage();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Filter' })[0]);
-    expect(mocks.navigate).toHaveBeenCalledWith({ to: '/browse', search: { selectedDirs: ['C:'] } });
+    fireEvent.click(within(rowFor('Media')).getByRole('button', { name: 'Filter' }));
+    expect(mocks.navigate).toHaveBeenCalledTimes(1);
+    const call = mocks.navigate.mock.calls[0][0];
+    expect(call.to).toBe('/browse');
+    expect(typeof call.search).toBe('function');
+    expect(call.search({ selectedDirs: [] })).toEqual({ selectedDirs: ['C:/Media'] });
   });
 
   it('copies a path', async () => {
     renderPage();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy path' })[0]);
-    await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith('C:'));
+    fireEvent.click(within(rowFor('Media')).getByRole('button', { name: 'Copy path' }));
+    await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith('C:/Media'));
+  });
+
+  it('reports an error when the clipboard is unavailable', () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    renderPage();
+    fireEvent.click(within(rowFor('Media')).getByRole('button', { name: 'Copy path' }));
+    expect(mocks.notifyShow).toHaveBeenCalledWith({ color: 'red', message: 'Could not copy the path.' });
   });
 });

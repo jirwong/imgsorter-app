@@ -289,9 +289,8 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
   const revealFolder = async (path: string): Promise<NativeActionResult> => {
     try {
       if (!isWithinRoots(path)) return { ok: false, reason: 'not-found' };
-      const realPath = path.startsWith('@fixtures') ? virtualToReal(path) : path;
-      if (!deps.fileExists(realPath)) return { ok: false, reason: 'missing' };
-      const command = buildRevealFolderCommand(deps.platform, realPath);
+      if (!deps.fileExists(path)) return { ok: false, reason: 'missing' };
+      const command = buildRevealFolderCommand(deps.platform, path);
       if (!command) return { ok: false, reason: 'unsupported' };
       deps.spawn(command);
       return { ok: true };

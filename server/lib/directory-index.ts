@@ -35,6 +35,14 @@ function aggregate(node: DirectoryNode): void {
   node.size = size;
 }
 
+function markLibrary(nodes: DirectoryNode[], within: boolean): void {
+  for (const node of nodes) {
+    const inside = within || node.isRoot === true;
+    if (inside) node.inLibrary = true;
+    markLibrary(node.children, inside);
+  }
+}
+
 function sortTree(nodes: DirectoryNode[]): void {
   nodes.sort((a, b) => a.label.localeCompare(b.label));
   for (const node of nodes) sortTree(node.children);
@@ -58,6 +66,7 @@ export function buildDirectoryIndex(roots: ConfiguredRoot[], stats: DirectorySta
   }
   const top = [...index.values()].filter((node) => !node.path.includes('/'));
   for (const node of top) aggregate(node);
+  markLibrary(top, false);
   sortTree(top);
   return top;
 }

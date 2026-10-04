@@ -36,6 +36,15 @@ describe('buildDirectoryIndex', () => {
     });
   });
 
+  it('marks configured roots and their descendants as in the library', () => {
+    const tree = buildDirectoryIndex([{ path: 'C:/Media' }], [{ path: 'C:/Media/2025', fileCount: 1, size: 10 }]);
+    const drive = tree[0];
+    const media = drive.children[0];
+    expect(drive.inLibrary).toBeUndefined();
+    expect(media.inLibrary).toBe(true);
+    expect(media.children[0].inLibrary).toBe(true);
+  });
+
   it('merges configured roots with file stats at the same path', () => {
     const tree = buildDirectoryIndex(
       [{ path: 'C:/Media', lastScannedAt: '2026-10-04T08:00:00.000Z' }],

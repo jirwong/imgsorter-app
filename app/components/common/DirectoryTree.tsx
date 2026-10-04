@@ -18,21 +18,17 @@ export function DirectoryTree({ tree }: { tree: DirectoryNode[] }) {
     return (
       <div key={node.path}>
         <div className="directory-node" style={{ paddingLeft: depth * 14 }}>
-          <button
-            className="directory-expand"
-            aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${node.label}`}
-            onClick={() => hasChildren && setNodeOpen((state) => ({ ...state, [node.path]: !isOpen }))}
-          >
-            {hasChildren ? (
-              isOpen ? (
-                <ChevronDown size={13} />
-              ) : (
-                <ChevronRight size={13} />
-              )
-            ) : (
-              <span className="directory-spacer" />
-            )}
-          </button>
+          {hasChildren ? (
+            <button
+              className="directory-expand"
+              aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${node.label}`}
+              onClick={() => setNodeOpen((state) => ({ ...state, [node.path]: !isOpen }))}
+            >
+              {isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+          ) : (
+            <span className="directory-spacer" />
+          )}
           <Checkbox
             checked={selectedDirs.includes(node.path)}
             onChange={() => toggleSelectedDir(node.path)}

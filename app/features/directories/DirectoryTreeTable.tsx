@@ -18,13 +18,10 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
   const router = useRouter();
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    const visit = (nodes: DirectoryNode[]): void => {
-      for (const node of nodes) {
-        initial[node.path] = true;
-        visit(node.children);
-      }
-    };
-    visit(tree);
+    for (const node of tree) {
+      initial[node.path] = true;
+      for (const child of node.children) initial[child.path] = true;
+    }
     return initial;
   });
 
@@ -38,10 +35,17 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
   };
 
   const filterBrowse = (path: string) => {
-    void router.navigate({ to: '/browse', search: { selectedDirs: [path] } as never });
+    void router.navigate({
+      to: '/browse',
+      search: ((prev: Record<string, unknown>) => ({ ...prev, selectedDirs: [path] })) as never,
+    });
   };
 
   const copyPath = (path: string) => {
+    if (!navigator.clipboard) {
+      notifications.show({ color: 'red', message: 'Could not copy the path.' });
+      return;
+    }
     void navigator.clipboard
       .writeText(path)
       .then(() => notifications.show({ color: 'cyan', message: 'Path copied.' }))
@@ -77,9 +81,16 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
         <Table.Td>{node.isRoot && node.lastScannedAt ? formatRelativeTime(node.lastScannedAt) : ''}</Table.Td>
         <Table.Td>
           <Group gap={4} justify="flex-end">
-            <Button variant="subtle" size="xs" leftSection={<FolderOpen size={13} />} onClick={() => reveal(node.path)}>
-              Reveal
-            </Button>
+            {node.inLibrary ? (
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={<FolderOpen size={13} />}
+                onClick={() => reveal(node.path)}
+              >
+                Reveal
+              </Button>
+            ) : null}
             <Button
               variant="subtle"
               size="xs"
@@ -109,7 +120,20 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
           <Table.Th>Files</Table.Th>
           <Table.Th>Size</Table.Th>
           <Table.Th>Last scan</Table.Th>
-          <Table.Th />
+          <Table.Th>
+            <span
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                overflow: 'hidden',
+                clip: 'rect(0 0 0 0)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Actions
+            </span>
+          </Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>{rows}</Table.Tbody>
