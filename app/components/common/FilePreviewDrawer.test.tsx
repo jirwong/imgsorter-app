@@ -8,12 +8,17 @@ import type { Entry } from '../../lib/types';
 const mocks = vi.hoisted(() => ({
   revealEntry: vi.fn(),
   openEntry: vi.fn(),
+  getThumbnails: vi.fn(),
   notifyShow: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/native', () => ({
   revealEntry: mocks.revealEntry,
   openEntry: mocks.openEntry,
+}));
+
+vi.mock('../../../server/routes/thumbnails', () => ({
+  getThumbnails: mocks.getThumbnails,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -54,6 +59,7 @@ function renderDrawer() {
 describe('FilePreviewDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getThumbnails.mockResolvedValue({});
   });
 
   it('renders nothing while closed', () => {
@@ -92,5 +98,17 @@ describe('FilePreviewDrawer', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open file' }));
     await waitFor(() => expect(mocks.openEntry).toHaveBeenCalledWith({ data: { id: 7 } }));
     expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
+  });
+
+  it('renders the fetched preview', async () => {
+    mocks.getThumbnails.mockResolvedValue({ 7: 'data:image/webp;base64,AAAA' });
+    renderDrawer();
+    await waitFor(() => expect(mocks.getThumbnails).toHaveBeenCalledWith({ data: { ids: [7] } }));
+    await waitFor(() => expect(document.querySelector('.drawer-thumb-empty')).not.toBeInTheDocument());
+  });
+
+  it('shows the placeholder when there is no preview', async () => {
+    renderDrawer();
+    await waitFor(() => expect(document.querySelector('.drawer-thumb-empty')).toBeInTheDocument());
   });
 });
