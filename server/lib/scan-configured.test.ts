@@ -26,6 +26,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       updateRecords: false,
       resyncDirectories: true,
       verifyFiles: true,
+      generatePreviews: false,
     },
     directoryMeta: {},
     ...overrides,

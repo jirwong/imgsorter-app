@@ -155,6 +155,39 @@ describe('createAppConfigStore', () => {
     expect(store.getLastScan()).toBeNull();
   });
 
+  it('defaults previews to off', () => {
+    expect(store.get().application.generatePreviews).toBe(false);
+  });
+
+  it('round-trips the preview setting', () => {
+    const saved = store.saveApplication({ ...DEFAULT_APP_CONFIG.application, generatePreviews: true });
+    expect(saved.application.generatePreviews).toBe(true);
+    expect(store.get().application.generatePreviews).toBe(true);
+  });
+
+  it('reads a stored application without generatePreviews as off and keeps the other fields', () => {
+    store.get();
+    const raw = new Database(dbPath);
+    raw.prepare(`UPDATE app_config SET value = ? WHERE key = 'application'`).run(
+      JSON.stringify({
+        extensions: 'png',
+        processDirectories: false,
+        updateRecords: true,
+        resyncDirectories: false,
+        verifyFiles: false,
+      }),
+    );
+    raw.close();
+    expect(store.get().application).toEqual({
+      extensions: 'png',
+      processDirectories: false,
+      updateRecords: true,
+      resyncDirectories: false,
+      verifyFiles: false,
+      generatePreviews: false,
+    });
+  });
+
   it('falls back to defaults when stored JSON is invalid', () => {
     store.get();
     const raw = new Database(dbPath);
