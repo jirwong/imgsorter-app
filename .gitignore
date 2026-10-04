@@ -12,3 +12,4 @@ server/data/*.db-shm
 server/data/*.db-wal
 server/data/app-config.db
 server/data/imgsorter.db
+server/data/thumb-cache/

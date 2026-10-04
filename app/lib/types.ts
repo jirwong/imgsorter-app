@@ -127,3 +127,5 @@ export type LastScan = {
   duplicateFiles: number;
   errors: number;
 };
+
+export type ThumbnailMap = Record<number, string>;
