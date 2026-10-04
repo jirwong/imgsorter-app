@@ -17,6 +17,7 @@
     "lint:fix": "oxlint --fix app server scripts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "check": "pnpm generate-routes && pnpm typecheck && pnpm lint && pnpm test && pnpm format:check",
     "seed": "tsx scripts/seed.ts"
   },
