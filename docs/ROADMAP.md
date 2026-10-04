@@ -67,6 +67,10 @@ spec → plan → PR loop):
 - **State management:** no TanStack Store. Local `useState` + TanStack Router
   search params + one context. Revisit `useSyncExternalStore`/store in Phase 3 for
   the scan-progress stream.
+- **CI:** GitHub Actions run the local quality gates (`generate-routes`, typecheck,
+  lint, format check, tests, coverage) and a build on push to `main` and PRs, plus
+  gitleaks secret scanning and Dependabot. See
+  [2026-10-04-github-actions-ci-design.md](superpowers/specs/2026-10-04-github-actions-ci-design.md).
 
 ## Detailed specs
 
