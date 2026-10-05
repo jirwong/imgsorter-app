@@ -22,7 +22,7 @@ export function MaintenancePanel() {
       .then((result) => {
         setConfirmOpen(false);
         notifications.show({ color: 'cyan', message: `Library index reset (${result.entries} files removed).` });
-        return router.invalidate();
+        void router.invalidate();
       })
       .catch(() => notifications.show({ color: 'red', message: 'Could not reset the library index.' }))
       .finally(() => setBusy(false));
@@ -60,7 +60,7 @@ export function MaintenancePanel() {
           <Button variant="subtle" onClick={() => setConfirmOpen(false)}>
             Cancel
           </Button>
-          <Button color="red" loading={busy} onClick={reset}>
+          <Button color="red" loading={busy} disabled={running} onClick={reset}>
             Reset
           </Button>
         </Group>

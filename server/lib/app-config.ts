@@ -263,8 +263,11 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
     resetScanMetadata: () => {
       const db = openStore(dbPath);
       try {
-        writeKey(db, DIRECTORY_META_KEY, {});
-        db.prepare(`DELETE FROM app_config WHERE key = ?`).run(LAST_SCAN_KEY);
+        const reset = db.transaction(() => {
+          writeKey(db, DIRECTORY_META_KEY, {});
+          db.prepare(`DELETE FROM app_config WHERE key = ?`).run(LAST_SCAN_KEY);
+        });
+        reset();
       } finally {
         db.close();
       }
