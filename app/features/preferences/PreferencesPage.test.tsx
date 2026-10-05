@@ -30,7 +30,11 @@ vi.mock('@mantine/notifications', () => ({
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
-  return { ...actual, useRouter: () => ({ invalidate: vi.fn(async () => {}) }) };
+  return {
+    ...actual,
+    useRouter: () => ({ invalidate: vi.fn(async () => {}) }),
+    useLoaderData: () => ({ files: 0, size: 0 }),
+  };
 });
 
 import { PreferencesPage } from './PreferencesPage';
@@ -77,6 +81,13 @@ describe('PreferencesPage', () => {
     expect(screen.getByText(/42 files/)).toBeInTheDocument();
     expect(screen.getByText(/Last scan/)).toBeInTheDocument();
     expect(screen.getByText(/Not scanned yet/)).toBeInTheDocument();
+  });
+
+  it('shows the Maintenance tab', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Maintenance' }));
+    expect(screen.getByText('Library index')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset library index' })).toBeInTheDocument();
   });
 
   it('saves a new indexed directory', async () => {
