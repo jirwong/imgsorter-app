@@ -125,4 +125,11 @@ review`.
   are also in place. Spec at
   `docs/superpowers/specs/2026-10-04-github-actions-ci-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-github-actions-ci.md`.
+- Phase 7 (maintenance tab + library index reset) — **complete**: a Preferences
+  **Maintenance** tab shows the indexed totals and a guarded **Reset library index**
+  action (confirmation modal; disabled during a scan) that clears the scanned files,
+  duplicate records, scan metadata, keepers, and thumbnail cache, and keeps
+  directories and preferences. Spec at
+  `docs/superpowers/specs/2026-10-04-phase7-library-reset-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-phase7-library-reset.md`.
 - Roadmap: `docs/ROADMAP.md`.
