@@ -4,6 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { FolderOpen, ShieldCheck } from 'lucide-react';
 import { useRouter } from '@tanstack/react-router';
 import { PageHeading } from '../../components/common/PageHeading';
+import { MaintenancePanel } from './MaintenancePanel';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
 import { normalizeDirectoryPath } from '../../lib/directory-path';
 import { saveApplicationSettings, saveDirectories } from '../../../server/routes/preferences';
@@ -136,6 +137,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
           <Tabs.List>
             <Tabs.Tab value="application">Application configuration</Tabs.Tab>
             <Tabs.Tab value="directories">Directories</Tabs.Tab>
+            <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
           </Tabs.List>
         </Tabs>
 
@@ -408,6 +410,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
             </Group>
           </Card>
         )}
+
+        {activeTab === 'maintenance' && <MaintenancePanel />}
 
         {message && (
           <Text size="xs" c="orange">
