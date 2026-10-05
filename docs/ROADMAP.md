@@ -17,6 +17,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 4 | Preferences persistence (`app_config`) + directory management + native OS actions (Reveal/Open, folder picker) + keeper persistence | Full config persistence + actions | `[x]` |
 | 5 | Real thumbnails/previews (optional) | Polish | `[x]` |
 | 6 | Indexed directory tree page + drive-rooted Browse filter + native Reveal foreground fix | Directories page + working Reveal | `[x]` |
+| 7 | Maintenance tab + guarded library index reset | In-app reset with confirmation | `[x]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
@@ -27,6 +28,13 @@ phase's brainstorm runs.*
   loses its dead collapse button; Windows **Reveal** forces the file-manager
   window to the front. Spec:
   [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md).
+
+- **7 — Maintenance + library reset:** a Preferences **Maintenance** tab shows the
+  indexed totals and a guarded **Reset library index** action (confirmation modal,
+  disabled during a scan) that clears the scanned files, duplicate records, scan
+  metadata, keepers, and thumbnail cache while keeping directories and preferences.
+  Spec:
+  [2026-10-04-phase7-library-reset-design.md](superpowers/specs/2026-10-04-phase7-library-reset-design.md).
 
 ## Phase 4 sub-phases
 
