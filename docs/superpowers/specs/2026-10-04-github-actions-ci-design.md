@@ -61,7 +61,7 @@ package.json                # + "test:coverage": "vitest run --coverage"
 - **Steps, in order:**
   1. `actions/checkout@v7`
   2. `pnpm/action-setup@v6` (reads `packageManager: pnpm@11.20.0`)
-  3. `actions/setup-node@v7` — `node-version: 24.12.0`, `cache: pnpm`
+  3. `actions/setup-node@v7` — `node-version: 24.15.0`, `cache: pnpm`
   4. `pnpm install --frozen-lockfile` with `CI: true`
   5. `pnpm generate-routes` — **added for this repo**; `tsr generate` must run
      before `typecheck` because the route tree is generated, not committed
@@ -124,8 +124,9 @@ tested — `pnpm check`; Checklist), adapted to this repo's conventions
 - **Action version pins.** The template pins `checkout@v7`,
   `pnpm/action-setup@v6`, `setup-node@v7`, `gitleaks-action@v3`. These are
   copied as-is; Dependabot's Actions updates will keep them current.
-- **Node pin drift.** CI pins `24.12.0` while `package.json` engines allow
-  `>=24`. The pin matches the template; a future change can align them.
+- **Node pin drift.** CI pins `24.15.0`. The reference template pins
+  `24.12.0`, but `jsdom@30.1.1` (a devDependency) declares
+  `engines: node ^24.15.0`, so the pin is raised to satisfy it.
 
 ## 11. Verification
 
