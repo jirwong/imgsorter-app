@@ -5,6 +5,7 @@ function makeDeps(): ResetDeps & { calls: string[] } {
   const calls: string[] = [];
   return {
     calls,
+    isScanning: vi.fn(() => false),
     clearIndex: vi.fn(() => {
       calls.push('clearIndex');
       return { entries: 5, records: 3 };
@@ -39,6 +40,15 @@ describe('createResetService', () => {
     expect(() => service.reset()).toThrow('boom');
     expect(deps.resetScanMetadata).not.toHaveBeenCalled();
     expect(deps.clearKeepers).not.toHaveBeenCalled();
+    expect(deps.clearThumbnails).not.toHaveBeenCalled();
+  });
+
+  it('refuses to reset while a scan is running', () => {
+    const deps = makeDeps();
+    vi.mocked(deps.isScanning).mockReturnValue(true);
+    const service = createResetService(deps);
+    expect(() => service.reset()).toThrow('A scan is running.');
+    expect(deps.clearIndex).not.toHaveBeenCalled();
     expect(deps.clearThumbnails).not.toHaveBeenCalled();
   });
 });

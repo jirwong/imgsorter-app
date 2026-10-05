@@ -2,9 +2,11 @@ import '@tanstack/react-start/server-only';
 import type { ResetResult } from '../../app/lib/types';
 import { appConfigStore } from './app-config';
 import { clearIndex } from './queries';
+import { scanService } from './scan';
 import { thumbnails } from './thumbnails';
 
 export type ResetDeps = {
+  isScanning: () => boolean;
   clearIndex: () => { entries: number; records: number };
   resetScanMetadata: () => void;
   clearKeepers: () => void;
@@ -14,6 +16,7 @@ export type ResetDeps = {
 export function createResetService(deps: ResetDeps): { reset: () => ResetResult } {
   return {
     reset: () => {
+      if (deps.isScanning()) throw new Error('A scan is running.');
       const index = deps.clearIndex();
       deps.resetScanMetadata();
       deps.clearKeepers();
@@ -24,6 +27,7 @@ export function createResetService(deps: ResetDeps): { reset: () => ResetResult 
 }
 
 export const resetService = createResetService({
+  isScanning: () => scanService.status().status === 'running',
   clearIndex,
   resetScanMetadata: () => appConfigStore.resetScanMetadata(),
   clearKeepers: () => {

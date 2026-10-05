@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 import { MaintenancePanel } from './MaintenancePanel';
 
 function renderPanel() {
-  render(
+  return render(
     <MantineProvider defaultColorScheme="dark" env="test">
       <MaintenancePanel />
     </MantineProvider>,
@@ -56,5 +56,25 @@ describe('MaintenancePanel', () => {
     mocks.scan.status = 'running';
     renderPanel();
     expect(screen.getByRole('button', { name: 'Reset library index' })).toBeDisabled();
+  });
+
+  it('shows an error toast when the reset fails', async () => {
+    mocks.resetLibraryIndex.mockRejectedValue(new Error('nope'));
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset library index' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+  });
+
+  it('disables the modal confirm while a scan is running', () => {
+    const { rerender } = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset library index' }));
+    mocks.scan.status = 'running';
+    rerender(
+      <MantineProvider defaultColorScheme="dark" env="test">
+        <MaintenancePanel />
+      </MantineProvider>,
+    );
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
   });
 });

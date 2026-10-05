@@ -93,6 +93,7 @@ spec → plan → PR loop):
 | 4d | [2026-10-03-phase4d-keeper-design.md](superpowers/specs/2026-10-03-phase4d-keeper-design.md) |
 | 5 | [2026-10-04-phase5-thumbnails-design.md](superpowers/specs/2026-10-04-phase5-thumbnails-design.md) |
 | 6 | [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md) |
+| 7 | [2026-10-04-phase7-library-reset-design.md](superpowers/specs/2026-10-04-phase7-library-reset-design.md) |
 
 ## How to add a phase
 
