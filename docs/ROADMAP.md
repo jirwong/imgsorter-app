@@ -18,6 +18,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 5 | Real thumbnails/previews (optional) | Polish | `[x]` |
 | 6 | Indexed directory tree page + drive-rooted Browse filter + native Reveal foreground fix | Directories page + working Reveal | `[x]` |
 | 7 | Maintenance tab + guarded library index reset | In-app reset with confirmation | `[x]` |
+| 8 | Enabled-directory scoping | Disabled directories hide from every page | `[x]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
@@ -35,6 +36,12 @@ phase's brainstorm runs.*
   metadata, keepers, and thumbnail cache while keeping directories and preferences.
   Spec:
   [2026-10-04-phase7-library-reset-design.md](superpowers/specs/2026-10-04-phase7-library-reset-design.md).
+
+- **8 — Enabled-directory scoping:** disabling a configured directory now hides
+  its files from every read path (Overview, Files, Browse, Analytics, Duplicates,
+  Directories, shell totals, Preferences counts); re-enabling restores them with no
+  rescan. Reads are filtered by the enabled roots; nothing is deleted. Spec:
+  [2026-10-04-phase8-enabled-directory-scope-design.md](superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md).
 
 ## Phase 4 sub-phases
 
@@ -94,6 +101,7 @@ spec → plan → PR loop):
 | 5 | [2026-10-04-phase5-thumbnails-design.md](superpowers/specs/2026-10-04-phase5-thumbnails-design.md) |
 | 6 | [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md) |
 | 7 | [2026-10-04-phase7-library-reset-design.md](superpowers/specs/2026-10-04-phase7-library-reset-design.md) |
+| 8 | [2026-10-04-phase8-enabled-directory-scope-design.md](superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md) |
 
 ## How to add a phase
 

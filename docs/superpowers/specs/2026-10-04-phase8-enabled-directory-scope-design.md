@@ -200,4 +200,7 @@ roots disappear from the Directories and Browse trees.
 - The `records` table stays (the engine still writes it for the scan summary)
   but is no longer read for listings. It is effectively write-only for reads.
 - Keepers in a disabled directory become stale; re-enabling restores them.
+- Files with a NULL hash (unverified) are not grouped as duplicates, because
+  duplicate groups require a hash. This is a behaviour difference from the old
+  `records`-based derivation.
 - The scope is derived from `app-config.db` on every read; it is not cached.
