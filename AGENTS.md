@@ -132,4 +132,11 @@ review`.
   directories and preferences. Spec at
   `docs/superpowers/specs/2026-10-04-phase7-library-reset-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-phase7-library-reset.md`.
+- Phase 8 (enabled-directory scoping) — **complete**: disabling a configured
+  directory hides its files from every read path (Overview, Files, Browse,
+  Analytics, Duplicates, Directories, shell totals, Preferences counts);
+  re-enabling restores them with no rescan. Reads filter by the enabled roots;
+  nothing is deleted. Spec at
+  `docs/superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md`; plan at
+  `docs/superpowers/plans/2026-10-04-phase8-enabled-directory-scope.md`.
 - Roadmap: `docs/ROADMAP.md`.
