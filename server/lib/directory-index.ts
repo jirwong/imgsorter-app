@@ -79,5 +79,6 @@ export function getDirectoryIndex(): DirectoryNode[] {
       path: entry.path,
       lastScannedAt: config.directoryMeta[normalizeDirectoryPath(entry.path).toLowerCase()]?.lastScannedAt,
     }));
-  return buildDirectoryIndex(roots, getDirectoryStats());
+  const scope = roots.map((root) => normalizeDirectoryPath(root.path));
+  return buildDirectoryIndex(roots, getDirectoryStats(scope));
 }

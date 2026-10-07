@@ -15,6 +15,7 @@ import type {
   ShellData,
 } from '../../app/lib/types';
 import { mapPathToDisplay, rootLabelOf } from './labels';
+import { isWithinRoots } from './directory-scope';
 import { sampleDbPath } from './db-path';
 
 type EntryRow = {
@@ -57,200 +58,157 @@ function toEntry(row: EntryRow): Entry {
   };
 }
 
-export function getOverviewStats(): OverviewData {
-  const db = openReadonly();
-  if (!db) {
-    return {
-      totalFiles: 0,
-      totalSize: 0,
-      duplicateGroups: 0,
-      redundantSpace: 0,
-      uniqueFiles: 0,
-      storageMap: [],
-      largestFiles: [],
-    };
-  }
-  try {
-    const totals = db.prepare(`SELECT COUNT(*) AS files, COALESCE(SUM(size), 0) AS size FROM entries`).get() as {
-      files: number;
-      size: number;
-    };
-    const groups = db.prepare(`SELECT COUNT(*) AS n FROM records WHERE count > 1`).get() as { n: number };
-    const redundant = db
-      .prepare(`SELECT COALESCE(SUM((count - 1) * size), 0) AS space FROM records WHERE count > 1`)
-      .get() as {
-      space: number;
-    };
-    const unique = db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM (SELECT hash FROM entries WHERE hash IS NOT NULL GROUP BY hash HAVING COUNT(*) = 1)`,
-      )
-      .get() as { n: number };
-    const dirAgg = db.prepare(`SELECT directory, SUM(size) AS size FROM entries GROUP BY directory`).all() as {
-      directory: string;
-      size: number;
-    }[];
-    const largest = db
-      .prepare(
-        `SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries ORDER BY size DESC, filename ASC LIMIT 4`,
-      )
-      .all() as EntryRow[];
-
-    const byRoot = new Map<string, number>();
-    for (const row of dirAgg) {
-      const label = rootLabelOf(mapPathToDisplay(row.directory));
-      byRoot.set(label, (byRoot.get(label) ?? 0) + row.size);
-    }
-    const storageMap = [...byRoot.entries()]
-      .map(([path, size]) => ({
-        path,
-        size,
-        share: totals.size === 0 ? 0 : Math.round((size / totals.size) * 100),
-      }))
-      .sort((a, b) => b.size - a.size);
-
-    return {
-      totalFiles: totals.files,
-      totalSize: totals.size,
-      duplicateGroups: groups.n,
-      redundantSpace: redundant.space,
-      uniqueFiles: unique.n,
-      storageMap,
-      largestFiles: largest.map(toEntry),
-    };
-  } finally {
-    db.close();
-  }
-}
-
-export function listEntries(input: FilesInput): Entry[] {
+function readScopedRows(roots: string[]): EntryRow[] {
   const db = openReadonly();
   if (!db) return [];
   try {
     const rows = db
       .prepare(`SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries`)
       .all() as EntryRow[];
-    return applyFilters(rows.map(toEntry), input.query, input.dir, input.ext, input.selectedDirs);
+    return rows.filter((row) => isWithinRoots(mapPathToDisplay(row.directory), roots));
   } finally {
     db.close();
   }
 }
 
-export function getDirectoryStats(): DirectoryStat[] {
-  const db = openReadonly();
-  if (!db) return [];
-  try {
-    const rows = db
-      .prepare(`SELECT directory, COUNT(*) AS fileCount, SUM(size) AS size FROM entries GROUP BY directory`)
-      .all() as { directory: string; fileCount: number; size: number }[];
-    return rows.map((row) => ({
-      path: mapPathToDisplay(row.directory),
-      fileCount: row.fileCount,
-      size: row.size,
-    }));
-  } finally {
-    db.close();
-  }
+function readEntries(roots: string[]): Entry[] {
+  return readScopedRows(roots).map(toEntry);
 }
 
-export function getAnalyticsData(): AnalyticsData {
-  const db = openReadonly();
-  if (!db) return { rankedBySize: [], rankedByCopies: [] };
-  try {
-    const rankedBySize = db.prepare(`SELECT filename, size FROM entries ORDER BY size DESC`).all() as {
-      filename: string;
-      size: number;
-    }[];
-    const rankedByCopies = db
-      .prepare(`SELECT filename AS name, count FROM records WHERE count > 1 ORDER BY count DESC, filename ASC`)
-      .all() as { name: string; count: number }[];
-    return { rankedBySize, rankedByCopies };
-  } finally {
-    db.close();
-  }
-}
+type DuplicateGrouping = {
+  key: string;
+  hash: string;
+  name: string;
+  count: number;
+  size: number;
+  extension: string;
+  directories: string[];
+  files: Entry[];
+};
 
-export function getShellData(): ShellData {
-  const db = openReadonly();
-  if (!db) return { files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 };
-  try {
-    const totals = db.prepare(`SELECT COUNT(*) AS files, COALESCE(SUM(size), 0) AS size FROM entries`).get() as {
-      files: number;
-      size: number;
-    };
-    const dirs = db.prepare(`SELECT DISTINCT directory FROM entries`).all() as { directory: string }[];
-    const exts = db.prepare(`SELECT DISTINCT extension FROM entries ORDER BY extension`).all() as {
-      extension: string;
-    }[];
-    const roots = [...new Set(dirs.map((row) => rootLabelOf(mapPathToDisplay(row.directory))))].sort();
-    const groups = db.prepare(`SELECT COUNT(*) AS n FROM records WHERE count > 1`).get() as { n: number };
-    return {
-      files: totals.files,
-      size: totals.size,
-      roots,
-      extensions: exts.map((row) => row.extension),
-      duplicateGroups: groups.n,
-    };
-  } finally {
-    db.close();
+function groupDuplicates(entries: Entry[]): DuplicateGrouping[] {
+  const groups = new Map<string, Entry[]>();
+  for (const entry of entries) {
+    if (!entry.hash) continue;
+    const key = `${entry.hash}\u0000${entry.filename}`;
+    const list = groups.get(key);
+    if (list) list.push(entry);
+    else groups.set(key, [entry]);
   }
-}
-
-export function getDuplicateGroups(): DuplicateGroup[] {
-  const db = openReadonly();
-  if (!db) return [];
-  try {
-    const rows = db
-      .prepare(
-        `SELECT filename, hash, count, size, extension, directories FROM records WHERE count > 1 ORDER BY filename`,
-      )
-      .all() as {
-      filename: string;
-      hash: string;
-      count: number;
-      size: number;
-      extension: string;
-      directories: string;
-    }[];
-    const memberStmt = db.prepare(
-      `SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries WHERE hash = ? AND filename = ? ORDER BY path`,
-    );
-    return rows.map((row) => {
-      const files = memberStmt.all(row.hash, row.filename) as EntryRow[];
-      return {
-        key: `${row.hash}:${row.filename}`,
-        hash: row.hash,
-        name: row.filename,
-        count: row.count,
-        size: row.size,
-        redundantSpace: (row.count - 1) * row.size,
-        extension: row.extension,
-        directories: (JSON.parse(row.directories) as string[]).map(mapPathToDisplay),
-        files: files.map(toEntry),
-      };
+  const result: DuplicateGrouping[] = [];
+  for (const files of groups.values()) {
+    if (files.length < 2) continue;
+    const first = files[0];
+    result.push({
+      key: `${first.hash}:${first.filename}`,
+      hash: first.hash as string,
+      name: first.filename,
+      count: files.length,
+      size: first.size,
+      extension: first.extension,
+      directories: [...new Set(files.map((file) => file.directory))],
+      files,
     });
-  } finally {
-    db.close();
   }
+  return result;
 }
 
-export function countEntriesByDirectory(root: string): number {
-  const db = openReadonly();
-  if (!db) return 0;
-  try {
-    const normalized = normalizeDirectoryPath(root).toLowerCase();
-    const escaped = normalized.replace(/[%_]/g, (ch) => `\\${ch}`);
-    const row = db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM entries
-         WHERE lower(replace(directory, char(92), '/')) = ?
-            OR lower(replace(directory, char(92), '/')) LIKE ? ESCAPE '\\'`,
-      )
-      .get(normalized, `${escaped}/%`) as { n: number };
-    return row.n;
-  } finally {
-    db.close();
+export function getOverviewStats(roots: string[]): OverviewData {
+  const entries = readEntries(roots);
+  const totalFiles = entries.length;
+  const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
+  const groups = groupDuplicates(entries);
+  const redundantSpace = groups.reduce((sum, group) => sum + (group.count - 1) * group.size, 0);
+
+  const hashCounts = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.hash) hashCounts.set(entry.hash, (hashCounts.get(entry.hash) ?? 0) + 1);
   }
+  const uniqueFiles = [...hashCounts.values()].filter((count) => count === 1).length;
+
+  const byRoot = new Map<string, number>();
+  for (const entry of entries) {
+    const label = rootLabelOf(entry.directory);
+    byRoot.set(label, (byRoot.get(label) ?? 0) + entry.size);
+  }
+  const storageMap = [...byRoot.entries()]
+    .map(([path, size]) => ({ path, size, share: totalSize === 0 ? 0 : Math.round((size / totalSize) * 100) }))
+    .sort((a, b) => b.size - a.size);
+
+  const largestFiles = [...entries].sort((a, b) => b.size - a.size || a.filename.localeCompare(b.filename)).slice(0, 4);
+
+  return {
+    totalFiles,
+    totalSize,
+    duplicateGroups: groups.length,
+    redundantSpace,
+    uniqueFiles,
+    storageMap,
+    largestFiles,
+  };
+}
+
+export function listEntries(input: FilesInput, roots: string[]): Entry[] {
+  return applyFilters(readEntries(roots), input.query, input.dir, input.ext, input.selectedDirs);
+}
+
+export function getDirectoryStats(roots: string[]): DirectoryStat[] {
+  const totals = new Map<string, DirectoryStat>();
+  for (const entry of readEntries(roots)) {
+    const existing = totals.get(entry.directory);
+    if (existing) {
+      existing.fileCount += 1;
+      existing.size += entry.size;
+    } else {
+      totals.set(entry.directory, { path: entry.directory, fileCount: 1, size: entry.size });
+    }
+  }
+  return [...totals.values()];
+}
+
+export function getAnalyticsData(roots: string[]): AnalyticsData {
+  const entries = readEntries(roots);
+  const rankedBySize = [...entries]
+    .sort((a, b) => b.size - a.size)
+    .map((entry) => ({ filename: entry.filename, size: entry.size }));
+  const rankedByCopies = groupDuplicates(entries)
+    .map((group) => ({ name: group.name, count: group.count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return { rankedBySize, rankedByCopies };
+}
+
+export function getShellData(roots: string[]): ShellData {
+  const entries = readEntries(roots);
+  const files = entries.length;
+  const size = entries.reduce((sum, entry) => sum + entry.size, 0);
+  const rootLabels = [...new Set(entries.map((entry) => rootLabelOf(entry.directory)))].sort();
+  const extensions = [...new Set(entries.map((entry) => entry.extension))].sort();
+  const duplicateGroups = groupDuplicates(entries).length;
+  return { files, size, roots: rootLabels, extensions, duplicateGroups };
+}
+
+export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
+  return groupDuplicates(readEntries(roots))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((group) => ({
+      key: group.key,
+      hash: group.hash,
+      name: group.name,
+      count: group.count,
+      size: group.size,
+      redundantSpace: (group.count - 1) * group.size,
+      extension: group.extension,
+      directories: group.directories,
+      files: group.files,
+    }));
+}
+
+export function countEntriesByDirectory(root: string, roots: string[]): number {
+  const normalized = normalizeDirectoryPath(mapPathToDisplay(root)).toLowerCase();
+  return readEntries(roots).filter(
+    (entry) =>
+      entry.directory.toLowerCase() === normalized || entry.directory.toLowerCase().startsWith(`${normalized}/`),
+  ).length;
 }
 
 export function getEntryPathById(id: number): string | null {
@@ -279,38 +237,31 @@ export function getEntryPathsByIds(ids: number[]): string[] {
   }
 }
 
-export function getKeeperData(paths: string[]): { keepers: KeeperMap; stale: string[] } {
+export function getKeeperData(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
   const keepers: KeeperMap = {};
   if (paths.length === 0) return { keepers, stale: [] };
-  const db = openReadonly();
-  if (!db) return { keepers, stale: [] };
-  try {
-    const storedByKey = new Map<string, string>();
-    for (const path of paths) {
-      storedByKey.set(normalizeDirectoryPath(path).toLowerCase(), path);
+  const rows = readScopedRows(roots);
+  const counts = new Map<string, number>();
+  const byPath = new Map<string, EntryRow>();
+  for (const row of rows) {
+    byPath.set(normalizeDirectoryPath(row.path).toLowerCase(), row);
+    if (row.hash) {
+      const key = `${row.hash}:${row.filename}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    const keys = [...storedByKey.keys()];
-    const placeholders = keys.map(() => '?').join(', ');
-    const rows = db
-      .prepare(
-        `SELECT e.id AS id, e.path AS path, e.hash AS hash, e.filename AS filename, r.count AS count
-         FROM entries e
-         LEFT JOIN records r ON r.hash = e.hash AND r.filename = e.filename
-         WHERE lower(replace(e.path, char(92), '/')) IN (${placeholders})`,
-      )
-      .all(...keys) as { id: number; path: string; hash: string; filename: string; count: number | null }[];
-    const matched = new Set<string>();
-    for (const row of rows) {
-      if (row.count !== null && row.count > 1) {
-        keepers[`${row.hash}:${row.filename}`] = row.id;
-        matched.add(normalizeDirectoryPath(row.path).toLowerCase());
-      }
-    }
-    const stale = paths.filter((path) => !matched.has(normalizeDirectoryPath(path).toLowerCase()));
-    return { keepers, stale };
-  } finally {
-    db.close();
   }
+  const stale: string[] = [];
+  for (const path of paths) {
+    const row = byPath.get(normalizeDirectoryPath(path).toLowerCase());
+    if (!row || !row.hash) {
+      stale.push(path);
+      continue;
+    }
+    const key = `${row.hash}:${row.filename}`;
+    if ((counts.get(key) ?? 0) > 1) keepers[key] = row.id;
+    else stale.push(path);
+  }
+  return { keepers, stale };
 }
 
 export function clearIndex(): { entries: number; records: number } {
