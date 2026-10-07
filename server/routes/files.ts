@@ -5,5 +5,6 @@ export const getFilteredEntries = createServerFn({ method: 'POST' })
   .validator((input: FilesInput) => input)
   .handler(async ({ data }) => {
     const { listEntries } = await import('../lib/queries');
-    return { files: listEntries(data) };
+    const { enabledRoots } = await import('../lib/directory-scope');
+    return { files: listEntries(data, enabledRoots()) };
   });

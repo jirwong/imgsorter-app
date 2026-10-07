@@ -8,9 +8,11 @@ function keeperKey(path: string): string {
 
 export const getDuplicatesData = createServerFn({ method: 'GET' }).handler(async (): Promise<DuplicatesData> => {
   const { getDuplicateGroups, getKeeperData } = await import('../lib/queries');
+  const { enabledRoots } = await import('../lib/directory-scope');
   const { appConfigStore } = await import('../lib/app-config');
-  const groups = getDuplicateGroups();
-  const { keepers, stale } = getKeeperData(appConfigStore.getKeepers());
+  const roots = enabledRoots();
+  const groups = getDuplicateGroups(roots);
+  const { keepers, stale } = getKeeperData(appConfigStore.getKeepers(), roots);
   return { groups, keepers, staleKeepers: stale.length };
 });
 
@@ -26,8 +28,9 @@ export const saveKeepers = createServerFn({ method: 'POST' })
 
 export const clearStaleKeepers = createServerFn({ method: 'POST' }).handler(async () => {
   const { getKeeperData } = await import('../lib/queries');
+  const { enabledRoots } = await import('../lib/directory-scope');
   const { appConfigStore } = await import('../lib/app-config');
-  const { stale } = getKeeperData(appConfigStore.getKeepers());
+  const { stale } = getKeeperData(appConfigStore.getKeepers(), enabledRoots());
   const staleKeys = new Set(stale.map((path) => keeperKey(path)));
   const remaining = appConfigStore.getKeepers().filter((path) => !staleKeys.has(keeperKey(path)));
   appConfigStore.setKeepers(remaining);
