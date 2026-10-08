@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Group, Select, Table, Text, TextInput } from '@mantine/core';
 import { Search } from 'lucide-react';
+import { DirectoryPicker } from '../../components/common/DirectoryPicker';
 import { formatBytes } from '../../lib/format';
 import type { Entry } from '../../lib/types';
 
@@ -12,7 +13,7 @@ export type FilesTableProps = {
 
 export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
   const [fileQuery, setFileQuery] = useState('');
-  const [directory, setDirectory] = useState('All directories');
+  const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
   const [count, setCount] = useState('All counts');
   const [size, setSize] = useState('All sizes');
   const [extension, setExtension] = useState('All extensions');
@@ -20,6 +21,15 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
   const [page, setPage] = useState(1);
 
   const directories = useMemo(() => [...new Set(files.map((e) => e.directory))], [files]);
+  const directoryOptions = useMemo(
+    () =>
+      directories.map((d) => ({
+        value: d,
+        label: d,
+        count: files.filter((e) => e.directory === d).length,
+      })),
+    [directories, files],
+  );
   const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
 
   const list = useMemo(
@@ -28,7 +38,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
         .filter(
           (e) =>
             (!fileQuery || `${e.filename} ${e.path}`.toLowerCase().includes(fileQuery.toLowerCase())) &&
-            (directory === 'All directories' || e.directory === directory) &&
+            (appliedDirectories.length === 0 || appliedDirectories.includes(e.directory)) &&
             (extension === 'All extensions' || e.extension === extension) &&
             (count === 'All counts' || count === 'Unique only') &&
             (size === 'All sizes' ||
@@ -37,7 +47,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
               (size === 'Over 25 MB' && e.size > 25000000)),
         )
         .sort((a, b) => a.filename.localeCompare(b.filename)),
-    [files, fileQuery, directory, extension, count, size],
+    [files, fileQuery, appliedDirectories, extension, count, size],
   );
 
   const pageLimit = Number(pageSize);
@@ -46,7 +56,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
 
   useEffect(() => {
     setPage(1);
-  }, [fileQuery, directory, extension, count, size, pageSize, list.length]);
+  }, [fileQuery, appliedDirectories, extension, count, size, pageSize, list.length]);
 
   return (
     <>
@@ -58,11 +68,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
             placeholder="Filter filename or path"
             leftSection={<Search size={15} />}
           />
-          <Select
-            value={directory}
-            onChange={(v) => setDirectory(v ?? 'All directories')}
-            data={['All directories', ...directories]}
-          />
+          <DirectoryPicker applied={appliedDirectories} options={directoryOptions} onApply={setAppliedDirectories} />
           <Select value={count} onChange={(v) => setCount(v ?? 'All counts')} data={['All counts', 'Unique only']} />
           <Select
             value={size}
