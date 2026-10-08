@@ -49,7 +49,7 @@ TypeScript strict. No new dependency.
 ```
 server/
   lib/
-    directory-scope.ts        # NEW: enabledRoots, isWithinRoots, scopeEntries
+    directory-scope.ts        # NEW: enabledRoots, isWithinRoots
     directory-scope.test.ts   # NEW
     queries.ts                # read fns take roots and compute from scoped entries
     queries.test.ts           # update calls; add scope tests
@@ -70,7 +70,6 @@ server/
 `import '@tanstack/react-start/server-only';`
 
 ```ts
-import type { Entry } from '../../app/lib/types';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigStore } from './app-config';
 
@@ -88,10 +87,6 @@ export function isWithinRoots(path: string, roots: string[]): boolean {
     return target === scope || target.startsWith(`${scope}/`);
   });
 }
-
-export function scopeEntries<T extends { directory: string }>(rows: T[], roots: string[]): T[] {
-  return rows.filter((row) => isWithinRoots(row.directory, roots));
-}
 ```
 
 - An **empty** roots list means **nothing** is in scope. With no enabled
@@ -104,8 +99,8 @@ Every read function takes the enabled roots and computes from **scoped entries**
 The `records` table is no longer read for listings; the duplicate summary is
 derived from the scoped entries (Section 8).
 
-- `listEntries(input, roots)`: fetch entries, map to `Entry`, `scopeEntries`,
-  then `applyFilters`.
+- `listEntries(input, roots)`: fetch entries, filter raw rows by
+  `isWithinRoots`, map to `Entry`, then `applyFilters`.
 - `getDirectoryStats(roots)`: scope entries, group by `directory` →
   `{ path, fileCount, size }`.
 - `getOverviewStats(roots)`: from scoped entries — `totalFiles`, `totalSize`;
@@ -118,8 +113,10 @@ derived from the scoped entries (Section 8).
 - `getDuplicateGroups(roots)`: Section 8.
 - `countEntriesByDirectory(root, roots)`: count scoped entries whose directory
   is `root` or under it. A disabled `root` yields 0.
-- `getKeeperData(paths, roots)`: match entries within scope, so a keeper whose
-  file is hidden counts as stale.
+- `getKeeperData(paths, roots)`: the returned `keepers` map only includes
+  keepers whose file is in scope and whose scoped duplicate-group count is > 1;
+  staleness is judged against the unscoped DB, so a keeper whose file is hidden
+  (out of scope) is neither kept nor stale and is preserved.
 
 Unchanged (id/path lookups for native actions): `getEntryPathById`,
 `getEntryPathsByIds`, `clearIndex`.
@@ -131,7 +128,7 @@ Unchanged (id/path lookups for native actions): `getEntryPathById`,
 Today `getDuplicateGroups` and the Overview duplicate metrics read the `records`
 table, which the engine precomputes over **all** entries. To honour the scope,
 derive duplicates from the scoped entries instead, using the same grouping the
-engine uses (`hash`, `filename`, `size`, `extension`):
+engine uses (`hash`, `filename`):
 
 - A **duplicate group** is a group with more than one entry.
 - `count` = group size; `size` = the group's size; `redundantSpace` =
@@ -167,7 +164,7 @@ roots disappear from the Directories and Browse trees.
 
 - **`server/lib/directory-scope.test.ts`:** `isWithinRoots` matches the root
   itself and a subtree, ignores case and separators, and returns false for an
-  empty roots list; `scopeEntries` filters a mixed list.
+  empty roots list; `enabledRoots` returns only the enabled, normalized roots.
 - **`server/lib/queries.test.ts`:** update every call to pass the fixture roots
   `['C:/Media', 'D:/Camera Imports']` (they cover all fixture directories).
   Add scope tests: with a narrower roots list (e.g. `['C:/Media/2024']`), the
@@ -199,7 +196,13 @@ roots disappear from the Directories and Browse trees.
   Analytics queries. A later phase could push the scope into SQL.
 - The `records` table stays (the engine still writes it for the scan summary)
   but is no longer read for listings. It is effectively write-only for reads.
-- Keepers in a disabled directory become stale; re-enabling restores them.
+- Keepers in a disabled directory are preserved: their file is neither kept nor
+  stale (staleness is judged against the unscoped DB), so "Clear saved keepers"
+  never deletes them and re-enabling restores them. Only a keeper whose file is
+  absent or is no longer a duplicate anywhere is stale.
+- A nested configured directory is not independently scoped: the scope is the
+  union of the enabled roots, so an enabled parent keeps a disabled child's
+  files visible.
 - Files with a NULL hash (unverified) are not grouped as duplicates, because
   duplicate groups require a hash. This is a behaviour difference from the old
   `records`-based derivation.

@@ -1,5 +1,22 @@
-import { describe, expect, it } from 'vitest';
-import { buildDirectoryIndex } from './directory-index';
+import { describe, expect, it, vi } from 'vitest';
+import { buildDirectoryIndex, getDirectoryIndex } from './directory-index';
+import { getDirectoryStats } from './queries';
+
+vi.mock('./app-config', () => ({
+  appConfigStore: {
+    get: () => ({
+      directories: {
+        indexed: [{ path: 'C:\\Media', enabled: true }],
+        ignored: [],
+      },
+      directoryMeta: {},
+    }),
+  },
+}));
+
+vi.mock('./queries', () => ({
+  getDirectoryStats: vi.fn(() => []),
+}));
 
 describe('buildDirectoryIndex', () => {
   it('builds drive-rooted nodes with a C:\\ label', () => {
@@ -53,5 +70,12 @@ describe('buildDirectoryIndex', () => {
     const media = tree[0].children[0];
     expect(media).toMatchObject({ isRoot: true, fileCount: 4, size: 100 });
     expect(media.lastScannedAt).toBe('2026-10-04T08:00:00.000Z');
+  });
+});
+
+describe('getDirectoryIndex', () => {
+  it('scopes the stats to the enabled roots', () => {
+    getDirectoryIndex();
+    expect(getDirectoryStats).toHaveBeenCalledWith(['C:/Media']);
   });
 });

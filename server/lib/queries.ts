@@ -240,28 +240,42 @@ export function getEntryPathsByIds(ids: number[]): string[] {
 export function getKeeperData(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
   const keepers: KeeperMap = {};
   if (paths.length === 0) return { keepers, stale: [] };
-  const rows = readScopedRows(roots);
-  const counts = new Map<string, number>();
-  const byPath = new Map<string, EntryRow>();
-  for (const row of rows) {
-    byPath.set(normalizeDirectoryPath(row.path).toLowerCase(), row);
-    if (row.hash) {
-      const key = `${row.hash}:${row.filename}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+  const db = openReadonly();
+  if (!db) return { keepers, stale: [] };
+  try {
+    const rows = db
+      .prepare(`SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries`)
+      .all() as EntryRow[];
+    const allCounts = new Map<string, number>();
+    const scopedCounts = new Map<string, number>();
+    const byPath = new Map<string, { row: EntryRow; scoped: boolean }>();
+    for (const row of rows) {
+      const scoped = isWithinRoots(mapPathToDisplay(row.directory), roots);
+      if (row.hash) {
+        const key = `${row.hash}:${row.filename}`;
+        allCounts.set(key, (allCounts.get(key) ?? 0) + 1);
+        if (scoped) scopedCounts.set(key, (scopedCounts.get(key) ?? 0) + 1);
+      }
+      byPath.set(normalizeDirectoryPath(row.path).toLowerCase(), { row, scoped });
     }
-  }
-  const stale: string[] = [];
-  for (const path of paths) {
-    const row = byPath.get(normalizeDirectoryPath(path).toLowerCase());
-    if (!row || !row.hash) {
-      stale.push(path);
-      continue;
+    const stale: string[] = [];
+    for (const path of paths) {
+      const found = byPath.get(normalizeDirectoryPath(path).toLowerCase());
+      if (!found || !found.row.hash) {
+        stale.push(path);
+        continue;
+      }
+      const key = `${found.row.hash}:${found.row.filename}`;
+      if ((allCounts.get(key) ?? 0) <= 1) {
+        stale.push(path);
+        continue;
+      }
+      if (found.scoped && (scopedCounts.get(key) ?? 0) > 1) keepers[key] = found.row.id;
     }
-    const key = `${row.hash}:${row.filename}`;
-    if ((counts.get(key) ?? 0) > 1) keepers[key] = row.id;
-    else stale.push(path);
+    return { keepers, stale };
+  } finally {
+    db.close();
   }
-  return { keepers, stale };
 }
 
 export function clearIndex(): { entries: number; records: number } {
