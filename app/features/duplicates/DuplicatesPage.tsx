@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { Search } from 'lucide-react';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DuplicateGroupTable } from './DuplicateGroupTable';
-import { DirectoryPicker } from './DirectoryPicker';
+import { DirectoryPicker } from '../../components/common/DirectoryPicker';
 import { matchesKeeperFilter, type KeeperFilterValue } from './keeper-filter';
 import { useApp } from '../../lib/app-context';
 import { clearStaleKeepers, saveKeepers } from '../../../server/routes/duplicates';
