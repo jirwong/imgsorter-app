@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest';
-import { isWithinRoots, scopeEntries } from './directory-scope';
+import { describe, expect, it, vi } from 'vitest';
+import { enabledRoots, isWithinRoots } from './directory-scope';
+
+vi.mock('./app-config', () => ({
+  appConfigStore: {
+    get: () => ({
+      directories: {
+        indexed: [
+          { path: 'C:\\Media', enabled: true },
+          { path: 'D:\\Other', enabled: false },
+        ],
+        ignored: [],
+      },
+      directoryMeta: {},
+    }),
+  },
+}));
+
+describe('enabledRoots', () => {
+  it('returns the normalized paths of enabled directories only', () => {
+    expect(enabledRoots()).toEqual(['C:/Media']);
+  });
+});
 
 describe('isWithinRoots', () => {
   it('matches a root and its subtree, case- and separator-insensitively', () => {
@@ -13,15 +34,5 @@ describe('isWithinRoots', () => {
 
   it('returns false for an empty roots list', () => {
     expect(isWithinRoots('C:/Media', [])).toBe(false);
-  });
-});
-
-describe('scopeEntries', () => {
-  it('keeps only rows within the roots', () => {
-    const rows = [
-      { directory: 'C:/Media/2025', name: 'a' },
-      { directory: 'D:/Camera Imports', name: 'b' },
-    ];
-    expect(scopeEntries(rows, ['C:/Media'])).toEqual([{ directory: 'C:/Media/2025', name: 'a' }]);
   });
 });

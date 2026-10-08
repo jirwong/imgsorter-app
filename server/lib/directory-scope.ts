@@ -16,7 +16,3 @@ export function isWithinRoots(path: string, roots: string[]): boolean {
     return target === scope || target.startsWith(`${scope}/`);
   });
 }
-
-export function scopeEntries<T extends { directory: string }>(rows: T[], roots: string[]): T[] {
-  return rows.filter((row) => isWithinRoots(row.directory, roots));
-}

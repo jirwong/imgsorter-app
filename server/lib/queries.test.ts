@@ -155,6 +155,16 @@ describe('queries against the committed sample db', () => {
     expect(stale).toEqual([]);
   });
 
+  it('preserves a keeper whose file is outside the enabled roots', () => {
+    const [group] = getDuplicateGroups(ROOTS);
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    expect(getKeeperData([raw], ['C:/Nope'])).toEqual({ keepers: {}, stale: [] });
+    const scoped = getKeeperData([raw], ROOTS);
+    expect(scoped.keepers[group.key]).toBe(id);
+    expect(scoped.stale).toEqual([]);
+  });
+
   it('excludes directories outside the enabled roots', () => {
     const scoped = getOverviewStats(['C:/Media/2024']);
     const all = getOverviewStats(ROOTS);
