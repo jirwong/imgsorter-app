@@ -2,6 +2,7 @@ import { createFileRoute, useLoaderData } from '@tanstack/react-router';
 import { FilesPage } from '../features/files/FilesPage';
 import { useFilterSearchParams } from '../lib/filter-sync';
 import { getFilteredEntries } from '../../server/routes/files';
+import { getHiddenFiles } from '../../server/routes/hidden';
 
 export const Route = createFileRoute('/unique-files')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -10,20 +11,25 @@ export const Route = createFileRoute('/unique-files')({
     ext: typeof search.ext === 'string' ? search.ext : undefined,
   }),
   loaderDeps: ({ search }) => ({ query: search.query, dir: search.dir, ext: search.ext }),
-  loader: async ({ deps }) =>
-    getFilteredEntries({
-      data: {
-        query: deps.query ?? '',
-        dir: deps.dir ?? 'All directories',
-        ext: deps.ext ?? 'All types',
-        selectedDirs: [],
-      },
-    }),
+  loader: async ({ deps }) => {
+    const [{ files }, { hidden }] = await Promise.all([
+      getFilteredEntries({
+        data: {
+          query: deps.query ?? '',
+          dir: deps.dir ?? 'All directories',
+          ext: deps.ext ?? 'All types',
+          selectedDirs: [],
+        },
+      }),
+      getHiddenFiles(),
+    ]);
+    return { files, hidden };
+  },
   component: UniqueFilesRoute,
 });
 
 function UniqueFilesRoute() {
   useFilterSearchParams();
-  const { files } = useLoaderData({ from: '/unique-files' });
-  return <FilesPage files={files} />;
+  const { files, hidden } = useLoaderData({ from: '/unique-files' });
+  return <FilesPage files={files} hidden={hidden} />;
 }
