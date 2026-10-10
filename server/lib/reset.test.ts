@@ -16,6 +16,9 @@ function makeDeps(): ResetDeps & { calls: string[] } {
     clearKeepers: vi.fn(() => {
       calls.push('clearKeepers');
     }),
+    clearHidden: vi.fn(() => {
+      calls.push('clearHidden');
+    }),
     clearThumbnails: vi.fn(() => {
       calls.push('clearThumbnails');
       return 2;
@@ -28,7 +31,7 @@ describe('createResetService', () => {
     const deps = makeDeps();
     const service = createResetService(deps);
     expect(service.reset()).toEqual({ entries: 5, records: 3, thumbnails: 2 });
-    expect(deps.calls).toEqual(['clearIndex', 'resetScanMetadata', 'clearKeepers', 'clearThumbnails']);
+    expect(deps.calls).toEqual(['clearIndex', 'resetScanMetadata', 'clearKeepers', 'clearHidden', 'clearThumbnails']);
   });
 
   it('stops when clearing the index fails', () => {
@@ -40,6 +43,7 @@ describe('createResetService', () => {
     expect(() => service.reset()).toThrow('boom');
     expect(deps.resetScanMetadata).not.toHaveBeenCalled();
     expect(deps.clearKeepers).not.toHaveBeenCalled();
+    expect(deps.clearHidden).not.toHaveBeenCalled();
     expect(deps.clearThumbnails).not.toHaveBeenCalled();
   });
 

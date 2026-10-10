@@ -1,10 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
-import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryKey } from '../../app/lib/directory-path';
 import type { DuplicatesData, KeeperMap } from '../../app/lib/types';
-
-function keeperKey(path: string): string {
-  return normalizeDirectoryPath(path).toLowerCase();
-}
 
 export const getDuplicatesData = createServerFn({ method: 'GET' }).handler(async (): Promise<DuplicatesData> => {
   const { getDuplicateGroups, getKeeperData } = await import('../lib/queries');
@@ -31,8 +27,8 @@ export const clearStaleKeepers = createServerFn({ method: 'POST' }).handler(asyn
   const { enabledRoots } = await import('../lib/directory-scope');
   const { appConfigStore } = await import('../lib/app-config');
   const { stale } = getKeeperData(appConfigStore.getKeepers(), enabledRoots());
-  const staleKeys = new Set(stale.map((path) => keeperKey(path)));
-  const remaining = appConfigStore.getKeepers().filter((path) => !staleKeys.has(keeperKey(path)));
+  const staleKeys = new Set(stale.map((path) => normalizeDirectoryKey(path)));
+  const remaining = appConfigStore.getKeepers().filter((path) => !staleKeys.has(normalizeDirectoryKey(path)));
   appConfigStore.setKeepers(remaining);
   return { staleKeepers: 0 };
 });
