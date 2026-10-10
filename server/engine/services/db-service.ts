@@ -116,7 +116,7 @@ export class DbService {
     this.selectEntriesByDirStmt = this.db.prepare(
       `SELECT size, directory, extension, filename, birthtime, hash, path
        FROM entries
-       WHERE directory = ? OR directory LIKE ? ESCAPE '\\' OR directory LIKE ? ESCAPE '\\'`,
+       WHERE lower(replace(directory, '\\', '/')) = ? OR lower(replace(directory, '\\', '/')) LIKE ? ESCAPE '\\'`,
     );
 
     this.deleteEntryByPathStmt = this.db.prepare(`DELETE FROM entries WHERE path = ?`);
@@ -245,10 +245,13 @@ export class DbService {
 
   getFileEntriesByDirectory(directory: string) {
     // Match the directory itself and any directory beneath it, bounded by a path
-    // separator. Wildcard characters in the directory name are escaped so they are
-    // not treated as LIKE patterns. Both '/' and '\' separators are handled.
-    const escaped = escapeLike(directory);
-    const rows = this.selectEntriesByDirStmt.all(directory, `${escaped}/%`, `${escaped}\\${'\\'}%`) as EntryRow[];
+    // separator. The stored directories and the query are normalized to forward
+    // slashes and lower case, so the comparison is not sensitive to the path
+    // separator or the letter case. Wildcard characters in the directory name are
+    // escaped so they are not treated as LIKE patterns.
+    const normalized = directory.replace(/\\/g, '/').toLowerCase();
+    const escaped = escapeLike(normalized);
+    const rows = this.selectEntriesByDirStmt.all(normalized, `${escaped}/%`) as EntryRow[];
     return rows.map((row) => this.mapEntry(row));
   }
 
