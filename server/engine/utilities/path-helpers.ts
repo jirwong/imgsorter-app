@@ -1,7 +1,7 @@
-// Normalize paths for comparison: trim trailing separators and ignore case
-// (filesystems on Windows are case-insensitive).
+// Normalize paths for comparison: unify separators, trim trailing separators,
+// and ignore case (filesystems on Windows are case-insensitive).
 export function normalizePath(path: string): string {
-  return path.replace(/[\\/]+$/, '').toLowerCase();
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }
 
 export function buildIgnoredSet(ignoreDirectories: string[]): Set<string> {

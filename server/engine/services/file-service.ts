@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { dirname, extname, basename, join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { buildIgnoredSet, isIgnored } from '../utilities/path-helpers';
 import type { FileEntry } from '../types/file-types';
 
 const EDGE_CHUNK_SIZE = 16 * 1024; // 16KB
@@ -83,6 +84,7 @@ export async function listFilesRecursive(
 
   // Normalize extensions to lowercase once for case-insensitive matching
   const normalizedExtensions = extensions?.map((ext) => ext.toLowerCase());
+  const ignored = buildIgnoredSet(ignoreDirectories ?? []);
 
   async function walk(dir: string): Promise<void> {
     let entries: Dirent[];
@@ -99,7 +101,7 @@ export async function listFilesRecursive(
       const fullPath = join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        if (ignoreDirectories && ignoreDirectories.includes(fullPath)) {
+        if (isIgnored(fullPath, ignored)) {
           continue;
         }
         await walk(fullPath);
@@ -135,6 +137,7 @@ export async function listFilePathsRecursive(
   onFile?: (filePath: string) => void,
 ): Promise<string[]> {
   const result: string[] = [];
+  const ignored = buildIgnoredSet(ignoreDirectories ?? []);
 
   async function walk(dir: string): Promise<void> {
     let entries: Dirent[];
@@ -151,7 +154,7 @@ export async function listFilePathsRecursive(
       const fullPath = join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        if (ignoreDirectories && ignoreDirectories.includes(fullPath)) {
+        if (isIgnored(fullPath, ignored)) {
           continue;
         }
         await walk(fullPath);
