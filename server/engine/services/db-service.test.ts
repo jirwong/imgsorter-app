@@ -49,10 +49,12 @@ describe('getFileEntriesByDirectory', () => {
     const db = new DbService(':memory:');
     db.insertFileEntries([
       file('C:\\Users\\jirwo\\Pictures\\100%_done', 'a.jpg'),
+      file('C:\\Users\\jirwo\\Pictures\\100%_done\\Sub', 'child.jpg'),
       file('C:\\Users\\jirwo\\Pictures\\100Xdone', 'b.jpg'),
+      file('C:\\Users\\jirwo\\Pictures\\100Xdone\\Sub', 'other.jpg'),
     ]);
     const rows = db.getFileEntriesByDirectory('C:/Users/jirwo/Pictures/100%_done');
-    expect(rows.map((row) => row.filename)).toEqual(['a.jpg']);
+    expect(rows.map((row) => row.filename).sort()).toEqual(['a.jpg', 'child.jpg']);
     db.close();
   });
 });
