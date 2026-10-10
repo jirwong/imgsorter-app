@@ -113,6 +113,31 @@ describe('createAppConfigStore', () => {
     expect(store.getKeepers()).toEqual([]);
   });
 
+  it('defaults hidden files to an empty list', () => {
+    expect(store.getHidden()).toEqual([]);
+  });
+
+  it('normalizes, de-duplicates, and round-trips hidden files', () => {
+    const saved = store.setHidden([' C:\\Media\\A.jpg ', 'c:/media/a.jpg', '', 'C:\\Media\\B.jpg\\']);
+    expect(saved).toEqual(['C:/Media/A.jpg', 'C:/Media/B.jpg']);
+    expect(store.getHidden()).toEqual(['C:/Media/A.jpg', 'C:/Media/B.jpg']);
+  });
+
+  it('keeps hidden files when directories and settings are saved', () => {
+    store.setHidden(['C:/Media/A.jpg']);
+    store.saveDirectories({ indexed: [], ignored: [] });
+    store.saveApplication({ ...DEFAULT_APP_CONFIG.application, extensions: 'png' });
+    expect(store.getHidden()).toEqual(['C:/Media/A.jpg']);
+  });
+
+  it('ignores an invalid hidden value', () => {
+    store.getHidden();
+    const raw = new Database(dbPath);
+    raw.prepare(`UPDATE app_config SET value = '{}' WHERE key = 'hidden'`).run();
+    raw.close();
+    expect(store.getHidden()).toEqual([]);
+  });
+
   it('defaults the last scan to null', () => {
     expect(store.getLastScan()).toBeNull();
   });

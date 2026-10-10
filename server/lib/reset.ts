@@ -10,6 +10,7 @@ export type ResetDeps = {
   clearIndex: () => { entries: number; records: number };
   resetScanMetadata: () => void;
   clearKeepers: () => void;
+  clearHidden: () => void;
   clearThumbnails: () => number;
 };
 
@@ -20,6 +21,7 @@ export function createResetService(deps: ResetDeps): { reset: () => ResetResult 
       const index = deps.clearIndex();
       deps.resetScanMetadata();
       deps.clearKeepers();
+      deps.clearHidden();
       const thumbs = deps.clearThumbnails();
       return { entries: index.entries, records: index.records, thumbnails: thumbs };
     },
@@ -32,6 +34,9 @@ export const resetService = createResetService({
   resetScanMetadata: () => appConfigStore.resetScanMetadata(),
   clearKeepers: () => {
     appConfigStore.setKeepers([]);
+  },
+  clearHidden: () => {
+    appConfigStore.setHidden([]);
   },
   clearThumbnails: () => thumbnails.clearCache(),
 });

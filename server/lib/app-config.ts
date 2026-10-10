@@ -17,6 +17,7 @@ const DIRECTORY_KEY = 'directories';
 const APPLICATION_KEY = 'application';
 const DIRECTORY_META_KEY = 'directory_meta';
 const KEEPERS_KEY = 'keepers';
+const HIDDEN_KEY = 'hidden';
 const LAST_SCAN_KEY = 'last_scan';
 
 export type AppConfigStore = {
@@ -26,6 +27,8 @@ export type AppConfigStore = {
   recordScannedDirectories: (paths: string[], at: string) => AppConfig;
   getKeepers: () => string[];
   setKeepers: (paths: string[]) => string[];
+  getHidden: () => string[];
+  setHidden: (paths: string[]) => string[];
   getLastScan: () => LastScan | null;
   recordLastScan: (scan: LastScan) => LastScan;
   resetScanMetadata: () => void;
@@ -73,7 +76,7 @@ function normalizeApplication(input: ApplicationConfig): ApplicationConfig {
   };
 }
 
-function normalizeKeepers(paths: string[]): string[] {
+function normalizePathList(paths: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const value of paths) {
@@ -119,7 +122,7 @@ function isDirectoryMeta(value: unknown): value is DirectoryMeta {
   return Object.values(value).every((entry) => isRecord(entry) && typeof entry.lastScannedAt === 'string');
 }
 
-function isKeeperPaths(value: unknown): value is string[] {
+function isPathList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
@@ -220,7 +223,7 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
     getKeepers: () => {
       const db = openStore(dbPath);
       try {
-        return readKey<string[]>(db, KEEPERS_KEY, [], isKeeperPaths);
+        return readKey<string[]>(db, KEEPERS_KEY, [], isPathList);
       } finally {
         db.close();
       }
@@ -228,8 +231,26 @@ export function createAppConfigStore(dbPath: string): AppConfigStore {
     setKeepers: (paths) => {
       const db = openStore(dbPath);
       try {
-        const next = normalizeKeepers(paths);
+        const next = normalizePathList(paths);
         writeKey(db, KEEPERS_KEY, next);
+        return next;
+      } finally {
+        db.close();
+      }
+    },
+    getHidden: () => {
+      const db = openStore(dbPath);
+      try {
+        return readKey<string[]>(db, HIDDEN_KEY, [], isPathList);
+      } finally {
+        db.close();
+      }
+    },
+    setHidden: (paths) => {
+      const db = openStore(dbPath);
+      try {
+        const next = normalizePathList(paths);
+        writeKey(db, HIDDEN_KEY, next);
         return next;
       } finally {
         db.close();
