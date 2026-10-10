@@ -26,7 +26,8 @@ export function FilesTable({ files, unique, hidden, onHide, onUnhide, onClearHid
   const [pageSize, setPageSize] = useState('25');
   const [page, setPage] = useState(1);
 
-  const hiddenEnabled = hidden !== undefined && onHide !== undefined && onUnhide !== undefined;
+  const hiddenEnabled =
+    hidden !== undefined && onHide !== undefined && onUnhide !== undefined && onClearHidden !== undefined;
   const hiddenKeys = useMemo(() => new Set((hidden ?? []).map(normalizeDirectoryKey)), [hidden]);
   const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
 
