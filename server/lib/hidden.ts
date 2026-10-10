@@ -1,10 +1,6 @@
 import '@tanstack/react-start/server-only';
-import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryKey } from '../../app/lib/directory-path';
 import { appConfigStore } from './app-config';
-
-function hiddenKey(path: string): string {
-  return normalizeDirectoryPath(path).toLowerCase();
-}
 
 export type HiddenService = {
   get: () => string[];
@@ -23,8 +19,8 @@ export function createHiddenService(deps: HiddenDeps): HiddenService {
     get: () => deps.getHidden(),
     hide: (path) => deps.setHidden([...deps.getHidden(), path]),
     unhide: (path) => {
-      const key = hiddenKey(path);
-      return deps.setHidden(deps.getHidden().filter((item) => hiddenKey(item) !== key));
+      const key = normalizeDirectoryKey(path);
+      return deps.setHidden(deps.getHidden().filter((item) => normalizeDirectoryKey(item) !== key));
     },
     clear: () => deps.setHidden([]),
   };

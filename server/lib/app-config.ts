@@ -34,22 +34,8 @@ export type AppConfigStore = {
   resetScanMetadata: () => void;
 };
 
-function dedupePaths(values: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const path = normalizeDirectoryPath(value);
-    if (path.length === 0) continue;
-    const key = path.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(path);
-  }
-  return result;
-}
-
 function normalizeDirectories(input: DirectoriesConfig): DirectoriesConfig {
-  const ignored = dedupePaths(input.ignored);
+  const ignored = normalizePathList(input.ignored);
   const ignoredKeys = new Set(ignored.map((path) => path.toLowerCase()));
   const indexed: IndexedDirectory[] = [];
   const seen = new Set<string>();
