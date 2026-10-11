@@ -163,4 +163,10 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('25 selected')).toBeInTheDocument();
   });
+
+  it('offers 100 rows per page', () => {
+    renderPage();
+    fireEvent.click(screen.getAllByLabelText('Items per page')[0]);
+    expect(screen.getByRole('option', { name: '100' })).toBeInTheDocument();
+  });
 });

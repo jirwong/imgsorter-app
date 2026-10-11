@@ -315,7 +315,7 @@ export function FilesTable({
           aria-label="Items per page"
           value={pageSize}
           onChange={(v) => setPageSize(v ?? '25')}
-          data={['10', '25', '50']}
+          data={['10', '25', '50', '100']}
           w={80}
         />
         <Group gap="8">
