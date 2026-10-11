@@ -454,12 +454,19 @@ h2 {
   border-radius: 8px;
 }
 
+.directory-tree-scroll {
+  overflow-x: auto;
+}
+
 .directory-node {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 28px;
   border-radius: 4px;
+  white-space: nowrap;
+  width: max-content;
+  min-width: 100%;
 }
 
 .directory-node:hover {
