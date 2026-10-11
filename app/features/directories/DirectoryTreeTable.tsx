@@ -3,6 +3,7 @@ import { ActionIcon, Button, Group, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { ChevronDown, ChevronRight, Copy, FolderOpen, ListFilter } from 'lucide-react';
 import { useRouter } from '@tanstack/react-router';
+import { copyToClipboard } from '../../lib/clipboard';
 import { formatBytes, formatRelativeTime } from '../../lib/format';
 import { revealFolder } from '../../../server/routes/native';
 import type { DirectoryNode, NativeActionFailure } from '../../lib/types';
@@ -39,17 +40,6 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
       to: '/browse',
       search: ((prev: Record<string, unknown>) => ({ ...prev, selectedDirs: [path] })) as never,
     });
-  };
-
-  const copyPath = (path: string) => {
-    if (!navigator.clipboard) {
-      notifications.show({ color: 'red', message: 'Could not copy the path.' });
-      return;
-    }
-    void navigator.clipboard
-      .writeText(path)
-      .then(() => notifications.show({ color: 'cyan', message: 'Path copied.' }))
-      .catch(() => notifications.show({ color: 'red', message: 'Could not copy the path.' }));
   };
 
   const rows: ReactElement[] = [];
@@ -99,7 +89,12 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
             >
               Filter
             </Button>
-            <Button variant="subtle" size="xs" leftSection={<Copy size={13} />} onClick={() => copyPath(node.path)}>
+            <Button
+              variant="subtle"
+              size="xs"
+              leftSection={<Copy size={13} />}
+              onClick={() => copyToClipboard(node.path, 'Path copied.', 'Could not copy the path.')}
+            >
               Copy path
             </Button>
           </Group>
