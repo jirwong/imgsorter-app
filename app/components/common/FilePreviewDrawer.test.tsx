@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   openEntry: vi.fn(),
   getThumbnails: vi.fn(),
   notifyShow: vi.fn(),
+  writeText: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/native', () => ({
@@ -60,6 +61,8 @@ describe('FilePreviewDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getThumbnails.mockResolvedValue({});
+    mocks.writeText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: mocks.writeText }, configurable: true });
   });
 
   it('renders nothing while closed', () => {
@@ -110,5 +113,26 @@ describe('FilePreviewDrawer', () => {
   it('shows the placeholder when there is no preview', async () => {
     renderDrawer();
     await waitFor(() => expect(document.querySelector('.drawer-thumb-empty')).toBeInTheDocument());
+  });
+
+  it('copies the directory to the clipboard', async () => {
+    renderDrawer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy directory' }));
+    await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith('C:/Media/2025'));
+    expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
+  });
+
+  it('copies the image path to the clipboard', async () => {
+    renderDrawer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy image path' }));
+    await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith('C:/Media/2025/a.jpg'));
+    expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
+  });
+
+  it('reports an error when the clipboard is unavailable', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    renderDrawer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy directory' }));
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
   });
 });

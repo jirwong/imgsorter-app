@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Group, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { FileImage, FolderOpen } from 'lucide-react';
+import { Copy, FileImage, FolderOpen } from 'lucide-react';
 import { useApp } from '../../lib/app-context';
 import { formatBytes } from '../../lib/format';
 import { openEntry, revealEntry } from '../../../server/routes/native';
@@ -64,6 +64,17 @@ export function FilePreviewDrawer() {
     }
   };
 
+  const copy = (text: string, message: string): void => {
+    if (!navigator.clipboard) {
+      notifications.show({ color: 'red', message: 'Could not copy.' });
+      return;
+    }
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => notifications.show({ color: 'cyan', message }))
+      .catch(() => notifications.show({ color: 'red', message: 'Could not copy.' }));
+  };
+
   return (
     <Drawer
       opened={!!selectedFile}
@@ -122,6 +133,20 @@ export function FilePreviewDrawer() {
               onClick={() => void run('open')}
             >
               Open file
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<Copy size={15} />}
+              onClick={() => copy(selectedFile.directory, 'Directory copied.')}
+            >
+              Copy directory
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<Copy size={15} />}
+              onClick={() => copy(selectedFile.path, 'Image path copied.')}
+            >
+              Copy image path
             </Button>
           </Group>
         </>
