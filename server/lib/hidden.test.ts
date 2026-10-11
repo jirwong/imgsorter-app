@@ -28,6 +28,20 @@ describe('createHiddenService', () => {
     expect(createHiddenService(deps).unhide('c:\\media\\a.jpg')).toEqual(['C:/Media/B.jpg']);
   });
 
+  it('adds many paths when hiding many', () => {
+    const deps = makeDeps(['C:/Media/A.jpg']);
+    expect(createHiddenService(deps).hideMany(['C:/Media/B.jpg', 'C:/Media/C.jpg'])).toEqual([
+      'C:/Media/A.jpg',
+      'C:/Media/B.jpg',
+      'C:/Media/C.jpg',
+    ]);
+  });
+
+  it('removes many paths when unhiding many, regardless of separator or case', () => {
+    const deps = makeDeps(['C:/Media/A.jpg', 'C:/Media/B.jpg', 'C:/Media/C.jpg']);
+    expect(createHiddenService(deps).unhideMany(['c:\\media\\a.jpg', 'C:/MEDIA/C.jpg'])).toEqual(['C:/Media/B.jpg']);
+  });
+
   it('clears all hidden paths', () => {
     const deps = makeDeps(['C:/Media/A.jpg']);
     expect(createHiddenService(deps).clear()).toEqual([]);
