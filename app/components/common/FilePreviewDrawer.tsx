@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Group, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { FileImage, FolderOpen } from 'lucide-react';
+import { Copy, FileImage, FolderOpen } from 'lucide-react';
 import { useApp } from '../../lib/app-context';
+import { copyToClipboard } from '../../lib/clipboard';
 import { formatBytes } from '../../lib/format';
 import { openEntry, revealEntry } from '../../../server/routes/native';
 import { getThumbnails } from '../../../server/routes/thumbnails';
@@ -122,6 +123,20 @@ export function FilePreviewDrawer() {
               onClick={() => void run('open')}
             >
               Open file
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<Copy size={15} />}
+              onClick={() => copyToClipboard(selectedFile.directory, 'Directory copied.', 'Could not copy.')}
+            >
+              Copy directory
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<Copy size={15} />}
+              onClick={() => copyToClipboard(selectedFile.path, 'Image path copied.', 'Could not copy.')}
+            >
+              Copy image path
             </Button>
           </Group>
         </>
