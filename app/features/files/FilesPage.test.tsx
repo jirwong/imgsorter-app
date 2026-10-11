@@ -6,14 +6,18 @@ import type { Entry } from '../../lib/types';
 
 const mocks = vi.hoisted(() => ({
   hideFile: vi.fn(),
+  hideFiles: vi.fn(),
   unhideFile: vi.fn(),
+  unhideFiles: vi.fn(),
   clearHidden: vi.fn(),
   notifyShow: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/hidden', () => ({
   hideFile: mocks.hideFile,
+  hideFiles: mocks.hideFiles,
   unhideFile: mocks.unhideFile,
+  unhideFiles: mocks.unhideFiles,
   clearHidden: mocks.clearHidden,
 }));
 
@@ -37,6 +41,7 @@ const entry = (id: number, directory: string): Entry => ({
 const files: Entry[] = [entry(1, 'C:/Media/2025'), entry(2, 'C:/Media/2025'), entry(3, 'C:/Media/2024')];
 const file1 = 'C:/Media/2025/file-1.jpg';
 const file2 = 'C:/Media/2025/file-2.jpg';
+const file3 = 'C:/Media/2024/file-3.jpg';
 
 function renderPage(data: Entry[] = files, hidden: string[] = []) {
   render(
@@ -57,7 +62,9 @@ describe('FilesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.hideFile.mockResolvedValue({ hidden: [] });
+    mocks.hideFiles.mockResolvedValue({ hidden: [] });
     mocks.unhideFile.mockResolvedValue({ hidden: [] });
+    mocks.unhideFiles.mockResolvedValue({ hidden: [] });
     mocks.clearHidden.mockResolvedValue({ hidden: [] });
   });
 
@@ -111,5 +118,49 @@ describe('FilesPage', () => {
     chooseHiddenFilter('Hidden files');
     fireEvent.click(screen.getByRole('button', { name: 'Restore all' }));
     await waitFor(() => expect(mocks.clearHidden).toHaveBeenCalledTimes(1));
+  });
+
+  it('hides the selected files with the bulk action', async () => {
+    mocks.hideFiles.mockResolvedValue({ hidden: [file1] });
+    renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select file-1.jpg' }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide selected' }));
+    await waitFor(() => expect(mocks.hideFiles).toHaveBeenCalledWith({ data: { paths: [file1] } }));
+    expect(screen.queryByText('file-1.jpg')).not.toBeInTheDocument();
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+  });
+
+  it('selects all visible rows with the header checkbox', async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide selected' }));
+    await waitFor(() => expect(mocks.hideFiles).toHaveBeenCalledWith({ data: { paths: [file1, file2, file3] } }));
+  });
+
+  it('toggles select all and deselect all with the button', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Deselect all' }));
+    expect(screen.queryByText('3 selected')).not.toBeInTheDocument();
+  });
+
+  it('unhides the selected files in the hidden view', async () => {
+    renderPage(files, [file1, file2]);
+    chooseHiddenFilter('Hidden files');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unhide selected' }));
+    await waitFor(() => expect(mocks.unhideFiles).toHaveBeenCalledWith({ data: { paths: [file1, file2] } }));
+  });
+
+  it('keeps the selection across pages', () => {
+    const many = Array.from({ length: 26 }, (_, index) => entry(index + 1, 'C:/Media/2025'));
+    renderPage(many);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all visible rows' }));
+    expect(screen.getByText('25 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('25 selected')).toBeInTheDocument();
   });
 });
