@@ -37,5 +37,6 @@ describe('BrowsePage', () => {
     );
     expect(screen.getByText('DIRECTORY FILTER')).toBeInTheDocument();
     expect(screen.getByText('2 files found')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
 });

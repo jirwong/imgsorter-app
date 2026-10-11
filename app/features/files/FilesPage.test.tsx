@@ -169,4 +169,9 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getAllByLabelText('Items per page')[0]);
     expect(screen.getByRole('option', { name: '100' })).toBeInTheDocument();
   });
+
+  it('does not show the Export button', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+  });
 });

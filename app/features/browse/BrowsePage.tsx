@@ -13,7 +13,6 @@ export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNod
         eyebrow="LIBRARY OVERVIEW"
         title="Browse"
         subtitle="Explore browse across your indexed media library."
-        showExport
       />
       <div className="browse-layout">
         <DirectoryTree tree={tree} />

@@ -50,7 +50,6 @@ export function FilesPage({ files, hidden }: { files: Entry[]; hidden: string[] 
         eyebrow="LIBRARY OVERVIEW"
         title="Unique Files"
         subtitle="Explore unique files across your indexed media library."
-        showExport
       />
       <FilesTable
         files={files}
