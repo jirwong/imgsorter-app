@@ -44,4 +44,9 @@ describe('DirectoryTree', () => {
     fireEvent.click(screen.getByLabelText('Filter C:\\'));
     expect(screen.getByLabelText('Filter C:\\')).toBeChecked();
   });
+
+  it('renders the nodes inside a scroll container', () => {
+    renderTree();
+    expect(screen.getByText('C:\\').closest('.directory-tree-scroll')).not.toBeNull();
+  });
 });

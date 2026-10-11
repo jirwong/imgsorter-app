@@ -47,7 +47,7 @@ export function DirectoryTree({ tree }: { tree: DirectoryNode[] }) {
       <Text className="eyebrow" mb="sm">
         DIRECTORY FILTER
       </Text>
-      {tree.map((node) => render(node, 0))}
+      <div className="directory-tree-scroll">{tree.map((node) => render(node, 0))}</div>
     </aside>
   );
 }
