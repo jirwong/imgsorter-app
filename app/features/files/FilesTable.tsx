@@ -1,24 +1,35 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Group, Select, Table, Text, TextInput } from '@mantine/core';
 import { Search } from 'lucide-react';
 import { DirectoryPicker } from '../../components/common/DirectoryPicker';
+import { normalizeDirectoryKey } from '../../lib/directory-path';
 import { formatBytes } from '../../lib/format';
 import type { Entry } from '../../lib/types';
 
 export type FilesTableProps = {
   files: Entry[];
   unique?: boolean;
+  hidden?: string[];
+  onHide?: (path: string) => void;
+  onUnhide?: (path: string) => void;
+  onClearHidden?: () => void;
   onSelect: (e: Entry) => void;
 };
 
-export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
+export function FilesTable({ files, unique, hidden, onHide, onUnhide, onClearHidden, onSelect }: FilesTableProps) {
   const [fileQuery, setFileQuery] = useState('');
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
   const [count, setCount] = useState('All counts');
   const [size, setSize] = useState('All sizes');
   const [extension, setExtension] = useState('All extensions');
+  const [hiddenFilter, setHiddenFilter] = useState('Active files');
   const [pageSize, setPageSize] = useState('25');
   const [page, setPage] = useState(1);
+
+  const hiddenEnabled =
+    hidden !== undefined && onHide !== undefined && onUnhide !== undefined && onClearHidden !== undefined;
+  const hiddenKeys = useMemo(() => new Set((hidden ?? []).map(normalizeDirectoryKey)), [hidden]);
+  const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
 
   const directories = useMemo(() => [...new Set(files.map((e) => e.directory))], [files]);
   const directoryOptions = useMemo(
@@ -31,12 +42,14 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
     [directories, files],
   );
   const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
+  const hiddenCount = useMemo(() => files.filter((e) => isHidden(e)).length, [files, isHidden]);
 
   const list = useMemo(
     () =>
       [...files]
         .filter(
           (e) =>
+            (hiddenFilter === 'All files' || (hiddenFilter === 'Hidden files' ? isHidden(e) : !isHidden(e))) &&
             (!fileQuery || `${e.filename} ${e.path}`.toLowerCase().includes(fileQuery.toLowerCase())) &&
             (appliedDirectories.length === 0 || appliedDirectories.includes(e.directory)) &&
             (extension === 'All extensions' || e.extension === extension) &&
@@ -47,7 +60,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
               (size === 'Over 25 MB' && e.size > 25000000)),
         )
         .sort((a, b) => a.filename.localeCompare(b.filename)),
-    [files, fileQuery, appliedDirectories, extension, count, size],
+    [files, fileQuery, appliedDirectories, extension, count, size, hiddenFilter, isHidden],
   );
 
   const pageLimit = Number(pageSize);
@@ -56,7 +69,7 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
 
   useEffect(() => {
     setPage(1);
-  }, [fileQuery, appliedDirectories, extension, count, size, pageSize, list.length]);
+  }, [fileQuery, appliedDirectories, extension, count, size, hiddenFilter, pageSize, list.length]);
 
   return (
     <>
@@ -69,6 +82,14 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
             leftSection={<Search size={15} />}
           />
           <DirectoryPicker applied={appliedDirectories} options={directoryOptions} onApply={setAppliedDirectories} />
+          {hiddenEnabled && (
+            <Select
+              aria-label="Hidden filter"
+              value={hiddenFilter}
+              onChange={(v) => setHiddenFilter(v ?? 'Active files')}
+              data={['Active files', 'Hidden files', 'All files']}
+            />
+          )}
           <Select value={count} onChange={(v) => setCount(v ?? 'All counts')} data={['All counts', 'Unique only']} />
           <Select
             value={size}
@@ -81,9 +102,21 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
             data={['All extensions', ...extensions]}
           />
         </Group>
-        <Text size="sm" c="dimmed">
-          {list.length} files found
-        </Text>
+        <Group gap="8">
+          {hiddenEnabled && (
+            <Text size="sm" c="dimmed">
+              {hiddenCount} hidden
+            </Text>
+          )}
+          {hiddenEnabled && hiddenFilter === 'Hidden files' && hiddenCount > 0 && (
+            <Button variant="subtle" size="xs" onClick={onClearHidden}>
+              Restore all
+            </Button>
+          )}
+          <Text size="sm" c="dimmed">
+            {list.length} files found
+          </Text>
+        </Group>
       </Group>
       <Table className="files-table" highlightOnHover>
         <Table.Thead>
@@ -99,9 +132,16 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
           {pageRows.map((e) => (
             <Table.Tr key={e.id} onClick={() => onSelect(e)} className="file-table-row">
               <Table.Td>
-                <Text size="sm" fw={500} truncate>
-                  {e.filename}
-                </Text>
+                <Group gap={6} wrap="nowrap">
+                  <Text size="sm" fw={500} truncate>
+                    {e.filename}
+                  </Text>
+                  {hiddenEnabled && isHidden(e) && (
+                    <Badge size="xs" variant="light" color="gray">
+                      Hidden
+                    </Badge>
+                  )}
+                </Group>
               </Table.Td>
               <Table.Td>
                 <Text className="table-meta" size="xs" truncate>
@@ -118,17 +158,43 @@ export function FilesTable({ files, unique, onSelect }: FilesTableProps) {
               </Table.Td>
               {unique && (
                 <Table.Td>
-                  <Button
-                    variant="subtle"
-                    size="xs"
-                    className="preview-button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelect(e);
-                    }}
-                  >
-                    Preview
-                  </Button>
+                  <Group gap={4} justify="flex-end" wrap="nowrap">
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      className="preview-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(e);
+                      }}
+                    >
+                      Preview
+                    </Button>
+                    {hiddenEnabled && isHidden(e) && (
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onUnhide?.(e.path);
+                        }}
+                      >
+                        Unhide
+                      </Button>
+                    )}
+                    {hiddenEnabled && !isHidden(e) && (
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onHide?.(e.path);
+                        }}
+                      >
+                        Hide
+                      </Button>
+                    )}
+                  </Group>
                 </Table.Td>
               )}
             </Table.Tr>

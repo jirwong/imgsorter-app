@@ -27,3 +27,7 @@ if (!('ResizeObserver' in window)) {
     },
   });
 }
+
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
