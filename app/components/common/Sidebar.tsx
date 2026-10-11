@@ -19,9 +19,9 @@ const navItems: { label: string; to: string; icon: LucideIcon }[] = [
   { label: 'Overview', to: '/', icon: BarChart3 },
   { label: 'Duplicates', to: '/duplicates', icon: Archive },
   { label: 'Unique Files', to: '/unique-files', icon: Sparkles },
-  { label: 'Analytics', to: '/analytics', icon: BarChart3 },
   { label: 'Browse', to: '/browse', icon: LayoutGrid },
   { label: 'Directories', to: '/directories', icon: FolderTree },
+  { label: 'Analytics', to: '/analytics', icon: BarChart3 },
   { label: 'Activity', to: '/activity', icon: Activity },
 ];
 

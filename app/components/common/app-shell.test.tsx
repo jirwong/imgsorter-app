@@ -79,6 +79,24 @@ describe('app shell', () => {
     expect(screen.getByText('24')).toBeInTheDocument();
   });
 
+  it('renders the side navigation in the configured order', () => {
+    render(
+      <MantineProvider defaultColorScheme="dark">
+        <Sidebar />
+      </MantineProvider>,
+    );
+    const labels = [...document.querySelectorAll('nav a')].map((link) => link.textContent?.replace(/\d+$/, ''));
+    expect(labels).toEqual([
+      'Overview',
+      'Duplicates',
+      'Unique Files',
+      'Browse',
+      'Directories',
+      'Analytics',
+      'Activity',
+    ]);
+  });
+
   it('shows the last scan and its errors', () => {
     shell.data.lastScan = scan;
     render(
