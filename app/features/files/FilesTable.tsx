@@ -210,12 +210,14 @@ export function FilesTable({
           <Table.Tr>
             {hiddenEnabled && (
               <Table.Th w={40}>
-                <Checkbox
-                  aria-label="Select all visible rows"
-                  checked={allVisibleSelected}
-                  indeterminate={someVisibleSelected && !allVisibleSelected}
-                  onChange={toggleAllVisible}
-                />
+                {pageRows.length > 0 && (
+                  <Checkbox
+                    aria-label="Select all visible rows"
+                    checked={allVisibleSelected}
+                    indeterminate={someVisibleSelected && !allVisibleSelected}
+                    onChange={toggleAllVisible}
+                  />
+                )}
               </Table.Th>
             )}
             <Table.Th>Filename</Table.Th>
