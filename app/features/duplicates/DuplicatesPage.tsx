@@ -250,7 +250,7 @@ export function DuplicatesPage({
             onChange={(v) => setKeeperFilter((v as KeeperFilterValue) ?? 'All groups')}
             data={['All groups', 'With keeper', 'Without keeper']}
           />
-          <Text size="xs" c="dimmed" className="filter-count">
+          <Text size="xs" c="dimmed">
             {visibleGroups.length} groups · {visibleFiles} files · {Object.keys(keeperByGroup).length} keepers
           </Text>
           <Text size="xs" c="dimmed">

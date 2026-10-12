@@ -230,4 +230,9 @@ describe('DuplicatesPage', () => {
     const option = within(dialog).getByText('C:/Media/2025/Trips').closest('.directory-option') as HTMLElement;
     expect(within(option).getByText('1 group · 1 hidden')).toBeInTheDocument();
   });
+
+  it('left aligns the control section', () => {
+    renderPage();
+    expect(screen.getByText('1 groups · 2 files · 0 keepers')).not.toHaveClass('filter-count');
+  });
 });
