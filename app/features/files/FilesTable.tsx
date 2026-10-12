@@ -58,8 +58,9 @@ export function FilesTable({
         value: d,
         label: d,
         count: files.filter((e) => e.directory === d).length,
+        ...(hiddenEnabled ? { hidden: files.filter((e) => e.directory === d && isHidden(e)).length } : {}),
       })),
-    [directories, files],
+    [directories, files, hiddenEnabled, isHidden],
   );
   const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
   const hiddenCount = useMemo(() => files.filter((e) => isHidden(e)).length, [files, isHidden]);

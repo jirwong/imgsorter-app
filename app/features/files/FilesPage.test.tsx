@@ -88,7 +88,17 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'All directories' }));
     const dialog = screen.getByRole('dialog');
     const option = within(dialog).getByText('C:/Media/2025').closest('.directory-option') as HTMLElement;
-    expect(within(option).getByText('2')).toBeInTheDocument();
+    expect(within(option).getByText('2 files · 0 hidden')).toBeInTheDocument();
+  });
+
+  it('shows the hidden count for each directory option', () => {
+    renderPage(files, [file1]);
+    fireEvent.click(screen.getByRole('button', { name: 'All directories' }));
+    const dialog = screen.getByRole('dialog');
+    const withHidden = within(dialog).getByText('C:/Media/2025').closest('.directory-option') as HTMLElement;
+    expect(within(withHidden).getByText('2 files · 1 hidden')).toBeInTheDocument();
+    const withoutHidden = within(dialog).getByText('C:/Media/2024').closest('.directory-option') as HTMLElement;
+    expect(within(withoutHidden).getByText('1 file · 0 hidden')).toBeInTheDocument();
   });
 
   it('hides a file and removes it from the active list', async () => {

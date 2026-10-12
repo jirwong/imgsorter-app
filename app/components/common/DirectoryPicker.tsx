@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Checkbox, Group, Popover, ScrollArea, Text, TextInput } from '@mantine/core';
 import { ChevronsUpDown, Search } from 'lucide-react';
 
-export type DirectoryOption = { value: string; label: string; count: number };
+export type DirectoryOption = { value: string; label: string; count: number; hidden?: number };
 
 export type DirectoryPickerProps = {
   applied: string[];
@@ -20,7 +20,7 @@ export function DirectoryPicker({ applied, options, onApply }: DirectoryPickerPr
   );
 
   return (
-    <Popover opened={open} onChange={setOpen} width={320} position="bottom-start" shadow="md">
+    <Popover opened={open} onChange={setOpen} width={1040} position="bottom-start" shadow="md">
       <Popover.Target>
         <Button
           size="xs"
@@ -58,7 +58,7 @@ export function DirectoryPicker({ applied, options, onApply }: DirectoryPickerPr
             </Button>
           </Group>
         </Group>
-        <ScrollArea h={220}>
+        <ScrollArea h={500}>
           {visible.map((item) => (
             <div className="directory-option" key={item.value}>
               <Checkbox
@@ -70,7 +70,9 @@ export function DirectoryPicker({ applied, options, onApply }: DirectoryPickerPr
                 label={item.label}
               />
               <Text size="xs" c="dimmed">
-                {item.count}
+                {item.hidden === undefined
+                  ? item.count
+                  : `${item.count} file${item.count === 1 ? '' : 's'} · ${item.hidden} hidden`}
               </Text>
             </div>
           ))}
