@@ -39,4 +39,15 @@ describe('BrowsePage', () => {
     expect(screen.getByText('2 files found')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
+
+  it('keeps the filters and the count on one row', () => {
+    render(
+      <MantineProvider defaultColorScheme="dark">
+        <AppProvider>
+          <BrowsePage files={files} tree={tree} />
+        </AppProvider>
+      </MantineProvider>,
+    );
+    expect(document.querySelector('.files-filter-rows')).toBeNull();
+  });
 });
