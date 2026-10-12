@@ -175,6 +175,14 @@ describe('FilesPage', () => {
     expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
 
+  it('renders the filters and controls in separate rows', () => {
+    renderPage();
+    const rows = document.querySelector('.files-filter-rows');
+    expect(rows?.children).toHaveLength(2);
+    expect(rows?.children[0]?.contains(screen.getByPlaceholderText('Filter filename or path'))).toBe(true);
+    expect(rows?.children[1]?.contains(screen.getByText('3 files found'))).toBe(true);
+  });
+
   it('sorts by location by default', () => {
     renderPage();
     expect(screen.getAllByText(/^file-\d+\.jpg$/).map((el) => el.textContent)).toEqual([

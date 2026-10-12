@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Checkbox, Group, Select, Table, Text, TextInput } from '@mantine/core';
+import { Badge, Button, Checkbox, Group, Select, Stack, Table, Text, TextInput } from '@mantine/core';
 import { Search } from 'lucide-react';
 import { DirectoryPicker } from '../../components/common/DirectoryPicker';
 import { normalizeDirectoryKey } from '../../lib/directory-path';
@@ -181,72 +181,85 @@ export function FilesTable({
     </Table.Th>
   );
 
+  const filters = (
+    <>
+      <TextInput
+        value={fileQuery}
+        onChange={(event) => setFileQuery(event.currentTarget.value)}
+        placeholder="Filter filename or path"
+        leftSection={<Search size={15} />}
+      />
+      <DirectoryPicker applied={appliedDirectories} options={directoryOptions} onApply={setAppliedDirectories} />
+      {hiddenEnabled && (
+        <Select
+          aria-label="Hidden filter"
+          value={hiddenFilter}
+          onChange={(v) => setHiddenFilter(v ?? 'Active files')}
+          data={['Active files', 'Hidden files', 'All files']}
+        />
+      )}
+      <Select value={count} onChange={(v) => setCount(v ?? 'All counts')} data={['All counts', 'Unique only']} />
+      <Select
+        value={size}
+        onChange={(v) => setSize(v ?? 'All sizes')}
+        data={['All sizes', 'Under 10 MB', '10–25 MB', 'Over 25 MB']}
+      />
+      <Select
+        value={extension}
+        onChange={(v) => setExtension(v ?? 'All extensions')}
+        data={['All extensions', ...extensions]}
+      />
+    </>
+  );
+
+  const controls = (
+    <>
+      {hiddenEnabled && pageRows.length > 0 && (
+        <Button variant="subtle" size="xs" onClick={toggleAllVisible}>
+          {allVisibleSelected ? 'Deselect all' : 'Select all'}
+        </Button>
+      )}
+      {hiddenEnabled && selectedPaths.length > 0 && (
+        <>
+          <Text size="sm" c="dimmed">
+            {selectedPaths.length} selected
+          </Text>
+          <Button variant="light" size="xs" onClick={hiddenFilter === 'Hidden files' ? unhideSelected : hideSelected}>
+            {hiddenFilter === 'Hidden files' ? 'Unhide selected' : 'Hide selected'}
+          </Button>
+        </>
+      )}
+      {hiddenEnabled && (
+        <Text size="sm" c="dimmed">
+          {hiddenCount} hidden
+        </Text>
+      )}
+      {hiddenEnabled && hiddenFilter === 'Hidden files' && hiddenCount > 0 && (
+        <Button variant="subtle" size="xs" onClick={onClearHidden}>
+          Restore all
+        </Button>
+      )}
+      <Text size="sm" c="dimmed">
+        {list.length} files found
+      </Text>
+    </>
+  );
+
   return (
     <>
-      <Group className="duplicate-filters" justify="space-between" mb="md">
-        <Group gap="8">
-          <TextInput
-            value={fileQuery}
-            onChange={(event) => setFileQuery(event.currentTarget.value)}
-            placeholder="Filter filename or path"
-            leftSection={<Search size={15} />}
-          />
-          <DirectoryPicker applied={appliedDirectories} options={directoryOptions} onApply={setAppliedDirectories} />
-          {hiddenEnabled && (
-            <Select
-              aria-label="Hidden filter"
-              value={hiddenFilter}
-              onChange={(v) => setHiddenFilter(v ?? 'Active files')}
-              data={['Active files', 'Hidden files', 'All files']}
-            />
-          )}
-          <Select value={count} onChange={(v) => setCount(v ?? 'All counts')} data={['All counts', 'Unique only']} />
-          <Select
-            value={size}
-            onChange={(v) => setSize(v ?? 'All sizes')}
-            data={['All sizes', 'Under 10 MB', '10–25 MB', 'Over 25 MB']}
-          />
-          <Select
-            value={extension}
-            onChange={(v) => setExtension(v ?? 'All extensions')}
-            data={['All extensions', ...extensions]}
-          />
+      {unique ? (
+        <Stack className="files-filter-rows" gap="8" mb="md">
+          <Group className="duplicate-filters" gap="8">
+            {filters}
+          </Group>
+          <Group gap="8">{controls}</Group>
+        </Stack>
+      ) : (
+        <Group className="duplicate-filters" justify="space-between" mb="md">
+          <Group gap="8">{filters}</Group>
+          <Group gap="8">{controls}</Group>
         </Group>
-        <Group gap="8">
-          {hiddenEnabled && pageRows.length > 0 && (
-            <Button variant="subtle" size="xs" onClick={toggleAllVisible}>
-              {allVisibleSelected ? 'Deselect all' : 'Select all'}
-            </Button>
-          )}
-          {hiddenEnabled && selectedPaths.length > 0 && (
-            <>
-              <Text size="sm" c="dimmed">
-                {selectedPaths.length} selected
-              </Text>
-              <Button
-                variant="light"
-                size="xs"
-                onClick={hiddenFilter === 'Hidden files' ? unhideSelected : hideSelected}
-              >
-                {hiddenFilter === 'Hidden files' ? 'Unhide selected' : 'Hide selected'}
-              </Button>
-            </>
-          )}
-          {hiddenEnabled && (
-            <Text size="sm" c="dimmed">
-              {hiddenCount} hidden
-            </Text>
-          )}
-          {hiddenEnabled && hiddenFilter === 'Hidden files' && hiddenCount > 0 && (
-            <Button variant="subtle" size="xs" onClick={onClearHidden}>
-              Restore all
-            </Button>
-          )}
-          <Text size="sm" c="dimmed">
-            {list.length} files found
-          </Text>
-        </Group>
-      </Group>
+      )}
       <Table className="files-table" highlightOnHover>
         <Table.Thead>
           <Table.Tr>
