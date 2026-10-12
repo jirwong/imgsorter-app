@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   clearStaleKeepers: vi.fn(),
   hideFile: vi.fn(),
   unhideFile: vi.fn(),
-  clearHidden: vi.fn(),
   notifyShow: vi.fn(),
 }));
 
@@ -21,7 +20,6 @@ vi.mock('../../../server/routes/duplicates', () => ({
 vi.mock('../../../server/routes/hidden', () => ({
   hideFile: mocks.hideFile,
   unhideFile: mocks.unhideFile,
-  clearHidden: mocks.clearHidden,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -92,7 +90,6 @@ describe('DuplicatesPage', () => {
     mocks.clearStaleKeepers.mockResolvedValue({ staleKeepers: 0 });
     mocks.hideFile.mockResolvedValue({ hidden: [] });
     mocks.unhideFile.mockResolvedValue({ hidden: [] });
-    mocks.clearHidden.mockResolvedValue({ hidden: [] });
   });
 
   it('allows at most one keeper per group and saves on toggle', async () => {
@@ -137,15 +134,15 @@ describe('DuplicatesPage', () => {
     renderPage({}, 0, [file1]);
     expandGroup();
     expect(shownDirs()).toEqual(['C:/Media/2025/Library']);
-    chooseHiddenMode('Hidden groups');
+    chooseHiddenMode('Hidden files');
     expect(shownDirs()).toEqual(['C:/Media/2025/Trips']);
-    chooseHiddenMode('All groups');
+    chooseHiddenMode('All files');
     expect(shownDirs()).toEqual(['C:/Media/2025/Trips', 'C:/Media/2025/Library']);
   });
 
   it('marks a hidden file with a badge', () => {
     renderPage({}, 0, [file1]);
-    chooseHiddenMode('All groups');
+    chooseHiddenMode('All files');
     expandGroup();
     expect(screen.getByText('Hidden')).toBeInTheDocument();
   });
@@ -157,5 +154,23 @@ describe('DuplicatesPage', () => {
     const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
     await waitFor(() => expect(mocks.hideFile).toHaveBeenCalledWith({ data: { path: file1 } }));
+  });
+
+  it('unhides a file from the hidden view', async () => {
+    renderPage({}, 0, [file1]);
+    chooseHiddenMode('Hidden files');
+    expandGroup();
+    const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Unhide' }));
+    await waitFor(() => expect(mocks.unhideFile).toHaveBeenCalledWith({ data: { path: file1 } }));
+  });
+
+  it('shows an error toast when hiding fails', async () => {
+    mocks.hideFile.mockRejectedValue(new Error('boom'));
+    renderPage();
+    expandGroup();
+    const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
   });
 });

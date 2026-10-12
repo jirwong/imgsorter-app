@@ -27,7 +27,7 @@ export function DuplicatesPage({
   const [keeperByGroup, setKeeperByGroup] = useState<KeeperMap>(initialKeepers);
   const [staleKeepers, setStaleKeepers] = useState(initialStaleKeepers);
   const [hiddenFiles, setHiddenFiles] = useState(hidden);
-  const [hiddenMode, setHiddenMode] = useState('Active groups');
+  const [hiddenMode, setHiddenMode] = useState('Active files');
   const [fileQuery, setFileQuery] = useState('');
   const [extension, setExtension] = useState('All extensions');
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
@@ -57,7 +57,7 @@ export function DuplicatesPage({
           ...g,
           files: g.files.filter(
             (e) =>
-              (hiddenMode === 'All groups' || (hiddenMode === 'Hidden groups' ? isHidden(e) : !isHidden(e))) &&
+              (hiddenMode === 'All files' || (hiddenMode === 'Hidden files' ? isHidden(e) : !isHidden(e))) &&
               (!fileQuery || `${e.filename} ${e.path}`.toLowerCase().includes(fileQuery.toLowerCase())) &&
               (appliedDirectories.length === 0 || appliedDirectories.includes(e.directory)) &&
               (extension === 'All extensions' || e.extension === extension),
@@ -167,8 +167,8 @@ export function DuplicatesPage({
             size="xs"
             aria-label="Hidden filter"
             value={hiddenMode}
-            onChange={(v) => setHiddenMode(v ?? 'Active groups')}
-            data={['Active groups', 'Hidden groups', 'All groups']}
+            onChange={(v) => setHiddenMode(v ?? 'Active files')}
+            data={['Active files', 'Hidden files', 'All files']}
           />
           <Select
             size="xs"
