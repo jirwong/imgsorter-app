@@ -8,7 +8,10 @@ const mocks = vi.hoisted(() => ({
   saveKeepers: vi.fn(),
   clearStaleKeepers: vi.fn(),
   hideFile: vi.fn(),
+  hideFiles: vi.fn(),
   unhideFile: vi.fn(),
+  unhideFiles: vi.fn(),
+  clearHidden: vi.fn(),
   notifyShow: vi.fn(),
 }));
 
@@ -19,7 +22,10 @@ vi.mock('../../../server/routes/duplicates', () => ({
 
 vi.mock('../../../server/routes/hidden', () => ({
   hideFile: mocks.hideFile,
+  hideFiles: mocks.hideFiles,
   unhideFile: mocks.unhideFile,
+  unhideFiles: mocks.unhideFiles,
+  clearHidden: mocks.clearHidden,
 }));
 
 vi.mock('@mantine/notifications', () => ({
@@ -89,7 +95,10 @@ describe('DuplicatesPage', () => {
     mocks.saveKeepers.mockResolvedValue({ saved: 1 });
     mocks.clearStaleKeepers.mockResolvedValue({ staleKeepers: 0 });
     mocks.hideFile.mockResolvedValue({ hidden: [] });
+    mocks.hideFiles.mockResolvedValue({ hidden: [] });
     mocks.unhideFile.mockResolvedValue({ hidden: [] });
+    mocks.unhideFiles.mockResolvedValue({ hidden: [] });
+    mocks.clearHidden.mockResolvedValue({ hidden: [] });
   });
 
   it('allows at most one keeper per group and saves on toggle', async () => {
@@ -172,5 +181,40 @@ describe('DuplicatesPage', () => {
     const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
     await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+  });
+
+  it('hides the selected files with the bulk action', async () => {
+    mocks.hideFiles.mockResolvedValue({ hidden: [file1] });
+    renderPage();
+    expandGroup();
+    fireEvent.click(screen.getByRole('checkbox', { name: `Select ${file1}` }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide selected' }));
+    await waitFor(() => expect(mocks.hideFiles).toHaveBeenCalledWith({ data: { paths: [file1] } }));
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+  });
+
+  it('selects all visible files with the header checkbox', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all visible files' }));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
+  it('selects a whole group with the group checkbox', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select group dup.jpg' }));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
+  it('drops a file from the selection after the row hide', async () => {
+    mocks.hideFile.mockResolvedValue({ hidden: [file1] });
+    renderPage();
+    expandGroup();
+    fireEvent.click(screen.getByRole('checkbox', { name: `Select ${file1}` }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
+    await waitFor(() => expect(mocks.hideFile).toHaveBeenCalled());
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
   });
 });

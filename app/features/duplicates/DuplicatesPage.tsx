@@ -9,7 +9,7 @@ import { matchesKeeperFilter, type KeeperFilterValue } from './keeper-filter';
 import { useApp } from '../../lib/app-context';
 import { normalizeDirectoryKey } from '../../lib/directory-path';
 import { clearStaleKeepers, saveKeepers } from '../../../server/routes/duplicates';
-import { hideFile, unhideFile } from '../../../server/routes/hidden';
+import { clearHidden, hideFile, hideFiles, unhideFile, unhideFiles } from '../../../server/routes/hidden';
 import type { DuplicateGroup, Entry, KeeperMap } from '../../lib/types';
 
 export function DuplicatesPage({
@@ -34,6 +34,7 @@ export function DuplicatesPage({
   const [countFilter, setCountFilter] = useState('All counts');
   const [sizeFilter, setSizeFilter] = useState('All sizes');
   const [keeperFilter, setKeeperFilter] = useState<KeeperFilterValue>('All groups');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const hiddenKeys = useMemo(() => new Set(hiddenFiles.map(normalizeDirectoryKey)), [hiddenFiles]);
   const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
@@ -90,6 +91,20 @@ export function DuplicatesPage({
   );
 
   const visibleFiles = useMemo(() => visibleGroups.reduce((n, g) => n + g.files.length, 0), [visibleGroups]);
+  const selectedPaths = useMemo(
+    () =>
+      groups
+        .flatMap((g) => g.files)
+        .filter((e) => selected.has(e.id))
+        .map((e) => e.path),
+    [groups, selected],
+  );
+  const visibleIds = useMemo(() => visibleGroups.flatMap((g) => g.files.map((e) => e.id)), [visibleGroups]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+  const hiddenCount = useMemo(
+    () => groups.flatMap((g) => g.files).filter((e) => isHidden(e)).length,
+    [groups, isHidden],
+  );
 
   const toggleKeeper = (groupKey: string, id: number) => {
     const next = { ...keeperByGroup };
@@ -118,7 +133,19 @@ export function DuplicatesPage({
       });
   };
 
-  const hideOne = (e: Entry) => applyHidden([...hiddenFiles, e.path], () => hideFile({ data: { path: e.path } }));
+  const dropSelected = (id: number) => {
+    setSelected((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const hideOne = (e: Entry) => {
+    applyHidden([...hiddenFiles, e.path], () => hideFile({ data: { path: e.path } }));
+    dropSelected(e.id);
+  };
 
   const unhideOne = (e: Entry) => {
     const key = normalizeDirectoryKey(e.path);
@@ -126,6 +153,38 @@ export function DuplicatesPage({
       hiddenFiles.filter((path) => normalizeDirectoryKey(path) !== key),
       () => unhideFile({ data: { path: e.path } }),
     );
+    dropSelected(e.id);
+  };
+
+  const toggleMany = (ids: number[]) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      const remove = ids.length > 0 && ids.every((id) => next.has(id));
+      for (const id of ids) {
+        if (remove) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const hideSelected = () => {
+    applyHidden([...hiddenFiles, ...selectedPaths], () => hideFiles({ data: { paths: selectedPaths } }));
+    setSelected(new Set());
+  };
+
+  const unhideSelected = () => {
+    const keys = new Set(selectedPaths.map(normalizeDirectoryKey));
+    applyHidden(
+      hiddenFiles.filter((path) => !keys.has(normalizeDirectoryKey(path))),
+      () => unhideFiles({ data: { paths: selectedPaths } }),
+    );
+    setSelected(new Set());
+  };
+
+  const restoreAll = () => {
+    applyHidden([], () => clearHidden());
+    setSelected(new Set());
   };
 
   return (
@@ -180,6 +239,24 @@ export function DuplicatesPage({
           <Text size="xs" c="dimmed" className="filter-count">
             {visibleGroups.length} groups · {visibleFiles} files · {Object.keys(keeperByGroup).length} keepers
           </Text>
+          <Button size="xs" variant="subtle" onClick={() => toggleMany(visibleIds)}>
+            {allVisibleSelected ? 'Deselect all' : 'Select all'}
+          </Button>
+          {selectedPaths.length > 0 && (
+            <>
+              <Text size="xs" c="dimmed">
+                {selectedPaths.length} selected
+              </Text>
+              <Button size="xs" variant="light" onClick={hiddenMode === 'Hidden files' ? unhideSelected : hideSelected}>
+                {hiddenMode === 'Hidden files' ? 'Unhide selected' : 'Hide selected'}
+              </Button>
+            </>
+          )}
+          {hiddenMode === 'Hidden files' && hiddenCount > 0 && (
+            <Button size="xs" variant="subtle" onClick={restoreAll}>
+              Restore all
+            </Button>
+          )}
         </Group>
         {staleKeepers > 0 && (
           <Alert color="orange" variant="light" mb="md">
@@ -199,6 +276,8 @@ export function DuplicatesPage({
           isHidden={isHidden}
           onHide={hideOne}
           onUnhide={unhideOne}
+          selected={selected}
+          onToggleMany={toggleMany}
         />
       </div>
     </>
