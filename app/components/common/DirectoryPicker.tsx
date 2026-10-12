@@ -10,9 +10,9 @@ export type DirectoryOption = {
   unit?: 'file' | 'group';
 };
 
-function unitLabel(option: DirectoryOption): string {
-  const singular = option.count === 1;
-  if (option.unit === 'group') return singular ? 'group' : 'groups';
+function unitLabel(count: number, unit?: 'file' | 'group'): string {
+  const singular = count === 1;
+  if (unit === 'group') return singular ? 'group' : 'groups';
   return singular ? 'file' : 'files';
 }
 
@@ -82,7 +82,9 @@ export function DirectoryPicker({ applied, options, onApply }: DirectoryPickerPr
                 label={item.label}
               />
               <Text size="xs" c="dimmed">
-                {item.hidden === undefined ? item.count : `${item.count} ${unitLabel(item)} · ${item.hidden} hidden`}
+                {item.hidden === undefined
+                  ? item.count
+                  : `${item.count} ${unitLabel(item.count, item.unit)} · ${item.hidden} hidden`}
               </Text>
             </div>
           ))}
