@@ -52,15 +52,24 @@ export function FilesTable({
   const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
 
   const directories = useMemo(() => [...new Set(files.map((e) => e.directory))], [files]);
-  const directoryOptions = useMemo(
-    () =>
-      directories.map((d) => ({
+  const directoryOptions = useMemo(() => {
+    const counts = new Map<string, { count: number; hidden: number }>();
+    for (const e of files) {
+      const entry = counts.get(e.directory) ?? { count: 0, hidden: 0 };
+      entry.count += 1;
+      if (hiddenEnabled && isHidden(e)) entry.hidden += 1;
+      counts.set(e.directory, entry);
+    }
+    return directories.map((d) => {
+      const countsForDir = counts.get(d) ?? { count: 0, hidden: 0 };
+      return {
         value: d,
         label: d,
-        count: files.filter((e) => e.directory === d).length,
-      })),
-    [directories, files],
-  );
+        count: countsForDir.count,
+        ...(hiddenEnabled ? { hidden: countsForDir.hidden } : {}),
+      };
+    });
+  }, [directories, files, hiddenEnabled, isHidden]);
   const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
   const hiddenCount = useMemo(() => files.filter((e) => isHidden(e)).length, [files, isHidden]);
   const selectedPaths = useMemo(() => files.filter((e) => selected.has(e.id)).map((e) => e.path), [files, selected]);
