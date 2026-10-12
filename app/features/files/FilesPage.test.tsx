@@ -174,4 +174,29 @@ describe('FilesPage', () => {
     renderPage();
     expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
   });
+
+  it('sorts by location by default', () => {
+    renderPage();
+    expect(screen.getAllByText(/^file-\d+\.jpg$/).map((el) => el.textContent)).toEqual([
+      'file-3.jpg',
+      'file-1.jpg',
+      'file-2.jpg',
+    ]);
+  });
+
+  it('sorts by filename when the header is clicked', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('columnheader', { name: /Filename/ }));
+    expect(screen.getAllByText(/^file-\d+\.jpg$/).map((el) => el.textContent)).toEqual([
+      'file-1.jpg',
+      'file-2.jpg',
+      'file-3.jpg',
+    ]);
+    fireEvent.click(screen.getByRole('columnheader', { name: /Filename/ }));
+    expect(screen.getAllByText(/^file-\d+\.jpg$/).map((el) => el.textContent)).toEqual([
+      'file-3.jpg',
+      'file-2.jpg',
+      'file-1.jpg',
+    ]);
+  });
 });

@@ -657,12 +657,12 @@ h2 {
   white-space: nowrap;
 }
 
-.duplicate-table .sortable-th {
+.sortable-th {
   cursor: pointer;
   user-select: none;
 }
 
-.duplicate-table .sortable-th:hover {
+.sortable-th:hover {
   color: #edf3f7;
 }
 
