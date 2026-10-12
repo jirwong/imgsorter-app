@@ -140,11 +140,6 @@ header {
   background: #141920;
 }
 
-.search {
-  flex: 1;
-  max-width: 430px;
-}
-
 .header-status {
   display: flex;
   align-items: center;
@@ -334,14 +329,8 @@ h2 {
     align-items: center;
     gap: 8px;
   }
-  .search {
-    max-width: none;
-  }
   header {
     gap: 8px;
-  }
-  header .mantine-Select-root {
-    display: none;
   }
   .content {
     padding: 18px;

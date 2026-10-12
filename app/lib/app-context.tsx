@@ -2,12 +2,6 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactEl
 import type { Entry } from './types';
 
 export type AppContextValue = {
-  query: string;
-  setQuery: (v: string) => void;
-  dir: string;
-  setDir: (v: string) => void;
-  ext: string;
-  setExt: (v: string) => void;
   selectedDirs: string[];
   setSelectedDirs: (dirs: string[]) => void;
   toggleSelectedDir: (path: string) => void;
@@ -19,9 +13,6 @@ export type AppContextValue = {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }): ReactElement {
-  const [query, setQuery] = useState('');
-  const [dir, setDir] = useState('All directories');
-  const [ext, setExt] = useState('All types');
   const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<Entry | null>(null);
 
@@ -35,12 +26,6 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
 
   const value = useMemo<AppContextValue>(
     () => ({
-      query,
-      setQuery,
-      dir,
-      setDir,
-      ext,
-      setExt,
       selectedDirs,
       setSelectedDirs,
       toggleSelectedDir,
@@ -48,7 +33,7 @@ export function AppProvider({ children }: { children: ReactNode }): ReactElement
       selectedFile,
       setSelectedFile,
     }),
-    [query, dir, ext, selectedDirs, toggleSelectedDir, clearSelectedDirs, selectedFile],
+    [selectedDirs, toggleSelectedDir, clearSelectedDirs, selectedFile],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

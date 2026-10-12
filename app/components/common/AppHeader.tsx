@@ -1,7 +1,6 @@
-import { Select, Text, TextInput } from '@mantine/core';
-import { Menu, Search } from 'lucide-react';
-import { useLoaderData, useRouterState } from '@tanstack/react-router';
-import { useApp } from '../../lib/app-context';
+import { Text } from '@mantine/core';
+import { Menu } from 'lucide-react';
+import { useRouterState } from '@tanstack/react-router';
 
 const viewTitles: Record<string, string> = {
   '/': 'Overview',
@@ -14,8 +13,6 @@ const viewTitles: Record<string, string> = {
 };
 
 export function AppHeader() {
-  const { query, setQuery, dir, setDir, ext, setExt } = useApp();
-  const { roots, extensions } = useLoaderData({ from: '__root__' });
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const title = viewTitles[pathname] ?? 'imgsorter';
 
@@ -25,19 +22,6 @@ export function AppHeader() {
         <Menu size={18} />
         <b>{title}</b>
       </div>
-      <TextInput
-        value={query}
-        onChange={(event) => setQuery(event.currentTarget.value)}
-        leftSection={<Search size={16} />}
-        placeholder="Search files, paths, hashes..."
-        className="search"
-      />
-      <Select
-        value={dir}
-        onChange={(value) => setDir(value ?? 'All directories')}
-        data={['All directories', ...roots]}
-      />
-      <Select value={ext} onChange={(value) => setExt(value ?? 'All types')} data={['All types', ...extensions]} />
       <div className="header-status">
         <span className="dot" />
         <Text size="xs">Ready</Text>
