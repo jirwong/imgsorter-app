@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useApp } from './app-context';
 
-export type FilterSearch = {
+type FilterSearch = {
   selectedDirs?: string[];
 };
 
