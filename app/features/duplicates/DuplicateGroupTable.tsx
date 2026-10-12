@@ -10,9 +10,20 @@ export type DuplicateGroupTableProps = {
   keeperByGroup: Record<string, number>;
   onToggleKeeper: (groupKey: string, id: number) => void;
   onSelect: (e: Entry) => void;
+  isHidden: (e: Entry) => boolean;
+  onHide: (e: Entry) => void;
+  onUnhide: (e: Entry) => void;
 };
 
-export function DuplicateGroupTable({ groups, keeperByGroup, onToggleKeeper, onSelect }: DuplicateGroupTableProps) {
+export function DuplicateGroupTable({
+  groups,
+  keeperByGroup,
+  onToggleKeeper,
+  onSelect,
+  isHidden,
+  onHide,
+  onUnhide,
+}: DuplicateGroupTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<'count' | 'name' | 'redundant'>('count');
   const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
@@ -97,9 +108,16 @@ export function DuplicateGroupTable({ groups, keeperByGroup, onToggleKeeper, onS
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" className="mono file-name-cell" title={e.filename} onClick={() => onSelect(e)}>
-                        {e.filename}
-                      </Text>
+                      <Group gap={6} wrap="nowrap">
+                        <Text size="xs" className="mono file-name-cell" title={e.filename} onClick={() => onSelect(e)}>
+                          {e.filename}
+                        </Text>
+                        {isHidden(e) && (
+                          <Badge size="xs" variant="light" color="gray">
+                            Hidden
+                          </Badge>
+                        )}
+                      </Group>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs" c="dimmed" className="mono directory-cell" title={e.directory}>
@@ -128,6 +146,15 @@ export function DuplicateGroupTable({ groups, keeperByGroup, onToggleKeeper, onS
                         <Button size="compact-xs" variant="subtle" onClick={() => onSelect(e)}>
                           Preview
                         </Button>
+                        {isHidden(e) ? (
+                          <Button size="compact-xs" variant="subtle" onClick={() => onUnhide(e)}>
+                            Unhide
+                          </Button>
+                        ) : (
+                          <Button size="compact-xs" variant="subtle" onClick={() => onHide(e)}>
+                            Hide
+                          </Button>
+                        )}
                       </Group>
                     </Table.Td>
                   </Table.Tr>

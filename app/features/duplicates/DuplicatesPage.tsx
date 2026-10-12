@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Button, Group, Select, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Search } from 'lucide-react';
@@ -7,27 +7,36 @@ import { DuplicateGroupTable } from './DuplicateGroupTable';
 import { DirectoryPicker } from '../../components/common/DirectoryPicker';
 import { matchesKeeperFilter, type KeeperFilterValue } from './keeper-filter';
 import { useApp } from '../../lib/app-context';
+import { normalizeDirectoryKey } from '../../lib/directory-path';
 import { clearStaleKeepers, saveKeepers } from '../../../server/routes/duplicates';
-import type { DuplicateGroup, KeeperMap } from '../../lib/types';
+import { hideFile, unhideFile } from '../../../server/routes/hidden';
+import type { DuplicateGroup, Entry, KeeperMap } from '../../lib/types';
 
 export function DuplicatesPage({
   groups,
   initialKeepers,
   initialStaleKeepers,
+  hidden,
 }: {
   groups: DuplicateGroup[];
   initialKeepers: KeeperMap;
   initialStaleKeepers: number;
+  hidden: string[];
 }) {
   const { setSelectedFile } = useApp();
   const [keeperByGroup, setKeeperByGroup] = useState<KeeperMap>(initialKeepers);
   const [staleKeepers, setStaleKeepers] = useState(initialStaleKeepers);
+  const [hiddenFiles, setHiddenFiles] = useState(hidden);
+  const [hiddenMode, setHiddenMode] = useState('Active groups');
   const [fileQuery, setFileQuery] = useState('');
   const [extension, setExtension] = useState('All extensions');
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
   const [countFilter, setCountFilter] = useState('All counts');
   const [sizeFilter, setSizeFilter] = useState('All sizes');
   const [keeperFilter, setKeeperFilter] = useState<KeeperFilterValue>('All groups');
+
+  const hiddenKeys = useMemo(() => new Set(hiddenFiles.map(normalizeDirectoryKey)), [hiddenFiles]);
+  const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
 
   const directories = useMemo(() => [...new Set(groups.flatMap((g) => g.files.map((e) => e.directory)))], [groups]);
   const extensions = useMemo(() => [...new Set(groups.flatMap((g) => g.files.map((e) => e.extension)))], [groups]);
@@ -48,6 +57,7 @@ export function DuplicatesPage({
           ...g,
           files: g.files.filter(
             (e) =>
+              (hiddenMode === 'All groups' || (hiddenMode === 'Hidden groups' ? isHidden(e) : !isHidden(e))) &&
               (!fileQuery || `${e.filename} ${e.path}`.toLowerCase().includes(fileQuery.toLowerCase())) &&
               (appliedDirectories.length === 0 || appliedDirectories.includes(e.directory)) &&
               (extension === 'All extensions' || e.extension === extension),
@@ -65,7 +75,18 @@ export function DuplicatesPage({
               (sizeFilter === 'Over 25 MB' && g.size > 25000000)) &&
             matchesKeeperFilter(g, keeperByGroup, keeperFilter),
         ),
-    [fileQuery, extension, appliedDirectories, countFilter, sizeFilter, keeperFilter, keeperByGroup, groups],
+    [
+      fileQuery,
+      extension,
+      appliedDirectories,
+      countFilter,
+      sizeFilter,
+      keeperFilter,
+      keeperByGroup,
+      groups,
+      hiddenMode,
+      isHidden,
+    ],
   );
 
   const visibleFiles = useMemo(() => visibleGroups.reduce((n, g) => n + g.files.length, 0), [visibleGroups]);
@@ -84,6 +105,27 @@ export function DuplicatesPage({
     void clearStaleKeepers()
       .then(() => setStaleKeepers(0))
       .catch(() => notifications.show({ color: 'red', message: 'Could not clear keepers.' }));
+  };
+
+  const applyHidden = (next: string[], run: () => Promise<{ hidden: string[] }>) => {
+    const previous = hiddenFiles;
+    setHiddenFiles(next);
+    void run()
+      .then((result) => setHiddenFiles(result.hidden))
+      .catch(() => {
+        setHiddenFiles(previous);
+        notifications.show({ color: 'red', message: 'Could not save hidden files.' });
+      });
+  };
+
+  const hideOne = (e: Entry) => applyHidden([...hiddenFiles, e.path], () => hideFile({ data: { path: e.path } }));
+
+  const unhideOne = (e: Entry) => {
+    const key = normalizeDirectoryKey(e.path);
+    applyHidden(
+      hiddenFiles.filter((path) => normalizeDirectoryKey(path) !== key),
+      () => unhideFile({ data: { path: e.path } }),
+    );
   };
 
   return (
@@ -123,6 +165,13 @@ export function DuplicatesPage({
           />
           <Select
             size="xs"
+            aria-label="Hidden filter"
+            value={hiddenMode}
+            onChange={(v) => setHiddenMode(v ?? 'Active groups')}
+            data={['Active groups', 'Hidden groups', 'All groups']}
+          />
+          <Select
+            size="xs"
             aria-label="Keeper filter"
             value={keeperFilter}
             onChange={(v) => setKeeperFilter((v as KeeperFilterValue) ?? 'All groups')}
@@ -147,6 +196,9 @@ export function DuplicatesPage({
           keeperByGroup={keeperByGroup}
           onToggleKeeper={toggleKeeper}
           onSelect={setSelectedFile}
+          isHidden={isHidden}
+          onHide={hideOne}
+          onUnhide={unhideOne}
         />
       </div>
     </>
