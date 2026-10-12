@@ -133,7 +133,19 @@ export function DuplicatesPage({
       });
   };
 
-  const hideOne = (e: Entry) => applyHidden([...hiddenFiles, e.path], () => hideFile({ data: { path: e.path } }));
+  const dropSelected = (id: number) => {
+    setSelected((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const hideOne = (e: Entry) => {
+    applyHidden([...hiddenFiles, e.path], () => hideFile({ data: { path: e.path } }));
+    dropSelected(e.id);
+  };
 
   const unhideOne = (e: Entry) => {
     const key = normalizeDirectoryKey(e.path);
@@ -141,6 +153,7 @@ export function DuplicatesPage({
       hiddenFiles.filter((path) => normalizeDirectoryKey(path) !== key),
       () => unhideFile({ data: { path: e.path } }),
     );
+    dropSelected(e.id);
   };
 
   const toggleMany = (ids: number[]) => {

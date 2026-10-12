@@ -205,4 +205,16 @@ describe('DuplicatesPage', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select group dup.jpg' }));
     expect(screen.getByText('2 selected')).toBeInTheDocument();
   });
+
+  it('drops a file from the selection after the row hide', async () => {
+    mocks.hideFile.mockResolvedValue({ hidden: [file1] });
+    renderPage();
+    expandGroup();
+    fireEvent.click(screen.getByRole('checkbox', { name: `Select ${file1}` }));
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
+    await waitFor(() => expect(mocks.hideFile).toHaveBeenCalled());
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+  });
 });
