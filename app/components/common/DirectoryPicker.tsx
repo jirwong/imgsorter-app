@@ -2,7 +2,19 @@ import { useState } from 'react';
 import { Button, Checkbox, Group, Popover, ScrollArea, Text, TextInput } from '@mantine/core';
 import { ChevronsUpDown, Search } from 'lucide-react';
 
-export type DirectoryOption = { value: string; label: string; count: number; hidden?: number };
+export type DirectoryOption = {
+  value: string;
+  label: string;
+  count: number;
+  hidden?: number;
+  unit?: 'file' | 'group';
+};
+
+function unitLabel(option: DirectoryOption): string {
+  const singular = option.count === 1;
+  if (option.unit === 'group') return singular ? 'group' : 'groups';
+  return singular ? 'file' : 'files';
+}
 
 export type DirectoryPickerProps = {
   applied: string[];
@@ -70,9 +82,7 @@ export function DirectoryPicker({ applied, options, onApply }: DirectoryPickerPr
                 label={item.label}
               />
               <Text size="xs" c="dimmed">
-                {item.hidden === undefined
-                  ? item.count
-                  : `${item.count} file${item.count === 1 ? '' : 's'} · ${item.hidden} hidden`}
+                {item.hidden === undefined ? item.count : `${item.count} ${unitLabel(item)} · ${item.hidden} hidden`}
               </Text>
             </div>
           ))}

@@ -47,8 +47,10 @@ export function DuplicatesPage({
         value: d,
         label: d,
         count: groups.filter((g) => g.files.some((e) => e.directory === d)).length,
+        hidden: groups.flatMap((g) => g.files).filter((e) => e.directory === d && isHidden(e)).length,
+        unit: 'group' as const,
       })),
-    [directories, groups],
+    [directories, groups, isHidden],
   );
 
   const visibleGroups = useMemo(
@@ -238,6 +240,9 @@ export function DuplicatesPage({
           />
           <Text size="xs" c="dimmed" className="filter-count">
             {visibleGroups.length} groups · {visibleFiles} files · {Object.keys(keeperByGroup).length} keepers
+          </Text>
+          <Text size="xs" c="dimmed">
+            {hiddenCount} hidden
           </Text>
           <Button size="xs" variant="subtle" onClick={() => toggleMany(visibleIds)}>
             {allVisibleSelected ? 'Deselect all' : 'Select all'}

@@ -217,4 +217,17 @@ describe('DuplicatesPage', () => {
     await waitFor(() => expect(mocks.hideFile).toHaveBeenCalled());
     expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
   });
+
+  it('shows the hidden count', () => {
+    renderPage({}, 0, [file1]);
+    expect(screen.getByText('1 hidden')).toBeInTheDocument();
+  });
+
+  it('shows the group and hidden counts in the directory picker', () => {
+    renderPage({}, 0, [file1]);
+    fireEvent.click(screen.getByRole('button', { name: 'All directories' }));
+    const dialog = screen.getByRole('dialog');
+    const option = within(dialog).getByText('C:/Media/2025/Trips').closest('.directory-option') as HTMLElement;
+    expect(within(option).getByText('1 group · 1 hidden')).toBeInTheDocument();
+  });
 });
