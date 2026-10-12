@@ -9,7 +9,6 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
     ...actual,
     useRouterState: (options?: { select?: (state: unknown) => unknown }) =>
       options?.select?.({ location: { pathname: '/browse' } }),
-    useLoaderData: () => ({ roots: [], extensions: [] }),
   };
 });
 
