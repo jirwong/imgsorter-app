@@ -38,6 +38,8 @@ export function FilesTable({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [pageSize, setPageSize] = useState('25');
   const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<'filename' | 'location' | 'type' | 'size'>('location');
+  const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
 
   const hiddenEnabled =
     hidden !== undefined &&
@@ -78,8 +80,29 @@ export function FilesTable({
               (size === '10–25 MB' && e.size >= 10000000 && e.size <= 25000000) ||
               (size === 'Over 25 MB' && e.size > 25000000)),
         )
-        .sort((a, b) => a.filename.localeCompare(b.filename)),
-    [files, fileQuery, appliedDirectories, extension, count, size, hiddenFilter, isHidden],
+        .sort((a, b) => {
+          if (!unique) return a.filename.localeCompare(b.filename);
+          const av =
+            sortKey === 'size'
+              ? a.size
+              : sortKey === 'filename'
+                ? a.filename
+                : sortKey === 'location'
+                  ? a.directory
+                  : a.extension;
+          const bv =
+            sortKey === 'size'
+              ? b.size
+              : sortKey === 'filename'
+                ? b.filename
+                : sortKey === 'location'
+                  ? b.directory
+                  : b.extension;
+          const result =
+            typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+          return direction === 'asc' ? result : -result;
+        }),
+    [files, fileQuery, appliedDirectories, extension, count, size, hiddenFilter, isHidden, unique, sortKey, direction],
   );
 
   const pageLimit = Number(pageSize);
@@ -90,7 +113,7 @@ export function FilesTable({
 
   useEffect(() => {
     setPage(1);
-  }, [fileQuery, appliedDirectories, extension, count, size, hiddenFilter, pageSize, list.length]);
+  }, [fileQuery, appliedDirectories, extension, count, size, hiddenFilter, sortKey, direction, pageSize, list.length]);
 
   const toggleSelected = (id: number) => {
     setSelected((current) => {
@@ -138,6 +161,25 @@ export function FilesTable({
     onUnhideMany?.(selectedPaths);
     setSelected(new Set());
   };
+
+  const headerClick = (key: 'filename' | 'location' | 'type' | 'size') => {
+    if (sortKey === key) {
+      setDirection((value) => (value === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setDirection(key === 'size' ? 'desc' : 'asc');
+    }
+  };
+
+  const arrow = (key: 'filename' | 'location' | 'type' | 'size') =>
+    sortKey === key ? (direction === 'asc' ? '↑' : '↓') : '';
+
+  const header = (key: 'filename' | 'location' | 'type' | 'size', label: string) => (
+    <Table.Th className={unique ? 'sortable-th' : undefined} onClick={unique ? () => headerClick(key) : undefined}>
+      {label}
+      {unique ? ` ${arrow(key)}` : ''}
+    </Table.Th>
+  );
 
   return (
     <>
@@ -220,10 +262,10 @@ export function FilesTable({
                 )}
               </Table.Th>
             )}
-            <Table.Th>Filename</Table.Th>
-            <Table.Th>Location</Table.Th>
-            <Table.Th>Type</Table.Th>
-            <Table.Th>Size</Table.Th>
+            {header('filename', 'Filename')}
+            {header('location', 'Location')}
+            {header('type', 'Type')}
+            {header('size', 'Size')}
             {unique && <Table.Th>Actions</Table.Th>}
           </Table.Tr>
         </Table.Thead>
