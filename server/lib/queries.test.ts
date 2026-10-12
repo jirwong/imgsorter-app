@@ -81,13 +81,11 @@ describe('queries against the committed sample db', () => {
     expect(data.rankedByCopies.length).toBe(expected.duplicateGroups);
   });
 
-  it('returns shell totals and options', () => {
+  it('returns shell totals', () => {
     const shell = getShellData(ROOTS);
     expect(shell.files).toBe(expected.totalFiles);
     expect(shell.size).toBe(expected.totalSize);
     expect(shell.duplicateGroups).toBe(expected.duplicateGroups);
-    expect(shell.roots).toContain('C:/Media/2025');
-    expect(shell.extensions).toEqual(['.gif', '.jpg', '.png']);
   });
 
   it('returns 24 duplicate groups with their member files', () => {
@@ -178,14 +176,14 @@ describe('queries against the committed sample db', () => {
     expect(getOverviewStats([]).totalFiles).toBe(0);
     expect(getDirectoryStats([])).toEqual([]);
     expect(getDuplicateGroups([])).toEqual([]);
-    expect(getShellData([])).toEqual({ files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 });
+    expect(getShellData([])).toEqual({ files: 0, size: 0, duplicateGroups: 0 });
   });
 
   it('returns empty shapes when the db is missing', () => {
     const previous = process.env.IMGSORTER_DB_PATH;
     process.env.IMGSORTER_DB_PATH = join(tmpdir(), 'imgsorter-missing-xyz.db');
     try {
-      expect(getShellData(ROOTS)).toEqual({ files: 0, size: 0, roots: [], extensions: [], duplicateGroups: 0 });
+      expect(getShellData(ROOTS)).toEqual({ files: 0, size: 0, duplicateGroups: 0 });
       expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS)).toEqual([]);
       expect(getDirectoryStats(ROOTS)).toEqual([]);
       expect(getDuplicateGroups(ROOTS)).toEqual([]);

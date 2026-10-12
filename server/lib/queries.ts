@@ -181,10 +181,8 @@ export function getShellData(roots: string[]): ShellData {
   const entries = readEntries(roots);
   const files = entries.length;
   const size = entries.reduce((sum, entry) => sum + entry.size, 0);
-  const rootLabels = [...new Set(entries.map((entry) => rootLabelOf(entry.directory)))].sort();
-  const extensions = [...new Set(entries.map((entry) => entry.extension))].sort();
   const duplicateGroups = groupDuplicates(entries).length;
-  return { files, size, roots: rootLabels, extensions, duplicateGroups };
+  return { files, size, duplicateGroups };
 }
 
 export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {

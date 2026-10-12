@@ -7,8 +7,6 @@ const shell = vi.hoisted(() => ({
   data: {
     files: 1272,
     size: 391_000_000,
-    roots: [] as string[],
-    extensions: [] as string[],
     duplicateGroups: 24,
     lastScan: null as LastScan | null,
   },
