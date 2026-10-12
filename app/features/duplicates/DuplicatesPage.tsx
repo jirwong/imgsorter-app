@@ -41,17 +41,29 @@ export function DuplicatesPage({
 
   const directories = useMemo(() => [...new Set(groups.flatMap((g) => g.files.map((e) => e.directory)))], [groups]);
   const extensions = useMemo(() => [...new Set(groups.flatMap((g) => g.files.map((e) => e.extension)))], [groups]);
-  const directoryOptions = useMemo(
-    () =>
-      directories.map((d) => ({
-        value: d,
-        label: d,
-        count: groups.filter((g) => g.files.some((e) => e.directory === d)).length,
-        hidden: groups.flatMap((g) => g.files).filter((e) => e.directory === d && isHidden(e)).length,
-        unit: 'group' as const,
-      })),
-    [directories, groups, isHidden],
-  );
+  const directoryOptions = useMemo(() => {
+    const groupCounts = new Map<string, number>();
+    const hiddenCounts = new Map<string, number>();
+    for (const g of groups) {
+      const seen = new Set<string>();
+      for (const e of g.files) {
+        if (!seen.has(e.directory)) {
+          seen.add(e.directory);
+          groupCounts.set(e.directory, (groupCounts.get(e.directory) ?? 0) + 1);
+        }
+        if (isHidden(e)) {
+          hiddenCounts.set(e.directory, (hiddenCounts.get(e.directory) ?? 0) + 1);
+        }
+      }
+    }
+    return directories.map((d) => ({
+      value: d,
+      label: d,
+      count: groupCounts.get(d) ?? 0,
+      hidden: hiddenCounts.get(d) ?? 0,
+      unit: 'group' as const,
+    }));
+  }, [directories, groups, isHidden]);
 
   const visibleGroups = useMemo(
     () =>
