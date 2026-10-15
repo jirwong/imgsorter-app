@@ -144,4 +144,17 @@ review`.
   nothing is deleted. Spec at
   `docs/superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md`; plan at
   `docs/superpowers/plans/2026-10-04-phase8-enabled-directory-scope.md`.
+- Phase 9 (hidden files) — **complete**: hidden file paths persist in `app-config.db`
+  (the `hidden` key) and can be hidden or unhidden one at a time or in bulk from the
+  Unique Files and Duplicates pages, without deleting anything. Duplicates has a
+  hidden filter, a hidden count, and per-directory hidden counts in the directory
+  picker. Landed in PRs #89, #90, #92, #93 (persistence, Unique Files hide UI, bulk
+  actions, multi-select) and #102–#104 (Duplicates hidden filter and counts).
+- Phase 10 (UI polish and refinements) — **complete**: the Files table gained a
+  100-row page size and column sorting; the file preview gained copy-directory and
+  copy-path actions; the header filters and the export button were removed; the
+  sidebar was reordered and the content widened; Browse scrolling and
+  excluded-directory / resync path handling were fixed. Landed in PRs #86–#88 and
+  #94–#101. No spec or plan was written for Phases 9–10; they are recorded here
+  retrospectively.
 - Roadmap: `docs/ROADMAP.md`.

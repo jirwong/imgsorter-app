@@ -19,6 +19,8 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 6 | Indexed directory tree page + drive-rooted Browse filter + native Reveal foreground fix | Directories page + working Reveal | `[x]` |
 | 7 | Maintenance tab + guarded library index reset | In-app reset with confirmation | `[x]` |
 | 8 | Enabled-directory scoping | Disabled directories hide from every page | `[x]` |
+| 9 | Hidden files (`app-config.db` `hidden` key; hide/unhide on Unique Files + Duplicates; bulk actions; hidden filters/counts) | Curate files without deleting them | `[x]` |
+| 10 | UI polish pass (page size + column sorting, preview copy actions, header filter/export removal, sidebar/content/directory-picker refinements, path-handling fixes) | Refined UI | `[x]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
@@ -42,6 +44,24 @@ phase's brainstorm runs.*
   Directories, shell totals, Preferences counts); re-enabling restores them with no
   rescan. Reads are filtered by the enabled roots; nothing is deleted. Spec:
   [2026-10-04-phase8-enabled-directory-scope-design.md](superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md).
+  (Phase 8 landed in PRs #82–#85.)
+
+- **9 — Hidden files:** hidden file paths persist in `app-config.db` (the `hidden`
+  key) and can be hidden or unhidden one at a time or in bulk from the Unique Files
+  and Duplicates pages, without deleting anything. Duplicates gains a hidden filter,
+  a hidden count, and per-directory hidden counts in the directory picker. Landed in
+  PRs #89, #90, #92, #93 (persistence, Unique Files hide UI, bulk actions,
+  multi-select) and #102–#104 (Duplicates hidden filter and counts).
+
+- **10 — UI polish and refinements:** the Files table gained a 100-row page size and
+  column sorting; the file preview gained copy-directory and copy-path actions; the
+  header filters and the export button were removed; the sidebar was reordered and
+  the content widened; the directory picker was widened and shows per-directory
+  hidden counts; Browse scrolling and excluded-directory / resync path handling were
+  fixed. Landed in PRs #86–#88 and #94–#101.
+
+*Phases 9 and 10 have no spec or plan document. This roadmap records them
+retrospectively.*
 
 ## Phase 4 sub-phases
 
@@ -69,6 +89,8 @@ spec → plan → PR loop):
 - Phase 4 depends on Phase 3 (scan lifecycle must be real before persisting
   preferences/history meaningfully).
 - Phase 5 is independent and can slot in anywhere after Phase 2.
+- Phase 9 depends on Phase 4a (the `app-config.db` store) and Phase 3 (Duplicates).
+- Phase 10 is a UI pass over the phases 1–8 pages and introduces no new data paths.
 
 ## Design decisions (cross-phase)
 
@@ -102,6 +124,8 @@ spec → plan → PR loop):
 | 6 | [2026-10-04-phase6-directories-reveal-design.md](superpowers/specs/2026-10-04-phase6-directories-reveal-design.md) |
 | 7 | [2026-10-04-phase7-library-reset-design.md](superpowers/specs/2026-10-04-phase7-library-reset-design.md) |
 | 8 | [2026-10-04-phase8-enabled-directory-scope-design.md](superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md) |
+| 9 | *(no spec — retrospective; landed in PRs #89, #90, #92, #93, #102–#104)* |
+| 10 | *(no spec — retrospective; landed in PRs #86–#88, #94–#101)* |
 
 ## How to add a phase
 
