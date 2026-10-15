@@ -53,6 +53,11 @@ review`.
   before claiming anything passes. Do the same when resolving comments.
 - **Fresh eyes.** The review sub-agent is always a separate, fresh agent.
 - **Never merge.** No `gh pr merge`, no self-approval, no auto-approve.
+- **gh identity.** All `gh` commands (branch pushes, PR create, review, comments)
+  must run as `jirwong-agent`, pinned per command via
+  `GH_TOKEN="$(gh auth token -u jirwong-agent)"`. Never rely on the active
+  account. Verify with `gh api user` and report the login before/after PR
+  creation.
 - **Operational failures halt execution.** If push/PR/`gh` auth or any command
   errors unexpectedly, STOP and report; do not work around failures silently.
 - **User's word overrides the loop.** Interjections, comments, or scope changes
