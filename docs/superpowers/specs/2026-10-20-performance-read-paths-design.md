@@ -421,6 +421,9 @@ shape. A3 is independent of both.
 - **Case folding:** the generated column and the scope parameters both use
   SQLite `lower()`, which folds ASCII only. ASCII directories are
   case-insensitive; non-ASCII directories are case-sensitive but consistent, so
-  a correctly cased configured root still matches its subtree. Windows paths in
-  practice are mostly ASCII; a later phase can add a custom collation or a
-  JS-maintained normalized column.
+  a correctly cased configured root still matches its subtree. Keeper lookup
+  follows the same rule: input paths are normalized without lowercasing and both
+  sides pass through SQLite `lower()`, so keeper matching is ASCII
+  case-insensitive and non-ASCII case-sensitive. Windows paths in practice are
+  mostly ASCII; a later phase can add a custom collation or a JS-maintained
+  normalized column.

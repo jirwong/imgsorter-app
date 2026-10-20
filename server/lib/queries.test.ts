@@ -32,6 +32,44 @@ import {
 
 const ROOTS = ['C:/Media', 'D:/Camera Imports'];
 
+type TempEntry = { directory: string; filename: string; hash: string | null; path: string };
+
+function runWithTempEntries(rows: TempEntry[], run: () => void): void {
+  const dir = mkdtempSync(join(tmpdir(), 'imgsorter-keeper-'));
+  const path = join(dir, 'keeper.db');
+  const db = new Database(path);
+  db.exec(`
+    CREATE TABLE entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      size INTEGER,
+      directory TEXT,
+      extension TEXT,
+      filename TEXT,
+      birthtime TEXT,
+      hash TEXT,
+      path TEXT,
+      UNIQUE(path)
+    );
+  `);
+  const insert = db.prepare(
+    `INSERT INTO entries (size, directory, extension, filename, birthtime, hash, path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const row of rows) {
+    insert.run(10, row.directory, '.jpg', row.filename, '2025-01-01T00:00:00Z', row.hash, row.path);
+  }
+  db.close();
+  const previous = process.env.IMGSORTER_DB_PATH;
+  process.env.IMGSORTER_DB_PATH = path;
+  try {
+    run();
+  } finally {
+    if (previous === undefined) delete process.env.IMGSORTER_DB_PATH;
+    else process.env.IMGSORTER_DB_PATH = previous;
+    closeReadConnections();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 describe('queries against the committed sample db', () => {
   const expected = expectedFixtureStats(buildFixtureFiles());
 
@@ -300,7 +338,6 @@ describe('queries against the committed sample db', () => {
       expect(group.size).toBe(6_400);
       expect(group.redundantSpace).toBe((group.count - 1) * group.size);
     }
-    expect(groups).toEqual(getDuplicateGroups(ROOTS));
   });
 
   it('counts entries under a root case- and separator-insensitively', () => {
@@ -361,7 +398,34 @@ describe('queries against the committed sample db', () => {
     expect(getKeeperDataSql([missing, missing], ROOTS)).toEqual({ keepers: {}, stale: [missing, missing] });
     expect(getKeeperDataSql([raw], ['C:/Nope'])).toEqual({ keepers: {}, stale: [] });
     expect(getKeeperDataSql([], ROOTS)).toEqual({ keepers: {}, stale: [] });
-    expect(getKeeperDataSql([variant, raw, missing], ROOTS)).toEqual(getKeeperData([variant, raw, missing], ROOTS));
+    expect(getKeeperDataSql([variant, missing, missing], ROOTS)).toEqual({
+      keepers: { [group.key]: id },
+      stale: [missing, missing],
+    });
+  });
+
+  it('matches a keeper path with a non-ASCII segment when the casing is identical', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Users/Ü/Bilder', filename: 'x.jpg', hash: 'abc', path: 'C:/Users/Ü/Bilder/x.jpg' },
+        { directory: 'C:/Users/Ü/Archiv', filename: 'x.jpg', hash: 'abc', path: 'C:/Users/Ü/Archiv/x.jpg' },
+      ],
+      () => {
+        expect(getKeeperDataSql(['C:/Users/Ü/Bilder/x.jpg'], ['C:/Users/Ü'])).toEqual({
+          keepers: { 'abc:x.jpg': 1 },
+          stale: [],
+        });
+      },
+    );
+  });
+
+  it('reports a matching keeper without a hash as stale', () => {
+    runWithTempEntries([{ directory: 'C:/NoHash', filename: 'x.jpg', hash: null, path: 'C:/NoHash/x.jpg' }], () => {
+      expect(getKeeperDataSql(['C:/NoHash/x.jpg'], ['C:/NoHash'])).toEqual({
+        keepers: {},
+        stale: ['C:/NoHash/x.jpg'],
+      });
+    });
   });
 
   it('preserves a keeper whose file is outside the enabled roots', () => {

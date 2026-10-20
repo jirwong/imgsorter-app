@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { normalizeDirectoryKey, normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
   DirectoryStat,
@@ -389,7 +389,7 @@ export function getEntryPathsByIds(ids: number[]): string[] {
 export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
   const keepers: KeeperMap = {};
   if (paths.length === 0) return { keepers, stale: [] };
-  const keys = [...new Set(paths.map(normalizeDirectoryKey))];
+  const keys = [...new Set(paths.map(normalizeDirectoryPath))];
   const rows = withRead((db) => {
     const scope = readScope(roots);
     const placeholders = keys.map(() => '(?)').join(', ');
@@ -420,20 +420,22 @@ export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: K
           COALESCE(a.n, 0) AS allCount,
           COALESCE(s.n, 0) AS scopedCount
         FROM lookup l
-        LEFT JOIN entries e ON e.id = (
-          SELECT id FROM entries WHERE lower(replace(path, '\\', '/')) = l.path_key ORDER BY id DESC LIMIT 1
-        )
+        LEFT JOIN entries e ON lower(replace(e.path, '\\', '/')) = lower(l.path_key)
         LEFT JOIN scoped sc ON sc.id = e.id
         LEFT JOIN all_counts a ON a.hash = e.hash AND a.filename = e.filename
-        LEFT JOIN scoped_counts s ON s.hash = e.hash AND s.filename = e.filename`,
+        LEFT JOIN scoped_counts s ON s.hash = e.hash AND s.filename = e.filename
+        ORDER BY e.id ASC`,
       )
       .all(...scope.params, ...keys) as KeeperRow[];
   });
   if (!rows) return { keepers, stale: [] };
-  const byKey = new Map(rows.map((row) => [row.pathKey, row]));
+  const byKey = new Map<string, KeeperRow>();
+  for (const row of rows) {
+    if (row.id !== null) byKey.set(row.pathKey, row);
+  }
   const stale: string[] = [];
   for (const path of paths) {
-    const found = byKey.get(normalizeDirectoryKey(path));
+    const found = byKey.get(normalizeDirectoryPath(path));
     if (!found || found.id === null || !found.hash || !found.filename) {
       stale.push(path);
       continue;
