@@ -1,4 +1,5 @@
 import '@tanstack/react-start/server-only';
+import Database from 'better-sqlite3';
 import { Runner } from '../engine/runner';
 import type { Reporter } from '../engine/output/reporter';
 import type { ProgressSink } from '../engine/types/progress';
@@ -7,6 +8,7 @@ import type { RunSummary } from '../engine/types/run-summary';
 import type { AppConfig, LastScan } from '../../app/lib/types';
 import { appConfigStore } from './app-config';
 import { sampleDbPath } from './db-path';
+import { ensureReadSchema } from './schema';
 
 const silentReporter: Reporter = { debug() {}, info() {}, warn() {}, error() {}, printSummary() {} };
 
@@ -57,6 +59,13 @@ export function createConfiguredScan(deps: ConfiguredScanDeps): (deps: RunConfig
       resync_directories: config.application.resyncDirectories,
       resync_check_actual_file: config.application.verifyFiles,
     };
+
+    const database = new Database(runConfig.dbName);
+    try {
+      ensureReadSchema(database);
+    } finally {
+      database.close();
+    }
 
     const summary = await deps.run(runConfig, { progress, signal });
     const at = new Date().toISOString();
