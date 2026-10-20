@@ -158,8 +158,8 @@ CREATE INDEX IF NOT EXISTS idx_entries_path_norm ON entries(lower(replace(path, 
 - The column is **VIRTUAL** because SQLite cannot add a STORED generated column
   with `ALTER TABLE`, and a virtual column does not rewrite the 355k-row table.
 - `idx_entries_path_norm` indexes the normalized path expression used by keeper
-  and hidden path matching, so each keeper lookup is an indexed `SEARCH` instead
-  of a full scan of `entries`.
+  matching, so each keeper lookup is an indexed `SEARCH` instead of a full scan
+  of `entries`. A2 reuses the same expression for hidden-path filtering.
 - The engine inserts and updates do not name the column, so its writes stay
   valid and the column is recomputed automatically.
 - Column existence is checked with `PRAGMA table_xinfo(entries)` before the
