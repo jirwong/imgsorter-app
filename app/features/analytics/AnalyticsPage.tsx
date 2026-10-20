@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Group, Select, Table, Text } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { PageHeading } from '../../components/common/PageHeading';
 import { formatBytes } from '../../lib/format';
-import { getAnalyticsData } from '../../../server/routes/analytics';
+import { getAnalyticsPage } from '../../../server/routes/analytics';
 import type { AnalyticsQuery, AnalyticsResult } from '../../lib/types';
 
 export const DEFAULT_ANALYTICS_QUERY: AnalyticsQuery = {
@@ -31,8 +32,16 @@ export function AnalyticsPage({ initial }: { initial: AnalyticsResult }) {
   const [copiesPageSize, setCopiesPageSize] = useState('10');
   const [sizePage, setSizePage] = useState(1);
   const [copiesPage, setCopiesPage] = useState(1);
+  const [revision, setRevision] = useState(0);
   const initialised = useRef(false);
+  const loaderData = useRef(initial);
   const requestId = useRef(0);
+
+  useEffect(() => {
+    if (loaderData.current === initial) return;
+    loaderData.current = initial;
+    setRevision((value) => value + 1);
+  }, [initial]);
 
   const query = useMemo<AnalyticsQuery>(
     () => ({
@@ -51,15 +60,19 @@ export function AnalyticsPage({ initial }: { initial: AnalyticsResult }) {
     }
     let cancelled = false;
     const id = ++requestId.current;
-    getAnalyticsData({ data: query })
+    getAnalyticsPage({ data: query })
       .then((result) => {
         if (!cancelled && id === requestId.current) setData(result);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled && id === requestId.current) {
+          notifications.show({ color: 'red', message: 'Could not load analytics.' });
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, revision]);
 
   const sizeLimit = toPageSize(sizePageSize);
   const copiesLimit = toPageSize(copiesPageSize);

@@ -477,6 +477,17 @@ describe('queries against the committed sample db', () => {
     expect(result.totalCopies).toBe(full.rankedByCopies.length);
   });
 
+  it('returns an empty analytics page past the end', () => {
+    const result = getAnalyticsPage(
+      { sizePage: 10_000, sizePageSize: 50, copiesPage: 10_000, copiesPageSize: 50 },
+      ROOTS,
+    );
+    expect(result.rankedBySize).toEqual([]);
+    expect(result.totalFiles).toBe(expected.totalFiles);
+    expect(result.rankedByCopies).toEqual([]);
+    expect(result.totalCopies).toBe(expected.duplicateGroups);
+  });
+
   it('returns shell totals', () => {
     const shell = getShellData(ROOTS);
     expect(shell.files).toBe(expected.totalFiles);

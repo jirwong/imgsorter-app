@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import type { AnalyticsResult } from '../../lib/types';
 
 const mocks = vi.hoisted(() => ({
-  getAnalyticsData: vi.fn(),
+  getAnalyticsPage: vi.fn(),
+  notifyShow: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/analytics', () => ({
-  getAnalyticsData: mocks.getAnalyticsData,
+  getAnalyticsPage: mocks.getAnalyticsPage,
+}));
+
+vi.mock('@mantine/notifications', () => ({
+  notifications: { show: mocks.notifyShow },
 }));
 
 import { AnalyticsPage } from './AnalyticsPage';
@@ -27,23 +32,27 @@ const pageResult = (overrides: Partial<AnalyticsResult> = {}): AnalyticsResult =
   ...overrides,
 });
 
-function renderPage(initial: AnalyticsResult = pageResult()) {
-  return render(
+function pageElement(initial: AnalyticsResult) {
+  return (
     <MantineProvider defaultColorScheme="dark">
       <AnalyticsPage initial={initial} />
-    </MantineProvider>,
+    </MantineProvider>
   );
 }
 
+function renderPage(initial: AnalyticsResult = pageResult()) {
+  return render(pageElement(initial));
+}
+
 function choose(label: string, name: string) {
-  fireEvent.click(screen.getByRole('combobox', { name: label }));
-  fireEvent.click(screen.getByRole('option', { name }));
+  const listbox = screen.getByRole('listbox', { name: label, hidden: true });
+  fireEvent.click(within(listbox).getByRole('option', { name, hidden: true }));
 }
 
 describe('AnalyticsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getAnalyticsData.mockResolvedValue(pageResult());
+    mocks.getAnalyticsPage.mockResolvedValue(pageResult());
   });
 
   it('renders both ranking cards from the loader without refetching', () => {
@@ -51,14 +60,14 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('Biggest files')).toBeInTheDocument();
     expect(screen.getByText('Most duplicated')).toBeInTheDocument();
     expect(screen.getByText('×4')).toBeInTheDocument();
-    expect(mocks.getAnalyticsData).not.toHaveBeenCalled();
+    expect(mocks.getAnalyticsPage).not.toHaveBeenCalled();
   });
 
   it('fetches the new page when a page size changes', async () => {
     renderPage();
     choose('Items per page for ranked by size', '25');
     await waitFor(() =>
-      expect(mocks.getAnalyticsData).toHaveBeenLastCalledWith({
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
         data: { sizePage: 1, sizePageSize: 25, copiesPage: 1, copiesPageSize: 10 },
       }),
     );
@@ -69,15 +78,62 @@ describe('AnalyticsPage', () => {
     const [sizeNext, copiesNext] = screen.getAllByRole('button', { name: 'Next' });
     fireEvent.click(copiesNext);
     await waitFor(() =>
-      expect(mocks.getAnalyticsData).toHaveBeenLastCalledWith({
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
         data: expect.objectContaining({ copiesPage: 2, sizePage: 1 }),
       }),
     );
     fireEvent.click(sizeNext);
     await waitFor(() =>
-      expect(mocks.getAnalyticsData).toHaveBeenLastCalledWith({
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
         data: expect.objectContaining({ sizePage: 2, copiesPage: 2 }),
       }),
     );
+  });
+
+  it('resets the ranking to page one when its page size changes on a later page', async () => {
+    renderPage(pageResult({ totalFiles: 50, totalCopies: 50 }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Next' })[0]);
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ sizePage: 2 }),
+      }),
+    );
+    choose('Items per page for ranked by size', '50');
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: { sizePage: 1, sizePageSize: 50, copiesPage: 1, copiesPageSize: 10 },
+      }),
+    );
+  });
+
+  it('shows a toast and keeps the last good page when a refetch fails', async () => {
+    renderPage();
+    mocks.getAnalyticsPage.mockRejectedValueOnce(new Error('boom'));
+    choose('Items per page for ranked by size', '25');
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+    expect(screen.getByText('big-1.jpg')).toBeInTheDocument();
+    expect(screen.getByText('×4')).toBeInTheDocument();
+  });
+
+  it('refetches the current query when the loader page changes', async () => {
+    const refreshed = pageResult({
+      rankedBySize: [{ filename: 'fresh.jpg', size: 1 }],
+      rankedByCopies: [{ name: 'fresh-dup.jpg', count: 2 }],
+    });
+    const { rerender } = renderPage();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Next' })[0]);
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ sizePage: 2 }),
+      }),
+    );
+    mocks.getAnalyticsPage.mockResolvedValue(refreshed);
+    rerender(pageElement(refreshed));
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: { sizePage: 2, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 },
+      }),
+    );
+    expect(await screen.findByText('fresh.jpg')).toBeInTheDocument();
   });
 });
