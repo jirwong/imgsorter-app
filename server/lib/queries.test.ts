@@ -14,6 +14,7 @@ import {
   countEntriesByDirectory,
   getAnalyticsData,
   getAnalyticsDataSql,
+  getAnalyticsPage,
   getDirectoryStats,
   getDirectoryStatsSql,
   getDuplicateGroups,
@@ -445,6 +446,35 @@ describe('queries against the committed sample db', () => {
       expect(previous.name <= current.name).toBe(true);
     }
     expect(data).toEqual(getAnalyticsData(ROOTS));
+  });
+
+  it('returns one page of each ranking with exact totals', () => {
+    const result = getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, ROOTS);
+    expect(result.rankedBySize).toHaveLength(10);
+    expect(result.totalFiles).toBe(expected.totalFiles);
+    expect(result.rankedByCopies).toHaveLength(10);
+    expect(result.totalCopies).toBe(expected.duplicateGroups);
+  });
+
+  it('continues both analytics rankings on page two', () => {
+    const full = getAnalyticsDataSql(ROOTS);
+    const result = getAnalyticsPage({ sizePage: 2, sizePageSize: 10, copiesPage: 2, copiesPageSize: 10 }, ROOTS);
+    expect(result.rankedBySize).toEqual(full.rankedBySize.slice(10, 20));
+    expect(result.rankedByCopies).toEqual(full.rankedByCopies.slice(10, 20));
+    expect(result.totalFiles).toBe(full.rankedBySize.length);
+    expect(result.totalCopies).toBe(full.rankedByCopies.length);
+  });
+
+  it('normalizes invalid analytics pages and page sizes', () => {
+    const full = getAnalyticsDataSql(ROOTS);
+    const result = getAnalyticsPage(
+      { sizePage: 0, sizePageSize: 999 as never, copiesPage: -3, copiesPageSize: 7 as never },
+      ROOTS,
+    );
+    expect(result.rankedBySize).toEqual(full.rankedBySize.slice(0, 10));
+    expect(result.rankedByCopies).toEqual(full.rankedByCopies.slice(0, 10));
+    expect(result.totalFiles).toBe(full.rankedBySize.length);
+    expect(result.totalCopies).toBe(full.rankedByCopies.length);
   });
 
   it('returns shell totals', () => {
@@ -902,6 +932,12 @@ describe('queries against the committed sample db', () => {
       expect(getDuplicateGroups(ROOTS)).toEqual([]);
       expect(getAnalyticsData(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
       expect(getAnalyticsDataSql(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
+      expect(getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, ROOTS)).toEqual({
+        rankedBySize: [],
+        totalFiles: 0,
+        rankedByCopies: [],
+        totalCopies: 0,
+      });
       expect(getOverviewStats(ROOTS)).toEqual({
         totalFiles: 0,
         totalSize: 0,

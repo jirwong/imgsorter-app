@@ -1,29 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Group, Select, Table, Text } from '@mantine/core';
 import { PageHeading } from '../../components/common/PageHeading';
 import { formatBytes } from '../../lib/format';
-import type { AnalyticsData } from '../../lib/types';
+import { getAnalyticsData } from '../../../server/routes/analytics';
+import type { AnalyticsQuery, AnalyticsResult } from '../../lib/types';
 
-export function AnalyticsPage({ data }: { data: AnalyticsData }) {
-  const [pageSize, setPageSize] = useState('10');
+export const DEFAULT_ANALYTICS_QUERY: AnalyticsQuery = {
+  sizePage: 1,
+  sizePageSize: 10,
+  copiesPage: 1,
+  copiesPageSize: 10,
+};
+
+function toPageSize(value: string): AnalyticsQuery['sizePageSize'] {
+  switch (value) {
+    case '5':
+      return 5;
+    case '25':
+      return 25;
+    case '50':
+      return 50;
+    default:
+      return 10;
+  }
+}
+
+export function AnalyticsPage({ initial }: { initial: AnalyticsResult }) {
+  const [data, setData] = useState(initial);
+  const [sizePageSize, setSizePageSize] = useState('10');
   const [copiesPageSize, setCopiesPageSize] = useState('10');
   const [sizePage, setSizePage] = useState(1);
   const [copiesPage, setCopiesPage] = useState(1);
+  const initialised = useRef(false);
+  const requestId = useRef(0);
 
-  const sizeLimit = Number(pageSize);
-  const copiesLimit = Number(copiesPageSize);
-  const sizePages = Math.max(1, Math.ceil(data.rankedBySize.length / sizeLimit));
-  const copiesPages = Math.max(1, Math.ceil(data.rankedByCopies.length / copiesLimit));
+  const query = useMemo<AnalyticsQuery>(
+    () => ({
+      sizePage,
+      sizePageSize: toPageSize(sizePageSize),
+      copiesPage,
+      copiesPageSize: toPageSize(copiesPageSize),
+    }),
+    [sizePage, sizePageSize, copiesPage, copiesPageSize],
+  );
 
   useEffect(() => {
-    setSizePage(1);
-  }, [pageSize, data.rankedBySize.length]);
-  useEffect(() => {
-    setCopiesPage(1);
-  }, [copiesPageSize, data.rankedByCopies.length]);
+    if (!initialised.current) {
+      initialised.current = true;
+      return;
+    }
+    let cancelled = false;
+    const id = ++requestId.current;
+    getAnalyticsData({ data: query })
+      .then((result) => {
+        if (!cancelled && id === requestId.current) setData(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
 
-  const sizeRows = data.rankedBySize.slice((sizePage - 1) * sizeLimit, sizePage * sizeLimit);
-  const copiesRows = data.rankedByCopies.slice((copiesPage - 1) * copiesLimit, copiesPage * copiesLimit);
+  const sizeLimit = toPageSize(sizePageSize);
+  const copiesLimit = toPageSize(copiesPageSize);
+  const sizePages = Math.max(1, Math.ceil(data.totalFiles / sizeLimit));
+  const copiesPages = Math.max(1, Math.ceil(data.totalCopies / copiesLimit));
 
   return (
     <>
@@ -41,15 +82,18 @@ export function AnalyticsPage({ data }: { data: AnalyticsData }) {
             </div>
             <Select
               aria-label="Items per page for ranked by size"
-              value={pageSize}
-              onChange={(v) => setPageSize(v ?? '5')}
-              data={['5', '10', '25']}
+              value={sizePageSize}
+              onChange={(v) => {
+                setSizePageSize(v ?? '10');
+                setSizePage(1);
+              }}
+              data={['5', '10', '25', '50']}
               w={72}
             />
           </Group>
           <Table className="analytics-ranking-table" mt="md">
             <Table.Tbody>
-              {sizeRows.map((e, i) => (
+              {data.rankedBySize.map((e, i) => (
                 <Table.Tr key={`${e.filename}-${i}`}>
                   <Table.Td>{(sizePage - 1) * sizeLimit + i + 1}</Table.Td>
                   <Table.Td>{e.filename}</Table.Td>
@@ -89,14 +133,17 @@ export function AnalyticsPage({ data }: { data: AnalyticsData }) {
             <Select
               aria-label="Items per page for ranked by copies"
               value={copiesPageSize}
-              onChange={(v) => setCopiesPageSize(v ?? '5')}
-              data={['5', '10', '25']}
+              onChange={(v) => {
+                setCopiesPageSize(v ?? '10');
+                setCopiesPage(1);
+              }}
+              data={['5', '10', '25', '50']}
               w={72}
             />
           </Group>
           <Table className="analytics-ranking-table" mt="md">
             <Table.Tbody>
-              {copiesRows.map((g, i) => (
+              {data.rankedByCopies.map((g, i) => (
                 <Table.Tr key={`${g.name}-${i}`}>
                   <Table.Td>{(copiesPage - 1) * copiesLimit + i + 1}</Table.Td>
                   <Table.Td>{g.name}</Table.Td>

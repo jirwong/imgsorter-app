@@ -5,6 +5,9 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import { normalizeDirectoryKey, normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
+  AnalyticsQuery,
+  AnalyticsResult,
+  CopyRankRow,
   DirectoryStat,
   DuplicateGroup,
   DuplicatesQuery,
@@ -71,6 +74,10 @@ const FILE_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 type FilePageSize = (typeof FILE_PAGE_SIZES)[number];
 
+const ANALYTICS_PAGE_SIZES = [5, 10, 25, 50] as const;
+
+type AnalyticsPageSize = (typeof ANALYTICS_PAGE_SIZES)[number];
+
 const FILE_SORT_COLUMNS = new Map<FilesQuery['sortKey'], string>([
   ['filename', 'filename'],
   ['location', 'directory'],
@@ -106,6 +113,10 @@ function normalizePage(value: number): number {
 
 function normalizePageSize(value: number): FilePageSize {
   return (FILE_PAGE_SIZES as readonly number[]).includes(value) ? (value as FilePageSize) : 10;
+}
+
+function normalizeAnalyticsPageSize(value: number): AnalyticsPageSize {
+  return (ANALYTICS_PAGE_SIZES as readonly number[]).includes(value) ? (value as AnalyticsPageSize) : 10;
 }
 
 type KeeperRow = {
@@ -415,22 +426,50 @@ export function getDirectoryStats(roots: string[]): DirectoryStat[] {
   return getDirectoryStatsSql(roots);
 }
 
+function copyRankRows(db: DatabaseType, scope: ScopeClause): CopyRankRow[] {
+  return duplicateGroupRows(db, scope)
+    .sort((a, b) => b.n - a.n || a.filename.localeCompare(b.filename))
+    .map((row) => ({ name: row.filename, count: row.n }));
+}
+
 export function getAnalyticsDataSql(roots: string[]): AnalyticsData {
   const data = withRead((db) => {
     const scope = readScope(db, roots);
     const rankedBySize = db
       .prepare(`SELECT filename, size FROM entries WHERE ${scope.sql} ORDER BY size DESC, filename ASC`)
       .all(...scope.params) as { filename: string; size: number }[];
-    const rankedByCopies = duplicateGroupRows(db, scope)
-      .sort((a, b) => b.n - a.n || a.filename.localeCompare(b.filename))
-      .map((row) => ({ name: row.filename, count: row.n }));
-    return { rankedBySize, rankedByCopies };
+    return { rankedBySize, rankedByCopies: copyRankRows(db, scope) };
   });
   return data ?? { rankedBySize: [], rankedByCopies: [] };
 }
 
 export function getAnalyticsData(roots: string[]): AnalyticsData {
   return getAnalyticsDataSql(roots);
+}
+
+export function getAnalyticsPage(input: AnalyticsQuery, roots: string[]): AnalyticsResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const sizePage = normalizePage(input.sizePage);
+    const sizePageSize = normalizeAnalyticsPageSize(input.sizePageSize);
+    const copiesPage = normalizePage(input.copiesPage);
+    const copiesPageSize = normalizeAnalyticsPageSize(input.copiesPageSize);
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
+    const rankedBySize = db
+      .prepare(
+        `SELECT filename, size FROM entries WHERE ${scope.sql}
+        ORDER BY size DESC, filename ASC LIMIT ? OFFSET ?`,
+      )
+      .all(...scope.params, sizePageSize, (sizePage - 1) * sizePageSize) as { filename: string; size: number }[];
+    const copies = copyRankRows(db, scope);
+    return {
+      rankedBySize,
+      totalFiles: total.n,
+      rankedByCopies: copies.slice((copiesPage - 1) * copiesPageSize, copiesPage * copiesPageSize),
+      totalCopies: copies.length,
+    };
+  });
+  return result ?? { rankedBySize: [], totalFiles: 0, rankedByCopies: [], totalCopies: 0 };
 }
 
 export function getShellDataSql(roots: string[]): ShellData {
