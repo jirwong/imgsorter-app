@@ -134,7 +134,10 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
     }
     setMessage('');
     setIndexedPath('');
-    void persistDirectories([...indexed, { path, enabled: true }], ignored);
+    void persistDirectories([...indexed, { path, enabled: true }], ignored).catch(() => {
+      notifications.show({ color: 'red', message: 'Could not add the directory.' });
+      void refresh();
+    });
   };
 
   const addIgnored = () => {
@@ -150,7 +153,10 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
     }
     setMessage('');
     setIgnoredPath('');
-    void persistDirectories(indexed, [...ignored, path]);
+    void persistDirectories(indexed, [...ignored, path]).catch(() => {
+      notifications.show({ color: 'red', message: 'Could not add the directory.' });
+      void refresh();
+    });
   };
 
   const resetDefaults = () => {

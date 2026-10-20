@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   pickDirectory: vi.fn(),
   clearThumbnailCache: vi.fn(),
   notifyShow: vi.fn(),
+  routerInvalidate: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/preferences', () => ({
@@ -32,7 +33,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
   return {
     ...actual,
-    useRouter: () => ({ invalidate: vi.fn(async () => {}) }),
+    useRouter: () => ({ invalidate: mocks.routerInvalidate }),
     useLoaderData: () => ({ files: 0, size: 0 }),
   };
 });
@@ -73,6 +74,7 @@ describe('PreferencesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.clearThumbnailCache.mockResolvedValue({ removed: 2 });
+    mocks.routerInvalidate.mockResolvedValue(undefined);
   });
 
   it('renders the application tab with a disabled database name', () => {
@@ -270,6 +272,21 @@ describe('PreferencesPage', () => {
     });
     await waitFor(() => expect(addButtons[0]).toBeEnabled());
     expect(addButtons[1]).toBeEnabled();
+  });
+
+  it('shows a toast and refreshes when adding a directory fails', async () => {
+    mocks.saveDirectories.mockRejectedValue(new Error('save failed'));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/New' } });
+    const addButtons = screen.getAllByRole('button', { name: 'Add directory' });
+    fireEvent.click(addButtons[0]);
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+    await waitFor(() => expect(mocks.routerInvalidate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(addButtons[0]).toBeEnabled());
+    expect(screen.getByText('C:/Media/2025')).toBeInTheDocument();
+    expect(screen.queryByText('C:/Media/New')).not.toBeInTheDocument();
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
   });
 
   it('saves a new indexed directory', async () => {
