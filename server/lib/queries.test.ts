@@ -17,9 +17,11 @@ import {
   getDirectoryStats,
   getDirectoryStatsSql,
   getDuplicateGroups,
+  getDuplicateGroupsSql,
   getEntryPathById,
   getEntryPathsByIds,
   getKeeperData,
+  getKeeperDataSql,
   getOverviewStats,
   getOverviewStatsSql,
   getShellData,
@@ -286,6 +288,21 @@ describe('queries against the committed sample db', () => {
     expect(totalRedundant).toBe(expected.redundantSpace);
   });
 
+  it('matches the old JS grouping exactly', () => {
+    const groups = getDuplicateGroupsSql(ROOTS);
+    expect(groups).toHaveLength(expected.duplicateGroups);
+    expect(groups.filter((g) => g.count === 2)).toHaveLength(8);
+    expect(groups.filter((g) => g.count === 3)).toHaveLength(8);
+    expect(groups.filter((g) => g.count === 4)).toHaveLength(8);
+    for (const group of groups) {
+      expect(group.files).toHaveLength(group.count);
+      expect(group.files.every((f) => f.hash === group.hash && f.filename === group.name)).toBe(true);
+      expect(group.size).toBe(6_400);
+      expect(group.redundantSpace).toBe((group.count - 1) * group.size);
+    }
+    expect(groups).toEqual(getDuplicateGroups(ROOTS));
+  });
+
   it('counts entries under a root case- and separator-insensitively', () => {
     const trips = countEntriesByDirectory('@fixtures/Media/2025/Trips', ROOTS);
     const media = countEntriesByDirectory('@fixtures/Media/2025', ROOTS);
@@ -331,6 +348,20 @@ describe('queries against the committed sample db', () => {
     const { keepers, stale } = getKeeperData([variant], ROOTS);
     expect(keepers[group.key]).toBe(id);
     expect(stale).toEqual([]);
+  });
+
+  it('resolves keepers in SQL with case- and separator-insensitive duplicate input', () => {
+    const [group] = getDuplicateGroups(ROOTS);
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    const variant = `${raw.toUpperCase().replace(/\//g, '\\')}\\`;
+    const missing = '@fixtures/does/not/exist.jpg';
+    expect(getKeeperDataSql([variant, variant], ROOTS)).toEqual({ keepers: { [group.key]: id }, stale: [] });
+    expect(getKeeperDataSql([raw, missing], ROOTS)).toEqual({ keepers: { [group.key]: id }, stale: [missing] });
+    expect(getKeeperDataSql([missing, missing], ROOTS)).toEqual({ keepers: {}, stale: [missing, missing] });
+    expect(getKeeperDataSql([raw], ['C:/Nope'])).toEqual({ keepers: {}, stale: [] });
+    expect(getKeeperDataSql([], ROOTS)).toEqual({ keepers: {}, stale: [] });
+    expect(getKeeperDataSql([variant, raw, missing], ROOTS)).toEqual(getKeeperData([variant, raw, missing], ROOTS));
   });
 
   it('preserves a keeper whose file is outside the enabled roots', () => {

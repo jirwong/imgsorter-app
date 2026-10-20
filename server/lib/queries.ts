@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only';
 import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryKey, normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
   DirectoryStat,
@@ -81,6 +81,16 @@ export type DuplicateGroupRow = { hash: string; filename: string; n: number; fir
 
 type CountRow = { n: number };
 
+type KeeperRow = {
+  pathKey: string;
+  id: number | null;
+  hash: string | null;
+  filename: string | null;
+  scoped: number;
+  allCount: number;
+  scopedCount: number;
+};
+
 function readScope(roots: string[]): ScopeClause {
   return scopeClause(toStorageRoots(roots));
 }
@@ -138,44 +148,6 @@ function storageMapRows(
   return [...byRoot.entries()]
     .map(([path, size]) => ({ path, size, share: totalSize === 0 ? 0 : Math.round((size / totalSize) * 100) }))
     .sort((a, b) => b.size - a.size);
-}
-
-type DuplicateGrouping = {
-  key: string;
-  hash: string;
-  name: string;
-  count: number;
-  size: number;
-  extension: string;
-  directories: string[];
-  files: Entry[];
-};
-
-function groupDuplicates(entries: Entry[]): DuplicateGrouping[] {
-  const groups = new Map<string, Entry[]>();
-  for (const entry of entries) {
-    if (!entry.hash) continue;
-    const key = `${entry.hash}\u0000${entry.filename}`;
-    const list = groups.get(key);
-    if (list) list.push(entry);
-    else groups.set(key, [entry]);
-  }
-  const result: DuplicateGrouping[] = [];
-  for (const files of groups.values()) {
-    if (files.length < 2) continue;
-    const first = files[0];
-    result.push({
-      key: `${first.hash}:${first.filename}`,
-      hash: first.hash as string,
-      name: first.filename,
-      count: files.length,
-      size: first.size,
-      extension: first.extension,
-      directories: [...new Set(files.map((file) => file.directory))],
-      files,
-    });
-  }
-  return result;
 }
 
 export function getOverviewStatsSql(roots: string[]): OverviewData {
@@ -317,20 +289,67 @@ export function getShellData(roots: string[]): ShellData {
   return getShellDataSql(roots);
 }
 
+export function getDuplicateGroupsSql(roots: string[]): DuplicateGroup[] {
+  const groups = withRead((db) => {
+    const scope = readScope(roots);
+    const rows = db
+      .prepare(
+        `WITH scoped AS MATERIALIZED (
+          SELECT id, size, directory, extension, filename, birthtime, hash, path
+          FROM entries WHERE ${scope.sql}
+        ),
+        groups AS (
+          SELECT hash, filename, COUNT(*) AS n, MIN(id) AS firstId
+          FROM scoped
+          WHERE hash IS NOT NULL AND hash <> ''
+          GROUP BY hash, filename
+          HAVING COUNT(*) > 1
+        ),
+        keys AS (SELECT hash, filename FROM groups),
+        members AS (
+          SELECT e.id, e.size, e.directory, e.extension, e.filename, e.birthtime, e.hash, e.path
+          FROM scoped e JOIN keys k ON e.hash = k.hash AND e.filename = k.filename
+        )
+        SELECT id, size, directory, extension, filename, birthtime, hash, path
+        FROM members
+        ORDER BY filename ASC, id ASC`,
+      )
+      .all(...scope.params) as EntryRow[];
+    const byKey = new Map<string, DuplicateGroup>();
+    const result: DuplicateGroup[] = [];
+    for (const row of rows) {
+      const hash = String(row.hash);
+      const key = `${hash}:${row.filename}`;
+      const entry = toEntry(row);
+      const group = byKey.get(key);
+      if (group) {
+        group.files.push(entry);
+        group.count += 1;
+        if (!group.directories.includes(entry.directory)) group.directories.push(entry.directory);
+        continue;
+      }
+      const created: DuplicateGroup = {
+        key,
+        hash,
+        name: row.filename,
+        count: 1,
+        size: row.size,
+        redundantSpace: 0,
+        extension: row.extension,
+        directories: [entry.directory],
+        files: [entry],
+      };
+      byKey.set(key, created);
+      result.push(created);
+    }
+    for (const group of result) group.redundantSpace = (group.count - 1) * group.size;
+    return result;
+  });
+  return groups ?? [];
+}
+
 export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
-  return groupDuplicates(readEntries(roots))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((group) => ({
-      key: group.key,
-      hash: group.hash,
-      name: group.name,
-      count: group.count,
-      size: group.size,
-      redundantSpace: (group.count - 1) * group.size,
-      extension: group.extension,
-      directories: group.directories,
-      files: group.files,
-    }));
+  return getDuplicateGroupsSql(roots);
 }
 
 export function countEntriesByDirectory(root: string, roots: string[]): number {
@@ -367,45 +386,70 @@ export function getEntryPathsByIds(ids: number[]): string[] {
   }
 }
 
-export function getKeeperData(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
+export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
   const keepers: KeeperMap = {};
   if (paths.length === 0) return { keepers, stale: [] };
-  const db = openReadonly();
-  if (!db) return { keepers, stale: [] };
-  try {
-    const rows = db
-      .prepare(`SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries`)
-      .all() as EntryRow[];
-    const allCounts = new Map<string, number>();
-    const scopedCounts = new Map<string, number>();
-    const byPath = new Map<string, { row: EntryRow; scoped: boolean }>();
-    for (const row of rows) {
-      const scoped = isWithinRoots(mapPathToDisplay(row.directory), roots);
-      if (row.hash) {
-        const key = `${row.hash}:${row.filename}`;
-        allCounts.set(key, (allCounts.get(key) ?? 0) + 1);
-        if (scoped) scopedCounts.set(key, (scopedCounts.get(key) ?? 0) + 1);
-      }
-      byPath.set(normalizeDirectoryPath(row.path).toLowerCase(), { row, scoped });
+  const keys = [...new Set(paths.map(normalizeDirectoryKey))];
+  const rows = withRead((db) => {
+    const scope = readScope(roots);
+    const placeholders = keys.map(() => '(?)').join(', ');
+    return db
+      .prepare(
+        `WITH scoped AS MATERIALIZED (
+          SELECT id, hash, filename FROM entries WHERE ${scope.sql}
+        ),
+        all_counts AS (
+          SELECT hash, filename, COUNT(*) AS n
+          FROM entries
+          WHERE hash IS NOT NULL AND hash <> ''
+          GROUP BY hash, filename
+        ),
+        scoped_counts AS (
+          SELECT hash, filename, COUNT(*) AS n
+          FROM scoped
+          WHERE hash IS NOT NULL AND hash <> ''
+          GROUP BY hash, filename
+        ),
+        lookup(path_key) AS (VALUES ${placeholders})
+        SELECT
+          l.path_key AS pathKey,
+          e.id,
+          e.hash,
+          e.filename,
+          (sc.id IS NOT NULL) AS scoped,
+          COALESCE(a.n, 0) AS allCount,
+          COALESCE(s.n, 0) AS scopedCount
+        FROM lookup l
+        LEFT JOIN entries e ON e.id = (
+          SELECT id FROM entries WHERE lower(replace(path, '\\', '/')) = l.path_key ORDER BY id DESC LIMIT 1
+        )
+        LEFT JOIN scoped sc ON sc.id = e.id
+        LEFT JOIN all_counts a ON a.hash = e.hash AND a.filename = e.filename
+        LEFT JOIN scoped_counts s ON s.hash = e.hash AND s.filename = e.filename`,
+      )
+      .all(...scope.params, ...keys) as KeeperRow[];
+  });
+  if (!rows) return { keepers, stale: [] };
+  const byKey = new Map(rows.map((row) => [row.pathKey, row]));
+  const stale: string[] = [];
+  for (const path of paths) {
+    const found = byKey.get(normalizeDirectoryKey(path));
+    if (!found || found.id === null || !found.hash || !found.filename) {
+      stale.push(path);
+      continue;
     }
-    const stale: string[] = [];
-    for (const path of paths) {
-      const found = byPath.get(normalizeDirectoryPath(path).toLowerCase());
-      if (!found || !found.row.hash) {
-        stale.push(path);
-        continue;
-      }
-      const key = `${found.row.hash}:${found.row.filename}`;
-      if ((allCounts.get(key) ?? 0) <= 1) {
-        stale.push(path);
-        continue;
-      }
-      if (found.scoped && (scopedCounts.get(key) ?? 0) > 1) keepers[key] = found.row.id;
+    const key = `${found.hash}:${found.filename}`;
+    if (found.allCount <= 1) {
+      stale.push(path);
+      continue;
     }
-    return { keepers, stale };
-  } finally {
-    db.close();
+    if (found.scoped === 1 && found.scopedCount > 1) keepers[key] = found.id;
   }
+  return { keepers, stale };
+}
+
+export function getKeeperData(paths: string[], roots: string[]): { keepers: KeeperMap; stale: string[] } {
+  return getKeeperDataSql(paths, roots);
 }
 
 export function clearIndex(): { entries: number; records: number } {
