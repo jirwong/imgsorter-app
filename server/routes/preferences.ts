@@ -3,14 +3,9 @@ import type { ApplicationConfig, DirectoriesConfig } from '../../app/lib/types';
 
 export const getPreferencesData = createServerFn({ method: 'GET' }).handler(async () => {
   const { appConfigStore } = await import('../lib/app-config');
-  const { countEntriesByDirectory } = await import('../lib/queries');
-  const { enabledRoots } = await import('../lib/directory-scope');
+  const { getPreferencesCounts } = await import('../lib/queries');
   const config = appConfigStore.get();
-  const roots = enabledRoots();
-  const counts: Record<string, number> = {};
-  for (const entry of config.directories.indexed) {
-    counts[entry.path] = countEntriesByDirectory(entry.path, roots);
-  }
+  const counts = getPreferencesCounts(config.directories.indexed.map((entry) => entry.path));
   return { config, counts };
 });
 

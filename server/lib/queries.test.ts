@@ -24,6 +24,7 @@ import {
   getKeeperDataSql,
   getOverviewStats,
   getOverviewStatsSql,
+  getPreferencesCounts,
   getShellData,
   getShellDataSql,
   listEntries,
@@ -341,11 +342,28 @@ describe('queries against the committed sample db', () => {
   });
 
   it('counts entries under a root case- and separator-insensitively', () => {
-    const trips = countEntriesByDirectory('@fixtures/Media/2025/Trips', ROOTS);
-    const media = countEntriesByDirectory('@fixtures/Media/2025', ROOTS);
+    const trips = countEntriesByDirectory('@fixtures/Media/2025/Trips');
+    const media = countEntriesByDirectory('@fixtures/Media/2025');
     expect(media).toBeGreaterThan(trips);
-    expect(countEntriesByDirectory('@FIXTURES/media/2025', ROOTS)).toBe(media);
-    expect(countEntriesByDirectory('@fixtures/Media/2025/nope', ROOTS)).toBe(0);
+    expect(countEntriesByDirectory('@FIXTURES/media/2025')).toBe(media);
+    expect(countEntriesByDirectory('@fixtures/Media/2025/nope')).toBe(0);
+  });
+
+  it('counts indexed entries regardless of enabled state', () => {
+    const media = countEntriesByDirectory('@fixtures/Media/2025');
+    expect(media).toBeGreaterThan(0);
+    expect(countEntriesByDirectory('@FIXTURES/media/2025')).toBe(media);
+    expect(countEntriesByDirectory('@fixtures/Media/2025/nope')).toBe(0);
+  });
+
+  it('folds preferences counts from one directory grouping', () => {
+    const counts = getPreferencesCounts(['C:/Media/2025', 'D:/Camera Imports', 'C:/Nope']);
+    expect(counts['C:/Media/2025']).toBeGreaterThan(0);
+    expect(counts['D:/Camera Imports']).toBeGreaterThan(0);
+    expect(counts['C:/Media/2025']).toBe(countEntriesByDirectory('C:/Media/2025'));
+    expect(counts['D:/Camera Imports']).toBe(countEntriesByDirectory('D:/Camera Imports'));
+    expect(counts['C:/Nope']).toBe(0);
+    expect(getPreferencesCounts([])).toEqual({});
   });
 
   it('reads the raw stored path for an entry id', () => {
@@ -444,7 +462,7 @@ describe('queries against the committed sample db', () => {
     expect(scoped.totalFiles).toBeLessThan(all.totalFiles);
     const dirs = getDirectoryStats(['C:/Media/2024']).map((row) => row.path);
     expect(dirs.every((path) => path.startsWith('C:/Media/2024'))).toBe(true);
-    expect(countEntriesByDirectory('C:/Media/2025/Library', ['C:/Media/2024'])).toBe(0);
+    expect(countEntriesByDirectory('C:/Media/2025/Library')).toBeGreaterThan(0);
   });
 
   it('returns empty results for an empty roots list', () => {
@@ -475,7 +493,8 @@ describe('queries against the committed sample db', () => {
         storageMap: [],
         largestFiles: [],
       });
-      expect(countEntriesByDirectory('C:/Photos', ROOTS)).toBe(0);
+      expect(countEntriesByDirectory('C:/Photos')).toBe(0);
+      expect(getPreferencesCounts(['C:/Photos'])).toEqual({ 'C:/Photos': 0 });
     } finally {
       if (previous === undefined) {
         delete process.env.IMGSORTER_DB_PATH;

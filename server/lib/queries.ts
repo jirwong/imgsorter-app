@@ -14,7 +14,6 @@ import type {
   ShellData,
 } from '../../app/lib/types';
 import { mapPathToDisplay, rootLabelOf, toStoragePath, toStorageRoots } from './labels';
-import { isWithinRoots } from './directory-scope';
 import { sampleDbPath } from './db-path';
 import { withRead } from './db';
 import { scopeClause, subtreeClause } from './scope-sql';
@@ -58,23 +57,6 @@ function toEntry(row: EntryRow): Entry {
     hash: row.hash,
     path: mapPathToDisplay(row.path),
   };
-}
-
-function readScopedRows(roots: string[]): EntryRow[] {
-  const db = openReadonly();
-  if (!db) return [];
-  try {
-    const rows = db
-      .prepare(`SELECT id, size, directory, extension, filename, birthtime, hash, path FROM entries`)
-      .all() as EntryRow[];
-    return rows.filter((row) => isWithinRoots(mapPathToDisplay(row.directory), roots));
-  } finally {
-    db.close();
-  }
-}
-
-function readEntries(roots: string[]): Entry[] {
-  return readScopedRows(roots).map(toEntry);
 }
 
 export type DuplicateGroupRow = { hash: string; filename: string; n: number; firstId: number };
@@ -352,12 +334,38 @@ export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
   return getDuplicateGroupsSql(roots);
 }
 
-export function countEntriesByDirectory(root: string, roots: string[]): number {
-  const normalized = normalizeDirectoryPath(mapPathToDisplay(root)).toLowerCase();
-  return readEntries(roots).filter(
-    (entry) =>
-      entry.directory.toLowerCase() === normalized || entry.directory.toLowerCase().startsWith(`${normalized}/`),
-  ).length;
+export function countEntriesByDirectory(root: string): number {
+  const scope = subtreeClause(toStoragePath(root));
+  const count = withRead(
+    (db) => db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow,
+  );
+  return count?.n ?? 0;
+}
+
+type DirectoryCountRow = { directory_norm: string; n: number };
+
+export function getPreferencesCounts(directories: string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const targets = new Map<string, string>();
+  for (const directory of directories) {
+    counts[directory] = 0;
+    targets.set(directory, normalizeDirectoryPath(toStoragePath(directory)).toLowerCase());
+  }
+  if (targets.size === 0) return counts;
+  const rows = withRead(
+    (db) =>
+      db
+        .prepare(`SELECT directory_norm, COUNT(*) AS n FROM entries GROUP BY directory_norm`)
+        .all() as DirectoryCountRow[],
+  );
+  if (!rows) return counts;
+  for (const row of rows) {
+    const directory = normalizeDirectoryPath(row.directory_norm).toLowerCase();
+    for (const [path, target] of targets) {
+      if (directory === target || directory.startsWith(`${target}/`)) counts[path] += row.n;
+    }
+  }
+  return counts;
 }
 
 export function getEntryPathById(id: number): string | null {
