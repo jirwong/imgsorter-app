@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check": "pnpm generate-routes && pnpm typecheck && pnpm lint && pnpm test && pnpm format:check",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "bench": "tsx scripts/bench.ts"
   },
   "dependencies": {
     "@mantine/core": "^9.7.2",
