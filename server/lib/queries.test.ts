@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { applyFilters } from '../../app/lib/filter-pipeline';
-import type { DirectoryStat, FilesInput } from '../../app/lib/types';
+import type { DirectoryStat, FilesInput, FilesQuery } from '../../app/lib/types';
 import { fixtureDbPath } from './db-path';
 import { closeReadConnections } from './db';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
@@ -29,11 +29,24 @@ import {
   getShellDataSql,
   listEntries,
   listEntriesSql,
+  listFilesPage,
 } from './queries';
 
 const ROOTS = ['C:/Media', 'D:/Camera Imports'];
 
-type TempEntry = { directory: string; filename: string; hash: string | null; path: string };
+const EMPTY_QUERY: FilesQuery = {
+  query: '',
+  selectedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 10,
+  sortKey: 'location',
+  direction: 'asc',
+};
+
+type TempEntry = { directory: string; filename: string; hash: string | null; path: string; size?: number };
 
 function runWithTempEntries(rows: TempEntry[], run: () => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'imgsorter-keeper-'));
@@ -56,7 +69,7 @@ function runWithTempEntries(rows: TempEntry[], run: () => void): void {
     `INSERT INTO entries (size, directory, extension, filename, birthtime, hash, path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const row of rows) {
-    insert.run(10, row.directory, '.jpg', row.filename, '2025-01-01T00:00:00Z', row.hash, row.path);
+    insert.run(row.size ?? 10, row.directory, '.jpg', row.filename, '2025-01-01T00:00:00Z', row.hash, row.path);
   }
   db.close();
   const previous = process.env.IMGSORTER_DB_PATH;
@@ -163,6 +176,125 @@ describe('queries against the committed sample db', () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((entry) => entry.path.toLowerCase().includes('2025'))).toBe(true);
     expect(rows.every((entry) => !entry.filename.toLowerCase().includes('2025'))).toBe(true);
+  });
+
+  it('returns the first page with an exact total', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('normalizes an invalid page and page size', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 0, pageSize: 999 as never }, ROOTS, []);
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('filters files into each size band on a temp database', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Sizes', filename: 'small.jpg', hash: null, path: 'C:/Sizes/small.jpg', size: 9_000_000 },
+        {
+          directory: 'C:/Sizes',
+          filename: 'middle.jpg',
+          hash: null,
+          path: 'C:/Sizes/middle.jpg',
+          size: 15_000_000,
+        },
+        { directory: 'C:/Sizes', filename: 'large.jpg', hash: null, path: 'C:/Sizes/large.jpg', size: 26_000_000 },
+      ],
+      () => {
+        const roots = ['C:/Sizes'];
+        const under = listFilesPage({ ...EMPTY_QUERY, sizeFilter: 'under10' }, roots, []);
+        expect(under.files.map((file) => file.filename)).toEqual(['small.jpg']);
+        expect(under.total).toBe(1);
+        const middle = listFilesPage({ ...EMPTY_QUERY, sizeFilter: '10to25' }, roots, []);
+        expect(middle.files.map((file) => file.filename)).toEqual(['middle.jpg']);
+        expect(middle.total).toBe(1);
+        const over = listFilesPage({ ...EMPTY_QUERY, sizeFilter: 'over25' }, roots, []);
+        expect(over.files.map((file) => file.filename)).toEqual(['large.jpg']);
+        expect(over.total).toBe(1);
+      },
+    );
+  });
+
+  it('falls back for unknown sort keys and size filters', () => {
+    const page = listFilesPage(
+      { ...EMPTY_QUERY, sortKey: 'constructor' as never, sizeFilter: 'constructor' as never },
+      ROOTS,
+      [],
+    );
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('filters hidden paths that use backslashes and mixed case', () => {
+    const target = getOverviewStats(ROOTS).largestFiles[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'active', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(page.files.some((file) => file.id === target.id)).toBe(false);
+    expect(page.total).toBe(expected.totalFiles - 1);
+    expect(page.hiddenCount).toBe(1);
+    expect(page.directoryCounts.find((row) => row.path === target.directory)?.hidden).toBe(1);
+    const onlyHidden = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'hidden', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(onlyHidden.files.map((file) => file.id)).toEqual([target.id]);
+    expect(onlyHidden.total).toBe(1);
+  });
+
+  it('includes hidden rows when the hidden mode is all', () => {
+    const target = getOverviewStats(ROOTS).largestFiles[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const all = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(all.total).toBe(expected.totalFiles);
+    expect(all.hiddenCount).toBe(1);
+    const exact = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all', query: target.filename }, ROOTS, hidden);
+    expect(exact.files.map((file) => file.id)).toEqual([target.id]);
+  });
+
+  it('returns a non-overlapping second page', () => {
+    const first = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    const second = listFilesPage({ ...EMPTY_QUERY, page: 2, pageSize: 10 }, ROOTS, []);
+    expect(second.files).toHaveLength(10);
+    const firstIds = new Set(first.files.map((file) => file.id));
+    expect(second.files.every((file) => !firstIds.has(file.id))).toBe(true);
+  });
+
+  it('returns directory and extension counts that match the scope', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.directoryCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.extensionCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.directoryCounts.every((row) => row.path.startsWith('C:/') || row.path.startsWith('D:/'))).toBe(true);
+  });
+
+  it('returns an empty page past the end', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 10000, pageSize: 100 }, ROOTS, []);
+    expect(page.files).toEqual([]);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('searches filenames and filters extensions', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, query: 'duplicate', extensions: ['.jpg'] }, ROOTS, []);
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.files.every((file) => file.filename.includes('duplicate') && file.extension === '.jpg')).toBe(true);
+    expect(page.extensionCounts.map((row) => row.extension)).toEqual(['.jpg']);
+  });
+
+  it('sorts pages through the whitelisted columns', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, sortKey: 'filename', direction: 'desc' }, ROOTS, []);
+    const filenames = page.files.map((file) => file.filename);
+    expect(filenames).toEqual([...filenames].sort().reverse());
+    const bySize = listFilesPage({ ...EMPTY_QUERY, sortKey: 'size', direction: 'desc' }, ROOTS, []);
+    const sizes = bySize.files.map((file) => file.size);
+    expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
+  });
+
+  it('keeps picker counts when a directory filter hides the page', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, selectedDirs: ['C:/Media/2025'], page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.files.every((file) => file.directory.startsWith('C:/Media/2025'))).toBe(true);
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.total).toBeLessThan(expected.totalFiles);
+    expect(page.directoryCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.extensionCounts.reduce((n, row) => n + row.count, 0)).toBe(page.total);
   });
 
   it('orders listings by directory then filename', () => {
@@ -538,6 +670,13 @@ describe('queries against the committed sample db', () => {
       });
       expect(countEntriesByDirectory('C:/Photos')).toBe(0);
       expect(getPreferencesCounts(['C:/Photos'])).toEqual({ 'C:/Photos': 0 });
+      expect(listFilesPage(EMPTY_QUERY, ROOTS, [])).toEqual({
+        files: [],
+        total: 0,
+        directoryCounts: [],
+        extensionCounts: [],
+        hiddenCount: 0,
+      });
     } finally {
       if (previous === undefined) {
         delete process.env.IMGSORTER_DB_PATH;

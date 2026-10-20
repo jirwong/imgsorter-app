@@ -2,13 +2,15 @@ import '@tanstack/react-start/server-only';
 import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryKey, normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
   DirectoryStat,
   DuplicateGroup,
   Entry,
   FilesInput,
+  FilesQuery,
+  FilesResult,
   KeeperMap,
   OverviewData,
   ShellData,
@@ -62,6 +64,34 @@ function toEntry(row: EntryRow): Entry {
 export type DuplicateGroupRow = { hash: string; filename: string; n: number; firstId: number };
 
 type CountRow = { n: number };
+
+const FILE_PAGE_SIZES = [10, 25, 50, 100] as const;
+
+type FilePageSize = (typeof FILE_PAGE_SIZES)[number];
+
+const FILE_SORT_COLUMNS = new Map<FilesQuery['sortKey'], string>([
+  ['filename', 'filename'],
+  ['location', 'directory'],
+  ['type', 'extension'],
+  ['size', 'size'],
+]);
+
+const FILE_SIZE_FILTERS = new Map<FilesQuery['sizeFilter'], string>([
+  ['all', '1'],
+  ['under10', 'size < 10000000'],
+  ['10to25', 'size >= 10000000 AND size <= 25000000'],
+  ['over25', 'size > 25000000'],
+]);
+
+const HIDDEN_MATCH_SQL = `lower(replace(path, '\\', '/')) IN (SELECT value FROM json_each(?))`;
+
+function normalizePage(value: number): number {
+  return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+}
+
+function normalizePageSize(value: number): FilePageSize {
+  return (FILE_PAGE_SIZES as readonly number[]).includes(value) ? (value as FilePageSize) : 10;
+}
 
 type KeeperRow = {
   pathKey: string;
@@ -233,6 +263,123 @@ export function listEntriesSql(input: FilesInput, roots: string[]): Entry[] {
 
 export function listEntries(input: FilesInput, roots: string[]): Entry[] {
   return listEntriesSql(input, roots);
+}
+
+type FilesDirectoryCountRow = { directory: string; n: number; hidden: number };
+
+type FilesExtensionCountRow = { extension: string; n: number };
+
+export function listFilesPage(input: FilesQuery, roots: string[], hidden: string[]): FilesResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const hiddenJson = JSON.stringify(hidden.map((path) => normalizeDirectoryKey(storagePath(db, path))));
+    const hiddenFilter =
+      input.hiddenMode === 'all'
+        ? null
+        : input.hiddenMode === 'hidden'
+          ? HIDDEN_MATCH_SQL
+          : `NOT (${HIDDEN_MATCH_SQL})`;
+
+    const where: string[] = [scope.sql];
+    const whereParams: (string | number)[] = [...scope.params];
+
+    const search = escapeLike(input.query.trim().toLowerCase());
+    if (search) {
+      where.push(`(lower(filename) LIKE ? ESCAPE '\\' OR lower(path) LIKE ? ESCAPE '\\')`);
+      whereParams.push(`%${search}%`, `%${search}%`);
+    }
+
+    const sizeFilter = FILE_SIZE_FILTERS.get(input.sizeFilter) ?? '1';
+    if (sizeFilter !== '1') where.push(sizeFilter);
+
+    const directoryFilter: string[] = [];
+    const directoryParams: string[] = [];
+    if (input.selectedDirs.length > 0) {
+      const scopes = input.selectedDirs.map((directory) => subtreeClause(storagePath(db, directory)));
+      directoryFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
+      directoryParams.push(...scopes.flatMap((item) => item.params));
+    }
+
+    const extensionFilter: string[] = [];
+    const extensionParams: string[] = [];
+    if (input.extensions.length > 0) {
+      extensionFilter.push(`extension IN (${input.extensions.map(() => '?').join(', ')})`);
+      extensionParams.push(...input.extensions);
+    }
+
+    const filteredWhere = [...where, ...directoryFilter, ...extensionFilter];
+    const filteredParams = [...whereParams, ...directoryParams, ...extensionParams];
+    const pageWhere = [...filteredWhere];
+    const pageParams = [...filteredParams];
+    if (hiddenFilter) {
+      pageWhere.push(hiddenFilter);
+      pageParams.push(hiddenJson);
+    }
+    const page = normalizePage(input.page);
+    const pageSize = normalizePageSize(input.pageSize);
+    const sortColumn = FILE_SORT_COLUMNS.get(input.sortKey) ?? 'directory';
+    const direction = input.direction === 'desc' ? 'DESC' : 'ASC';
+    const whereSql = pageWhere.join(' AND ');
+
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${whereSql}`).get(...pageParams) as CountRow;
+    const rows = db
+      .prepare(
+        `SELECT id, size, directory, extension, filename, birthtime, hash, path
+        FROM entries
+        WHERE ${whereSql}
+        ORDER BY ${sortColumn} ${direction}, filename ASC, directory ASC
+        LIMIT ? OFFSET ?`,
+      )
+      .all(...pageParams, pageSize, (page - 1) * pageSize) as EntryRow[];
+
+    const directoryWhere = [...where, ...extensionFilter];
+    const directoryWhereParams = [...whereParams, ...extensionParams];
+    const directorySelect: string[] = [];
+    const directoryCaseParams: string[] = [];
+    if (input.hiddenMode === 'all') {
+      directorySelect.push('COUNT(*) AS n');
+    } else {
+      const visible = input.hiddenMode === 'hidden' ? HIDDEN_MATCH_SQL : `NOT (${HIDDEN_MATCH_SQL})`;
+      directorySelect.push(`SUM(CASE WHEN ${visible} THEN 1 ELSE 0 END) AS n`);
+      directoryCaseParams.push(hiddenJson);
+    }
+    directorySelect.push(`SUM(CASE WHEN ${HIDDEN_MATCH_SQL} THEN 1 ELSE 0 END) AS hidden`);
+    directoryCaseParams.push(hiddenJson);
+    const directoryRows = db
+      .prepare(
+        `SELECT directory, ${directorySelect.join(', ')}
+        FROM entries WHERE ${directoryWhere.join(' AND ')} GROUP BY directory ORDER BY directory`,
+      )
+      .all(...directoryCaseParams, ...directoryWhereParams) as FilesDirectoryCountRow[];
+
+    const extensionWhere = [...where, ...directoryFilter];
+    const extensionWhereParams = [...whereParams, ...directoryParams];
+    if (hiddenFilter) {
+      extensionWhere.push(hiddenFilter);
+      extensionWhereParams.push(hiddenJson);
+    }
+    const extensionRows = db
+      .prepare(
+        `SELECT extension, COUNT(*) AS n
+        FROM entries WHERE ${extensionWhere.join(' AND ')} GROUP BY extension ORDER BY extension`,
+      )
+      .all(...extensionWhereParams) as FilesExtensionCountRow[];
+
+    const hiddenCount = db
+      .prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${[...filteredWhere, HIDDEN_MATCH_SQL].join(' AND ')}`)
+      .get(...filteredParams, hiddenJson) as CountRow;
+
+    return {
+      files: rows.map(toEntry),
+      total: total.n,
+      directoryCounts: directoryRows
+        .map((row) => ({ path: mapPathToDisplay(row.directory), count: row.n, hidden: row.hidden }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+      extensionCounts: extensionRows.map((row) => ({ extension: row.extension, count: row.n })),
+      hiddenCount: hiddenCount.n,
+    };
+  });
+  return result ?? { files: [], total: 0, directoryCounts: [], extensionCounts: [], hiddenCount: 0 };
 }
 
 export function getDirectoryStatsSql(roots: string[]): DirectoryStat[] {
