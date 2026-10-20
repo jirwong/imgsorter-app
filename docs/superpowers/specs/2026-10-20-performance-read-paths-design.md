@@ -232,7 +232,7 @@ the public signatures and return shapes stay the same, so the UI keeps working.
 | `listEntries` | A1: SQL `WHERE` plus `ORDER BY`, same full list; A2: adds `LIMIT`/`OFFSET` and `COUNT(*)` |
 | `getDuplicateGroups` | A1: SQL grouping plus all members, same groups and order; A2: pages the groups |
 | `getKeeperData` | keepers matched in SQL against the scoped set |
-| `countIndexedEntriesByDirectory` | counts all indexed entries for a directory, regardless of enabled state |
+| `countEntriesByDirectory` | counts all indexed entries for a directory, regardless of enabled state; `getPreferencesCounts` folds one `GROUP BY` read into those subtree counts |
 
 ### 8.1 Duplicate rule
 
