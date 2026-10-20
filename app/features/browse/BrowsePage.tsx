@@ -10,9 +10,10 @@ import type { DirectoryNode, FilesQuery, FilesResult } from '../../lib/types';
 export const DEFAULT_BROWSE_QUERY: FilesQuery = {
   query: '',
   selectedDirs: [],
+  lockedDirs: [],
   extensions: [],
   sizeFilter: 'all',
-  hiddenMode: 'active',
+  hiddenMode: 'all',
   page: 1,
   pageSize: 25,
   sortKey: 'location',
@@ -22,12 +23,16 @@ export const DEFAULT_BROWSE_QUERY: FilesQuery = {
 type BrowseResult = FilesResult & { tree: DirectoryNode[] };
 
 function queryKey(query: FilesQuery): string {
-  return JSON.stringify({ ...query, selectedDirs: [...query.selectedDirs].sort() });
+  return JSON.stringify({
+    ...query,
+    selectedDirs: [...query.selectedDirs].sort(),
+    lockedDirs: [...query.lockedDirs].sort(),
+  });
 }
 
 export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; selectedDirs: string[] }) {
   const { setSelectedFile } = useApp();
-  const [query, setQuery] = useState<FilesQuery>(() => ({ ...DEFAULT_BROWSE_QUERY, selectedDirs }));
+  const [query, setQuery] = useState<FilesQuery>(() => ({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs }));
   const [data, setData] = useState<FilesResult>(initial);
   const [tree, setTree] = useState<DirectoryNode[]>(initial.tree);
   const [loading, setLoading] = useState(false);
@@ -35,7 +40,7 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
   const initialised = useRef(false);
   const loaderData = useRef(initial);
   const loaderDirs = useRef(selectedDirs);
-  const dataKey = useRef(queryKey({ ...DEFAULT_BROWSE_QUERY, selectedDirs }));
+  const dataKey = useRef(queryKey({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs }));
   const requestId = useRef(0);
 
   useEffect(() => {
@@ -44,9 +49,14 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
     loaderDirs.current = selectedDirs;
     setData(initial);
     setTree(initial.tree);
-    dataKey.current = queryKey({ ...DEFAULT_BROWSE_QUERY, selectedDirs });
+    setQuery((current) => ({ ...current, lockedDirs: selectedDirs }));
+    dataKey.current = queryKey({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs });
     setRevision((value) => value + 1);
   }, [initial, selectedDirs]);
+
+  const applyQuery = (next: FilesQuery) => {
+    setQuery({ ...next, lockedDirs: selectedDirs, hiddenMode: 'all' });
+  };
 
   useEffect(() => {
     if (!initialised.current) {
@@ -92,7 +102,7 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
             data={data}
             loading={loading}
             lockedDirs={selectedDirs}
-            onQueryChange={setQuery}
+            onQueryChange={applyQuery}
             onSelect={setSelectedFile}
           />
         </div>

@@ -11,6 +11,7 @@ import type { FilesQuery, FilesResult } from '../../lib/types';
 export const DEFAULT_FILES_QUERY: FilesQuery = {
   query: '',
   selectedDirs: [],
+  lockedDirs: [],
   extensions: [],
   sizeFilter: 'all',
   hiddenMode: 'active',
@@ -116,6 +117,7 @@ export function FilesPage({ initial, hidden }: { initial: FilesResult; hidden: s
       <FilesTable
         data={data}
         loading={loading}
+        lockedDirs={[]}
         hidden={hiddenFiles}
         onHide={hide}
         onHideMany={hideMany}

@@ -79,6 +79,11 @@ export function AnalyticsPage({ initial }: { initial: AnalyticsResult }) {
   const sizePages = Math.max(1, Math.ceil(data.totalFiles / sizeLimit));
   const copiesPages = Math.max(1, Math.ceil(data.totalCopies / copiesLimit));
 
+  useEffect(() => {
+    setSizePage((page) => Math.min(page, sizePages));
+    setCopiesPage((page) => Math.min(page, copiesPages));
+  }, [sizePages, copiesPages]);
+
   return (
     <>
       <PageHeading

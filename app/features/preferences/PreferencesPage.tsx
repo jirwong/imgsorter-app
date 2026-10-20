@@ -114,6 +114,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   };
 
   const addIndexed = () => {
+    if (savingPath !== null) return;
     const path = indexedPath.trim();
     if (!path) {
       setMessage('Enter an indexed directory path first.');
@@ -129,6 +130,7 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   };
 
   const addIgnored = () => {
+    if (savingPath !== null) return;
     const path = ignoredPath.trim();
     if (!path) {
       setMessage('Enter an ignored directory path first.');
@@ -242,7 +244,9 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 >
                   Browse…
                 </Button>
-                <Button onClick={addIndexed}>Add directory</Button>
+                <Button disabled={savingPath !== null} onClick={addIndexed}>
+                  Add directory
+                </Button>
               </Group>
               <div className="preference-list">
                 {indexed.map((item) => (
@@ -305,7 +309,9 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                 >
                   Browse…
                 </Button>
-                <Button onClick={addIgnored}>Add directory</Button>
+                <Button disabled={savingPath !== null} onClick={addIgnored}>
+                  Add directory
+                </Button>
               </Group>
               <div className="preference-list">
                 {ignored.map((path) => (

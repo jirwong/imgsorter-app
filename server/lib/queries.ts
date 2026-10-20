@@ -107,8 +107,10 @@ const DUPLICATE_SIZE_FILTERS = new Map<DuplicatesQuery['sizeFilter'], string>([
 
 const HIDDEN_MATCH_SQL = `lower(replace(path, '\\', '/')) IN (SELECT value FROM json_each(?))`;
 
+const MAX_PAGE = 1_000_000;
+
 function normalizePage(value: number): number {
-  return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+  return Number.isFinite(value) ? Math.min(Math.max(1, Math.floor(value)), MAX_PAGE) : 1;
 }
 
 function normalizePageSize(value: number): FilePageSize {
@@ -324,13 +326,24 @@ export function listFilesPage(input: FilesQuery, roots: string[], hidden: string
     const sizeFilter = FILE_SIZE_FILTERS.get(input.sizeFilter) ?? '1';
     if (sizeFilter !== '1') where.push(sizeFilter);
 
-    const directoryFilter: string[] = [];
-    const directoryParams: string[] = [];
+    const pickerFilter: string[] = [];
+    const pickerParams: string[] = [];
     if (input.selectedDirs.length > 0) {
       const scopes = input.selectedDirs.map((directory) => subtreeClause(storagePath(db, directory)));
-      directoryFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
-      directoryParams.push(...scopes.flatMap((item) => item.params));
+      pickerFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
+      pickerParams.push(...scopes.flatMap((item) => item.params));
     }
+
+    const lockedFilter: string[] = [];
+    const lockedParams: string[] = [];
+    if (input.lockedDirs.length > 0) {
+      const scopes = input.lockedDirs.map((directory) => subtreeClause(storagePath(db, directory)));
+      lockedFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
+      lockedParams.push(...scopes.flatMap((item) => item.params));
+    }
+
+    const directoryFilter = [...pickerFilter, ...lockedFilter];
+    const directoryParams = [...pickerParams, ...lockedParams];
 
     const extensionFilter: string[] = [];
     const extensionParams: string[] = [];
@@ -364,8 +377,8 @@ export function listFilesPage(input: FilesQuery, roots: string[], hidden: string
       )
       .all(...pageParams, pageSize, (page - 1) * pageSize) as EntryRow[];
 
-    const directoryWhere = [...where, ...extensionFilter];
-    const directoryWhereParams = [...whereParams, ...extensionParams];
+    const directoryWhere = [...where, ...lockedFilter, ...extensionFilter];
+    const directoryWhereParams = [...whereParams, ...lockedParams, ...extensionParams];
     const directorySelect: string[] = [];
     const directoryCaseParams: string[] = [];
     if (input.hiddenMode === 'all' || !hasHidden) {
@@ -438,10 +451,32 @@ export function getDirectoryStats(roots: string[]): DirectoryStat[] {
   return getDirectoryStatsSql(roots);
 }
 
+function copyRankSql(scope: ScopeClause): string {
+  return `SELECT filename, COUNT(*) AS n
+    FROM entries INDEXED BY idx_entries_hash_filename_dir_norm
+    WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+    GROUP BY hash, filename
+    HAVING COUNT(*) > 1
+    ORDER BY n DESC, filename ASC`;
+}
+
 function copyRankRows(db: DatabaseType, scope: ScopeClause): CopyRankRow[] {
-  return duplicateGroupRows(db, scope)
-    .sort((a, b) => b.n - a.n || a.filename.localeCompare(b.filename))
-    .map((row) => ({ name: row.filename, count: row.n }));
+  const rows = db.prepare(copyRankSql(scope)).all(...scope.params) as { filename: string; n: number }[];
+  return rows.map((row) => ({ name: row.filename, count: row.n }));
+}
+
+function copyRankTotal(db: DatabaseType, scope: ScopeClause): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM (
+        SELECT hash, filename FROM entries INDEXED BY idx_entries_hash_filename_dir_norm
+        WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+        GROUP BY hash, filename
+        HAVING COUNT(*) > 1
+      )`,
+    )
+    .get(...scope.params) as CountRow;
+  return row.n;
 }
 
 export function getAnalyticsDataSql(roots: string[]): AnalyticsData {
@@ -473,12 +508,17 @@ export function getAnalyticsPage(input: AnalyticsQuery, roots: string[]): Analyt
         ORDER BY size DESC, filename ASC LIMIT ? OFFSET ?`,
       )
       .all(...scope.params, sizePageSize, (sizePage - 1) * sizePageSize) as { filename: string; size: number }[];
-    const copies = copyRankRows(db, scope);
+    const rankedByCopies = db
+      .prepare(`${copyRankSql(scope)} LIMIT ? OFFSET ?`)
+      .all(...scope.params, copiesPageSize, (copiesPage - 1) * copiesPageSize) as {
+      filename: string;
+      n: number;
+    }[];
     return {
       rankedBySize,
       totalFiles: total.n,
-      rankedByCopies: copies.slice((copiesPage - 1) * copiesPageSize, copiesPage * copiesPageSize),
-      totalCopies: copies.length,
+      rankedByCopies: rankedByCopies.map((row) => ({ name: row.filename, count: row.n })),
+      totalCopies: copyRankTotal(db, scope),
     };
   });
   return result ?? { rankedBySize: [], totalFiles: 0, rankedByCopies: [], totalCopies: 0 };

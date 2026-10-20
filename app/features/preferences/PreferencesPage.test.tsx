@@ -214,6 +214,36 @@ describe('PreferencesPage', () => {
     expect(checkbox).toBeEnabled();
   });
 
+  it('blocks adding a directory while a save is in flight', async () => {
+    const pending = deferred();
+    mocks.saveDirectories.mockReturnValue(pending.promise);
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const checkbox = screen.getByLabelText('Enable C:/Media/2025');
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeDisabled());
+    const addButtons = screen.getAllByRole('button', { name: 'Add directory' });
+    expect(addButtons[0]).toBeDisabled();
+    expect(addButtons[1]).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/New' } });
+    fireEvent.click(addButtons[0]);
+    fireEvent.change(screen.getByLabelText('Add globally ignored directory'), { target: { value: 'C:/Media/New' } });
+    fireEvent.click(addButtons[1]);
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: false },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    await waitFor(() => expect(addButtons[0]).toBeEnabled());
+    expect(addButtons[1]).toBeEnabled();
+  });
+
   it('saves a new indexed directory', async () => {
     mocks.saveDirectories.mockResolvedValue({
       directories: {

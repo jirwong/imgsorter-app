@@ -106,6 +106,23 @@ describe('AnalyticsPage', () => {
     );
   });
 
+  it('clamps a ranking page when a refetch shrinks the totals', async () => {
+    renderPage(pageResult({ totalFiles: 50, totalCopies: 50 }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Next' })[0]);
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ sizePage: 2 }),
+      }),
+    );
+    mocks.getAnalyticsPage.mockResolvedValue(pageResult({ totalFiles: 10, totalCopies: 20 }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Next' })[1]);
+    await waitFor(() =>
+      expect(mocks.getAnalyticsPage).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ sizePage: 1, copiesPage: 2 }),
+      }),
+    );
+  });
+
   it('shows a toast and keeps the last good page when a refetch fails', async () => {
     renderPage();
     mocks.getAnalyticsPage.mockRejectedValueOnce(new Error('boom'));

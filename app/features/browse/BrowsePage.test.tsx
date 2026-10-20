@@ -111,12 +111,16 @@ describe('BrowsePage', () => {
     );
   });
 
-  it('keeps the tree and picker directories together', async () => {
+  it('sends the tree and picker directories as separate filters', async () => {
     const { rerender } = renderPage(browseResult(), ['C:/Media']);
     applyPickerDirectories(['C:/Media/2025']);
     await waitFor(() =>
       expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
-        data: expect.objectContaining({ selectedDirs: ['C:/Media', 'C:/Media/2025'], page: 1 }),
+        data: expect.objectContaining({
+          selectedDirs: ['C:/Media/2025'],
+          lockedDirs: ['C:/Media'],
+          page: 1,
+        }),
       }),
     );
 
@@ -124,14 +128,28 @@ describe('BrowsePage', () => {
     rerender(pageElement(browseResult(), ['C:/Media/2024']));
     await waitFor(() =>
       expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
-        data: expect.objectContaining({ selectedDirs: ['C:/Media/2024', 'C:/Media/2025'], page: 1 }),
+        data: expect.objectContaining({
+          selectedDirs: ['C:/Media/2025'],
+          lockedDirs: ['C:/Media/2024'],
+          page: 1,
+        }),
       }),
     );
 
     applyPickerDirectories([], true);
     await waitFor(() =>
       expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
-        data: expect.objectContaining({ selectedDirs: ['C:/Media/2024'], page: 1 }),
+        data: expect.objectContaining({ selectedDirs: [], lockedDirs: ['C:/Media/2024'], page: 1 }),
+      }),
+    );
+  });
+
+  it('requests all files so hidden files stay visible', async () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText('Filter filename or path'), { target: { value: 'file' } });
+    await waitFor(() =>
+      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ hiddenMode: 'all', page: 1 }),
       }),
     );
   });
@@ -168,7 +186,11 @@ describe('BrowsePage', () => {
     rerender(pageElement(browseResult(), ['C:/Media/2024']));
     await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
     expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
-      data: expect.objectContaining({ selectedDirs: ['C:/Media/2024', 'C:/Media/2025'], page: 1 }),
+      data: expect.objectContaining({
+        selectedDirs: ['C:/Media/2025'],
+        lockedDirs: ['C:/Media/2024'],
+        page: 1,
+      }),
     });
   });
 

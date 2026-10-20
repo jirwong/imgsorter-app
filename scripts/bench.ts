@@ -57,6 +57,7 @@ const NARROW_QUERY: FilesInput = {
 const FILES_PAGE_QUERY: FilesQuery = {
   query: '',
   selectedDirs: [],
+  lockedDirs: [],
   extensions: [],
   sizeFilter: 'all',
   hiddenMode: 'active',

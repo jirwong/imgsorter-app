@@ -78,11 +78,6 @@ export function FilesTable({
     setPage(1);
   }
 
-  const selectedDirs = useMemo(
-    () => [...new Set([...(lockedDirs ?? []), ...appliedDirectories])],
-    [lockedDirs, appliedDirectories],
-  );
-
   const hiddenEnabled =
     hidden !== undefined &&
     onHide !== undefined &&
@@ -114,7 +109,8 @@ export function FilesTable({
 
   const query: FilesQuery = {
     query: fileQuery,
-    selectedDirs,
+    selectedDirs: appliedDirectories,
+    lockedDirs: lockedDirs ?? [],
     extensions: extension === 'All extensions' ? [] : [extension],
     sizeFilter: SIZE_FILTERS[size] ?? 'all',
     hiddenMode: HIDDEN_FILTERS[hiddenFilter] ?? 'active',
@@ -134,7 +130,7 @@ export function FilesTable({
       return;
     }
     onQueryChange(query);
-  }, [fileQuery, selectedDirs, extension, size, hiddenFilter, page, pageSize, sortKey, direction]);
+  }, [fileQuery, appliedDirectories, lockedKey, extension, size, hiddenFilter, page, pageSize, sortKey, direction]);
 
   const toggleSelected = (id: number, path: string) => {
     setSelected((current) => {

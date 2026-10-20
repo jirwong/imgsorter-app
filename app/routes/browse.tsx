@@ -15,7 +15,7 @@ export const Route = createFileRoute('/browse')({
   loaderDeps: ({ search }) => ({ selectedDirs: search.selectedDirs }),
   loader: async ({ deps }) => {
     const selectedDirs = deps.selectedDirs ?? [];
-    const initial = await getBrowseData({ data: { ...DEFAULT_BROWSE_QUERY, selectedDirs } });
+    const initial = await getBrowseData({ data: { ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs } });
     return { initial, selectedDirs };
   },
   component: BrowseRoute,

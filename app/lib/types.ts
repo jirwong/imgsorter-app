@@ -146,6 +146,7 @@ export type ResetResult = {
 export type FilesQuery = {
   query: string;
   selectedDirs: string[];
+  lockedDirs: string[];
   extensions: string[];
   sizeFilter: 'all' | 'under10' | '10to25' | 'over25';
   hiddenMode: 'active' | 'hidden' | 'all';
