@@ -13,6 +13,7 @@ import {
   clearIndex,
   countEntriesByDirectory,
   getAnalyticsData,
+  getAnalyticsDataSql,
   getDirectoryStats,
   getDirectoryStatsSql,
   getDuplicateGroups,
@@ -220,6 +221,29 @@ describe('queries against the committed sample db', () => {
     expect(data.rankedByCopies.length).toBe(expected.duplicateGroups);
   });
 
+  it('returns full analytics rankings from SQL', () => {
+    const data = getAnalyticsDataSql(ROOTS);
+    expect(data.rankedBySize.length).toBe(expected.totalFiles);
+    expect(data.rankedByCopies.length).toBe(expected.duplicateGroups);
+    const sizes = data.rankedBySize.map((row) => row.size);
+    expect([...sizes].sort((a, b) => b - a)).toEqual(sizes);
+    for (let index = 1; index < data.rankedBySize.length; index += 1) {
+      const previous = data.rankedBySize[index - 1];
+      const current = data.rankedBySize[index];
+      if (previous.size !== current.size) continue;
+      expect(previous.filename <= current.filename).toBe(true);
+    }
+    const counts = data.rankedByCopies.map((row) => row.count);
+    expect([...counts].sort((a, b) => b - a)).toEqual(counts);
+    for (let index = 1; index < data.rankedByCopies.length; index += 1) {
+      const previous = data.rankedByCopies[index - 1];
+      const current = data.rankedByCopies[index];
+      if (previous.count !== current.count) continue;
+      expect(previous.name <= current.name).toBe(true);
+    }
+    expect(data).toEqual(getAnalyticsData(ROOTS));
+  });
+
   it('returns shell totals', () => {
     const shell = getShellData(ROOTS);
     expect(shell.files).toBe(expected.totalFiles);
@@ -346,6 +370,7 @@ describe('queries against the committed sample db', () => {
       expect(getDirectoryStats(ROOTS)).toEqual([]);
       expect(getDuplicateGroups(ROOTS)).toEqual([]);
       expect(getAnalyticsData(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
+      expect(getAnalyticsDataSql(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
       expect(getOverviewStats(ROOTS)).toEqual({
         totalFiles: 0,
         totalSize: 0,

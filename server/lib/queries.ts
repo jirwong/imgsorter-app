@@ -280,15 +280,22 @@ export function getDirectoryStats(roots: string[]): DirectoryStat[] {
   return getDirectoryStatsSql(roots);
 }
 
+export function getAnalyticsDataSql(roots: string[]): AnalyticsData {
+  const data = withRead((db) => {
+    const scope = readScope(roots);
+    const rankedBySize = db
+      .prepare(`SELECT filename, size FROM entries WHERE ${scope.sql} ORDER BY size DESC, filename ASC`)
+      .all(...scope.params) as { filename: string; size: number }[];
+    const rankedByCopies = duplicateGroupRows(db, scope)
+      .sort((a, b) => b.n - a.n || (a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0))
+      .map((row) => ({ name: row.filename, count: row.n }));
+    return { rankedBySize, rankedByCopies };
+  });
+  return data ?? { rankedBySize: [], rankedByCopies: [] };
+}
+
 export function getAnalyticsData(roots: string[]): AnalyticsData {
-  const entries = readEntries(roots);
-  const rankedBySize = [...entries]
-    .sort((a, b) => b.size - a.size)
-    .map((entry) => ({ filename: entry.filename, size: entry.size }));
-  const rankedByCopies = groupDuplicates(entries)
-    .map((group) => ({ name: group.name, count: group.count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  return { rankedBySize, rankedByCopies };
+  return getAnalyticsDataSql(roots);
 }
 
 export function getShellDataSql(roots: string[]): ShellData {
