@@ -446,6 +446,49 @@ describe('queries against the committed sample db', () => {
     });
   });
 
+  it('reads a library whose entries store real display paths', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Media/2025', filename: 'a.jpg', hash: null, path: 'C:/Media/2025/a.jpg' },
+        { directory: 'C:/Media/2025/Sub', filename: 'a.jpg', hash: 'dup', path: 'C:/Media/2025/Sub/a.jpg' },
+        { directory: 'C:/Media/2025/Sub2', filename: 'a.jpg', hash: 'dup', path: 'C:/Media/2025/Sub2/a.jpg' },
+      ],
+      () => {
+        const roots = ['C:/Media/2025'];
+        expect(getShellData(roots)).toEqual({ files: 3, size: 30, duplicateGroups: 1 });
+        const all = listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, roots);
+        expect(all.map((entry) => entry.path)).toEqual([
+          'C:/Media/2025/a.jpg',
+          'C:/Media/2025/Sub/a.jpg',
+          'C:/Media/2025/Sub2/a.jpg',
+        ]);
+        const selected = listEntries(
+          { query: '', dir: 'C:/Media/2025/Sub', ext: 'All types', selectedDirs: [] },
+          roots,
+        );
+        expect(selected.map((entry) => entry.path)).toEqual(['C:/Media/2025/Sub/a.jpg']);
+        expect(getPreferencesCounts(roots)).toEqual({ 'C:/Media/2025': 3 });
+      },
+    );
+  });
+
+  it('orders duplicate groups with localeCompare, not SQLite BINARY order', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-1.jpg' },
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-2.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-1.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-2.jpg' },
+      ],
+      () => {
+        expect('Apple.jpg'.localeCompare('apple.jpg')).toBeGreaterThan(0);
+        const roots = ['C:/Case'];
+        expect(getDuplicateGroups(roots).map((group) => group.name)).toEqual(['apple.jpg', 'Apple.jpg']);
+        expect(getAnalyticsDataSql(roots).rankedByCopies.map((row) => row.name)).toEqual(['apple.jpg', 'Apple.jpg']);
+      },
+    );
+  });
+
   it('preserves a keeper whose file is outside the enabled roots', () => {
     const [group] = getDuplicateGroups(ROOTS);
     const id = group.files[0].id;

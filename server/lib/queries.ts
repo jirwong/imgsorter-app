@@ -73,15 +73,34 @@ type KeeperRow = {
   scopedCount: number;
 };
 
-function readScope(roots: string[]): ScopeClause {
-  return scopeClause(toStorageRoots(roots));
+const fixturePathChecks = new WeakMap<DatabaseType, boolean>();
+
+function storesFixturePaths(db: DatabaseType): boolean {
+  const cached = fixturePathChecks.get(db);
+  if (cached !== undefined) return cached;
+  const row = db.prepare(`SELECT 1 AS n FROM entries WHERE path LIKE '@fixtures/%' LIMIT 1`).get();
+  const found = row !== undefined;
+  fixturePathChecks.set(db, found);
+  return found;
+}
+
+export function storagePath(db: DatabaseType, path: string): string {
+  return storesFixturePaths(db) ? toStoragePath(path) : path;
+}
+
+export function storageRoots(db: DatabaseType, roots: string[]): string[] {
+  return storesFixturePaths(db) ? toStorageRoots(roots) : roots;
+}
+
+function readScope(db: DatabaseType, roots: string[]): ScopeClause {
+  return scopeClause(storageRoots(db, roots));
 }
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
-function filterClause(input: FilesInput): ScopeClause {
+function filterClause(db: DatabaseType, input: FilesInput): ScopeClause {
   const conditions: string[] = [];
   const params: string[] = [];
   const query = escapeLike(input.query.trim().toLowerCase());
@@ -90,7 +109,7 @@ function filterClause(input: FilesInput): ScopeClause {
     params.push(`%${query}%`, `%${query}%`);
   }
   if (input.dir !== 'All directories') {
-    const scope = subtreeClause(toStoragePath(input.dir));
+    const scope = subtreeClause(storagePath(db, input.dir));
     conditions.push(scope.sql);
     params.push(...scope.params);
   }
@@ -99,7 +118,7 @@ function filterClause(input: FilesInput): ScopeClause {
     params.push(input.ext);
   }
   if (input.selectedDirs.length > 0) {
-    const scopes = input.selectedDirs.map((dir) => subtreeClause(toStoragePath(dir)));
+    const scopes = input.selectedDirs.map((dir) => subtreeClause(storagePath(db, dir)));
     conditions.push(`(${scopes.map((scope) => scope.sql).join(' OR ')})`);
     params.push(...scopes.flatMap((scope) => scope.params));
   }
@@ -134,7 +153,7 @@ function storageMapRows(
 
 export function getOverviewStatsSql(roots: string[]): OverviewData {
   const stats = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     const files = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
     const size = db
       .prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM entries WHERE ${scope.sql}`)
@@ -197,8 +216,8 @@ export function getOverviewStats(roots: string[]): OverviewData {
 
 export function listEntriesSql(input: FilesInput, roots: string[]): Entry[] {
   const entries = withRead((db) => {
-    const scope = readScope(roots);
-    const filter = filterClause(input);
+    const scope = readScope(db, roots);
+    const filter = filterClause(db, input);
     const rows = db
       .prepare(
         `SELECT id, size, directory, extension, filename, birthtime, hash, path
@@ -218,7 +237,7 @@ export function listEntries(input: FilesInput, roots: string[]): Entry[] {
 
 export function getDirectoryStatsSql(roots: string[]): DirectoryStat[] {
   const stats = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     const rows = db
       .prepare(
         `SELECT directory, COUNT(*) AS fileCount, COALESCE(SUM(size), 0) AS size
@@ -236,12 +255,12 @@ export function getDirectoryStats(roots: string[]): DirectoryStat[] {
 
 export function getAnalyticsDataSql(roots: string[]): AnalyticsData {
   const data = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     const rankedBySize = db
       .prepare(`SELECT filename, size FROM entries WHERE ${scope.sql} ORDER BY size DESC, filename ASC`)
       .all(...scope.params) as { filename: string; size: number }[];
     const rankedByCopies = duplicateGroupRows(db, scope)
-      .sort((a, b) => b.n - a.n || (a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0))
+      .sort((a, b) => b.n - a.n || a.filename.localeCompare(b.filename))
       .map((row) => ({ name: row.filename, count: row.n }));
     return { rankedBySize, rankedByCopies };
   });
@@ -254,7 +273,7 @@ export function getAnalyticsData(roots: string[]): AnalyticsData {
 
 export function getShellDataSql(roots: string[]): ShellData {
   const shell = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     const files = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
     const size = db
       .prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM entries WHERE ${scope.sql}`)
@@ -273,7 +292,7 @@ export function getShellData(roots: string[]): ShellData {
 
 export function getDuplicateGroupsSql(roots: string[]): DuplicateGroup[] {
   const groups = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     const rows = db
       .prepare(
         `WITH scoped AS MATERIALIZED (
@@ -325,6 +344,7 @@ export function getDuplicateGroupsSql(roots: string[]): DuplicateGroup[] {
       result.push(created);
     }
     for (const group of result) group.redundantSpace = (group.count - 1) * group.size;
+    result.sort((a, b) => a.name.localeCompare(b.name) || a.key.localeCompare(b.key));
     return result;
   });
   return groups ?? [];
@@ -335,10 +355,10 @@ export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
 }
 
 export function countEntriesByDirectory(root: string): number {
-  const scope = subtreeClause(toStoragePath(root));
-  const count = withRead(
-    (db) => db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow,
-  );
+  const count = withRead((db) => {
+    const scope = subtreeClause(storagePath(db, root));
+    return db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
+  });
   return count?.n ?? 0;
 }
 
@@ -346,22 +366,24 @@ type DirectoryCountRow = { directory_norm: string; n: number };
 
 export function getPreferencesCounts(directories: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
-  const targets = new Map<string, string>();
   for (const directory of directories) {
     counts[directory] = 0;
-    targets.set(directory, normalizeDirectoryPath(toStoragePath(directory)).toLowerCase());
   }
-  if (targets.size === 0) return counts;
-  const rows = withRead(
-    (db) =>
-      db
-        .prepare(`SELECT directory_norm, COUNT(*) AS n FROM entries GROUP BY directory_norm`)
-        .all() as DirectoryCountRow[],
-  );
-  if (!rows) return counts;
-  for (const row of rows) {
+  if (directories.length === 0) return counts;
+  const data = withRead((db) => {
+    const targets = new Map<string, string>();
+    for (const directory of directories) {
+      targets.set(directory, normalizeDirectoryPath(storagePath(db, directory)).toLowerCase());
+    }
+    const rows = db
+      .prepare(`SELECT directory_norm, COUNT(*) AS n FROM entries GROUP BY directory_norm`)
+      .all() as DirectoryCountRow[];
+    return { targets, rows };
+  });
+  if (!data) return counts;
+  for (const row of data.rows) {
     const directory = normalizeDirectoryPath(row.directory_norm).toLowerCase();
-    for (const [path, target] of targets) {
+    for (const [path, target] of data.targets) {
       if (directory === target || directory.startsWith(`${target}/`)) counts[path] += row.n;
     }
   }
@@ -399,7 +421,7 @@ export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: K
   if (paths.length === 0) return { keepers, stale: [] };
   const keys = [...new Set(paths.map(normalizeDirectoryPath))];
   const rows = withRead((db) => {
-    const scope = readScope(roots);
+    const scope = readScope(db, roots);
     return db
       .prepare(
         `WITH scoped AS MATERIALIZED (
