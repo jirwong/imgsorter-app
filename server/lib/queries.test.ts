@@ -2,13 +2,17 @@ import { copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { applyFilters } from '../../app/lib/filter-pipeline';
+import type { DirectoryStat, FilesInput } from '../../app/lib/types';
 import { fixtureDbPath } from './db-path';
+import { closeReadConnections } from './db';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
 import {
   clearIndex,
   countEntriesByDirectory,
   getAnalyticsData,
   getDirectoryStats,
+  getDirectoryStatsSql,
   getDuplicateGroups,
   getEntryPathById,
   getEntryPathsByIds,
@@ -18,6 +22,7 @@ import {
   getShellData,
   getShellDataSql,
   listEntries,
+  listEntriesSql,
 } from './queries';
 
 const ROOTS = ['C:/Media', 'D:/Camera Imports'];
@@ -69,12 +74,79 @@ describe('queries against the committed sample db', () => {
     expect(scoped.every((e) => e.directory.startsWith('C:/Media/2025'))).toBe(true);
   });
 
+  it('filters in SQL and matches the shared pipeline', () => {
+    const all = listEntriesSql({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS);
+    expect(all).toHaveLength(expected.totalFiles);
+    const scoped = listEntriesSql(
+      { query: '', dir: 'All directories', ext: 'All types', selectedDirs: ['C:/Media/2025'] },
+      ROOTS,
+    );
+    expect(scoped.every((e) => e.directory.startsWith('C:/Media/2025'))).toBe(true);
+  });
+
+  it('matches the shared filter pipeline across the filter matrix', () => {
+    const all = listEntriesSql({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS);
+    const byId = (rows: typeof all) => [...rows].sort((a, b) => a.id - b.id);
+    const inputs: FilesInput[] = [
+      { query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] },
+      { query: 'duplicate', dir: 'All directories', ext: 'All types', selectedDirs: [] },
+      { query: '  LIBRARY  ', dir: 'All directories', ext: 'All types', selectedDirs: [] },
+      { query: '.gif', dir: 'All directories', ext: 'All types', selectedDirs: [] },
+      { query: 'no-such-file', dir: 'All directories', ext: 'All types', selectedDirs: [] },
+      { query: '', dir: 'C:/Media', ext: 'All types', selectedDirs: [] },
+      { query: '', dir: 'C:/Media/2025', ext: 'All types', selectedDirs: [] },
+      { query: '', dir: 'C:/Media/2025/Library', ext: 'All types', selectedDirs: [] },
+      { query: '', dir: 'D:/Camera Imports', ext: 'All types', selectedDirs: [] },
+      { query: '', dir: 'All directories', ext: '.png', selectedDirs: [] },
+      { query: '', dir: 'All directories', ext: '.jpg', selectedDirs: ['C:/Media/2024'] },
+      { query: 'duplicate-1', dir: 'C:/Media/2025', ext: '.jpg', selectedDirs: ['C:/Media/2025/Trips'] },
+      {
+        query: '',
+        dir: 'All directories',
+        ext: 'All types',
+        selectedDirs: ['C:/Media/2024', 'D:/Camera Imports'],
+      },
+    ];
+    for (const input of inputs) {
+      const actual = listEntriesSql(input, ROOTS);
+      const expectedRows = applyFilters(all, input.query, input.dir, input.ext, input.selectedDirs);
+      expect(byId(actual)).toEqual(byId(expectedRows));
+    }
+  });
+
   it('returns one stat row per directory with counts and sizes', () => {
     const stats = getDirectoryStats(ROOTS);
     expect(stats.length).toBeGreaterThanOrEqual(2);
     const media = stats.find((row) => row.path === 'C:/Media/2025/Library');
     expect(media?.fileCount).toBeGreaterThan(0);
     expect(media?.size).toBeGreaterThan(0);
+  });
+
+  it('groups directory stats in SQL', () => {
+    const stats = getDirectoryStatsSql(ROOTS);
+    expect(stats.find((row) => row.path === 'C:/Media/2025/Library')?.fileCount).toBeGreaterThan(0);
+  });
+
+  it('matches the shared directory totals', () => {
+    const all = listEntriesSql({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS);
+    const expectedStats = new Map<string, DirectoryStat>();
+    for (const entry of all) {
+      const row = expectedStats.get(entry.directory) ?? { path: entry.directory, fileCount: 0, size: 0 };
+      row.fileCount += 1;
+      row.size += entry.size;
+      expectedStats.set(entry.directory, row);
+    }
+    const stats = getDirectoryStatsSql(ROOTS);
+    expect(stats).toHaveLength(expectedStats.size);
+    for (const row of stats) {
+      expect(row).toEqual(expectedStats.get(row.path));
+    }
+  });
+
+  it('delegates listEntries and getDirectoryStats to the SQL reads', () => {
+    const input: FilesInput = { query: 'duplicate', dir: 'All directories', ext: '.jpg', selectedDirs: [] };
+    expect(listEntries(input, ROOTS)).toEqual(listEntriesSql(input, ROOTS));
+    expect(getDirectoryStats(ROOTS)).toEqual(getDirectoryStatsSql(ROOTS));
   });
 
   it('returns analytics rankings', () => {
@@ -241,6 +313,7 @@ describe('queries against the committed sample db', () => {
     } finally {
       if (previous === undefined) delete process.env.IMGSORTER_DB_PATH;
       else process.env.IMGSORTER_DB_PATH = previous;
+      closeReadConnections();
       rmSync(copy, { force: true });
     }
   });

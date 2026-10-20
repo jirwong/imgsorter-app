@@ -2,7 +2,6 @@ import '@tanstack/react-start/server-only';
 import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { applyFilters } from '../../app/lib/filter-pipeline';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
@@ -14,11 +13,11 @@ import type {
   OverviewData,
   ShellData,
 } from '../../app/lib/types';
-import { mapPathToDisplay, rootLabelOf, toStorageRoots } from './labels';
+import { mapPathToDisplay, rootLabelOf, toStoragePath, toStorageRoots } from './labels';
 import { isWithinRoots } from './directory-scope';
 import { sampleDbPath } from './db-path';
 import { withRead } from './db';
-import { scopeClause } from './scope-sql';
+import { scopeClause, subtreeClause } from './scope-sql';
 import type { ScopeClause } from './scope-sql';
 
 type EntryRow = {
@@ -84,6 +83,31 @@ type CountRow = { n: number };
 
 function readScope(roots: string[]): ScopeClause {
   return scopeClause(toStorageRoots(roots));
+}
+
+function filterClause(input: FilesInput): ScopeClause {
+  const conditions: string[] = [];
+  const params: string[] = [];
+  const query = input.query.trim().toLowerCase();
+  if (query) {
+    conditions.push(`(lower(filename) LIKE ? OR lower(path) LIKE ?)`);
+    params.push(`%${query}%`, `%${query}%`);
+  }
+  if (input.dir !== 'All directories') {
+    const scope = subtreeClause(toStoragePath(input.dir));
+    conditions.push(scope.sql);
+    params.push(...scope.params);
+  }
+  if (input.ext !== 'All types') {
+    conditions.push(`extension = ?`);
+    params.push(input.ext);
+  }
+  if (input.selectedDirs.length > 0) {
+    const scopes = input.selectedDirs.map((dir) => subtreeClause(toStoragePath(dir)));
+    conditions.push(`(${scopes.map((scope) => scope.sql).join(' OR ')})`);
+    params.push(...scopes.flatMap((scope) => scope.params));
+  }
+  return { sql: conditions.length === 0 ? '1' : conditions.join(' AND '), params };
 }
 
 function duplicateGroupSql(scope: ScopeClause): string {
@@ -213,22 +237,43 @@ export function getOverviewStats(roots: string[]): OverviewData {
   return getOverviewStatsSql(roots);
 }
 
+export function listEntriesSql(input: FilesInput, roots: string[]): Entry[] {
+  const entries = withRead((db) => {
+    const scope = readScope(roots);
+    const filter = filterClause(input);
+    const rows = db
+      .prepare(
+        `SELECT id, size, directory, extension, filename, birthtime, hash, path
+        FROM entries
+        WHERE ${scope.sql} AND ${filter.sql}
+        ORDER BY directory, filename`,
+      )
+      .all(...scope.params, ...filter.params) as EntryRow[];
+    return rows.map(toEntry);
+  });
+  return entries ?? [];
+}
+
 export function listEntries(input: FilesInput, roots: string[]): Entry[] {
-  return applyFilters(readEntries(roots), input.query, input.dir, input.ext, input.selectedDirs);
+  return listEntriesSql(input, roots);
+}
+
+export function getDirectoryStatsSql(roots: string[]): DirectoryStat[] {
+  const stats = withRead((db) => {
+    const scope = readScope(roots);
+    const rows = db
+      .prepare(
+        `SELECT directory, COUNT(*) AS fileCount, SUM(size) AS size
+        FROM entries WHERE ${scope.sql} GROUP BY directory`,
+      )
+      .all(...scope.params) as { directory: string; fileCount: number; size: number }[];
+    return rows.map((row) => ({ path: mapPathToDisplay(row.directory), fileCount: row.fileCount, size: row.size }));
+  });
+  return stats ?? [];
 }
 
 export function getDirectoryStats(roots: string[]): DirectoryStat[] {
-  const totals = new Map<string, DirectoryStat>();
-  for (const entry of readEntries(roots)) {
-    const existing = totals.get(entry.directory);
-    if (existing) {
-      existing.fileCount += 1;
-      existing.size += entry.size;
-    } else {
-      totals.set(entry.directory, { path: entry.directory, fileCount: 1, size: entry.size });
-    }
-  }
-  return [...totals.values()];
+  return getDirectoryStatsSql(roots);
 }
 
 export function getAnalyticsData(roots: string[]): AnalyticsData {
