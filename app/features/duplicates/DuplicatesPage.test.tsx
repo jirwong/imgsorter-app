@@ -75,6 +75,7 @@ const pageData = (overrides: Partial<DuplicatesResult> = {}): DuplicatesResult =
     { path: 'C:/Media/2025/Library', count: 1, hidden: 0, unit: 'group' },
     { path: 'C:/Media/2025/Trips', count: 1, hidden: 0, unit: 'group' },
   ],
+  extensionCounts: [{ extension: '.jpg', count: 2 }],
   hiddenCount: 0,
   ...overrides,
 });
@@ -209,6 +210,29 @@ describe('DuplicatesPage', () => {
     );
   });
 
+  it('lists extensions from the server counts', () => {
+    renderPage(
+      pageData({
+        extensionCounts: [
+          { extension: '.jpg', count: 2 },
+          { extension: '.png', count: 1 },
+        ],
+      }),
+    );
+    fireEvent.click(screen.getAllByLabelText('Extension filter')[0]);
+    expect(screen.getByRole('option', { name: '.png' })).toBeInTheDocument();
+  });
+
+  it('requests a server sort when a header is clicked', async () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('columnheader', { name: /Filename/ }));
+    await waitFor(() =>
+      expect(mocks.getDuplicatesData).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ sortKey: 'name', direction: 'asc', page: 1 }),
+      }),
+    );
+  });
+
   it('requests the keeper filter and renders the returned page', async () => {
     const kept = makeGroup('h2:kept.jpg', 'kept.jpg', 'h2', [
       entry(3, 'C:/Media/2024', 'kept.jpg', 'h2'),
@@ -223,6 +247,30 @@ describe('DuplicatesPage', () => {
       }),
     );
     expect(await screen.findByText('kept.jpg')).toBeInTheDocument();
+  });
+
+  it('refetches the keeper-filtered page after removing a keeper', async () => {
+    const kept = pageData({ keepers: { 'h1:dup.jpg': 1 } });
+    const empty = pageData({
+      groups: [],
+      totalGroups: 0,
+      totalFiles: 0,
+      keepers: {},
+      directoryCounts: [],
+      extensionCounts: [],
+    });
+    mocks.getDuplicatesData.mockResolvedValueOnce(kept).mockResolvedValueOnce(empty);
+    renderPage(kept);
+    chooseFilter('Keeper filter', 'With keeper');
+    await waitFor(() => expect(mocks.getDuplicatesData).toHaveBeenCalledTimes(1));
+    expandGroup();
+    fireEvent.click(screen.getByRole('button', { name: 'Keeper' }));
+    await waitFor(() => expect(mocks.saveKeepers).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.getDuplicatesData).toHaveBeenCalledTimes(2));
+    expect(mocks.getDuplicatesData).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({ keeperFilter: 'with', page: 1 }),
+    });
+    await waitFor(() => expect(screen.queryByText('dup.jpg')).not.toBeInTheDocument());
   });
 
   it('marks a hidden file with a badge', () => {
@@ -339,6 +387,37 @@ describe('DuplicatesPage', () => {
     expect(await screen.findByText('dup2.jpg')).toBeInTheDocument();
     expect(screen.getByText('2 selected')).toBeInTheDocument();
     expect(mocks.getDuplicatesData).toHaveBeenLastCalledWith({ data: expect.objectContaining({ page: 2 }) });
+  });
+
+  it('keeps an unrelated selection across a hide refetch', async () => {
+    const other = makeGroup('h2:other.jpg', 'other.jpg', 'h2', [
+      entry(3, 'C:/Media/2024', 'other.jpg', 'h2'),
+      entry(4, 'C:/Media/2025/Library', 'other.jpg', 'h2'),
+    ]);
+    const both = pageData({
+      groups: [baseGroup, other],
+      totalGroups: 2,
+      totalFiles: 4,
+      extensionCounts: [{ extension: '.jpg', count: 4 }],
+    });
+    const afterHide = pageData({
+      groups: [makeGroup('h1:dup.jpg', 'dup.jpg', 'h1', [libraryFile]), other],
+      totalGroups: 2,
+      totalFiles: 3,
+      directoryCounts: [],
+      hiddenCount: 1,
+    });
+    mocks.hideFile.mockResolvedValue({ hidden: [file1] });
+    mocks.getDuplicatesData.mockResolvedValue(afterHide);
+    renderPage(both);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select group other.jpg' }));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expandGroup();
+    const row = screen.getByText('C:/Media/2025/Trips').closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Hide' }));
+    await waitFor(() => expect(mocks.getDuplicatesData).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expect(screen.getByText('other.jpg')).toBeInTheDocument();
   });
 
   it('shows the hidden count', () => {

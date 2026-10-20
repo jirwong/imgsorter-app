@@ -527,6 +527,12 @@ type DuplicatePageRow = {
 
 type DuplicateDirectoryRow = { directory: string; n: number; hidden: number };
 
+type DuplicateExtensionRow = { extension: string; n: number };
+
+function duplicateRedundantSpace(row: DuplicatePageRow): number {
+  return (row.n - 1) * row.size;
+}
+
 function duplicateMemberClause(input: DuplicatesQuery, hiddenJson: string, directoryJson: string): ScopeClause {
   const conditions: string[] = [];
   const params: string[] = [];
@@ -619,7 +625,18 @@ export function getDuplicateGroupsPage(
 
     const ordered: (DuplicatePageRow & { key: string })[] = [];
     for (const row of rows) ordered.push({ ...row, key: `${row.hash}:${row.filename}` });
-    ordered.sort((a, b) => a.filename.localeCompare(b.filename) || a.key.localeCompare(b.key));
+    const sortKey = input.sortKey === 'name' || input.sortKey === 'redundant' ? input.sortKey : 'count';
+    const direction = input.direction === 'asc' ? 1 : -1;
+    ordered.sort((a, b) => {
+      const result =
+        sortKey === 'name'
+          ? a.filename.localeCompare(b.filename)
+          : sortKey === 'redundant'
+            ? duplicateRedundantSpace(a) - duplicateRedundantSpace(b)
+            : a.n - b.n;
+      if (result !== 0) return result * direction;
+      return a.key.localeCompare(b.key);
+    });
     const totalGroups = ordered.length;
     const totalFiles = ordered.reduce((sum, row) => sum + row.visible, 0);
     const page = normalizePage(input.page);
@@ -647,7 +664,7 @@ export function getDuplicateGroupsPage(
         name: row.filename,
         count: row.n,
         size: row.size,
-        redundantSpace: (row.n - 1) * row.size,
+        redundantSpace: duplicateRedundantSpace(row),
         extension: row.extension,
         directories: [],
         files: [],
@@ -675,6 +692,16 @@ export function getDuplicateGroupsPage(
       )
       .all(...scope.params, hiddenJson) as DuplicateDirectoryRow[];
 
+    const extensions = db
+      .prepare(
+        `WITH ${DUPLICATE_SCOPED_SQL(scope.sql)}
+        SELECT e.extension AS extension, COUNT(*) AS n
+        FROM scoped e JOIN grouped g ON e.hash = g.hash AND e.filename = g.filename
+        GROUP BY e.extension
+        ORDER BY e.extension`,
+      )
+      .all(...scope.params) as DuplicateExtensionRow[];
+
     return {
       groups,
       totalGroups,
@@ -689,6 +716,7 @@ export function getDuplicateGroupsPage(
           unit: 'group' as const,
         }))
         .sort((a, b) => a.path.localeCompare(b.path)),
+      extensionCounts: extensions.map((row) => ({ extension: row.extension, count: row.n })),
       hiddenCount: directories.reduce((sum, row) => sum + row.hidden, 0),
     };
   });
@@ -701,6 +729,7 @@ export function getDuplicateGroupsPage(
       keepers,
       staleKeepers: stale.length,
       directoryCounts: [],
+      extensionCounts: [],
       hiddenCount: 0,
     };
   }

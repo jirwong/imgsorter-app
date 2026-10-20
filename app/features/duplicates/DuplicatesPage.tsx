@@ -5,12 +5,13 @@ import { Search } from 'lucide-react';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DuplicateGroupTable } from './DuplicateGroupTable';
 import { DirectoryPicker } from '../../components/common/DirectoryPicker';
-import type { KeeperFilterValue } from './keeper-filter';
 import { useApp } from '../../lib/app-context';
 import { normalizeDirectoryKey } from '../../lib/directory-path';
 import { clearStaleKeepers, getDuplicatesData, saveKeepers } from '../../../server/routes/duplicates';
 import { clearHidden, hideFile, hideFiles, unhideFile, unhideFiles } from '../../../server/routes/hidden';
 import type { DuplicatesQuery, DuplicatesResult, Entry, KeeperMap } from '../../lib/types';
+
+type KeeperFilterValue = 'All groups' | 'With keeper' | 'Without keeper';
 
 export const DEFAULT_DUPLICATES_QUERY: DuplicatesQuery = {
   query: '',
@@ -22,6 +23,8 @@ export const DEFAULT_DUPLICATES_QUERY: DuplicatesQuery = {
   hiddenMode: 'active',
   page: 1,
   pageSize: 25,
+  sortKey: 'count',
+  direction: 'desc',
 };
 
 const COUNT_FILTERS: Record<string, DuplicatesQuery['countFilter']> = {
@@ -62,10 +65,6 @@ function toPageSize(value: string): DuplicatesQuery['pageSize'] {
   }
 }
 
-function extensionsOf(result: DuplicatesResult): string[] {
-  return [...new Set(result.groups.flatMap((group) => group.files.map((entry) => entry.extension)))];
-}
-
 export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult; hidden: string[] }) {
   const { setSelectedFile } = useApp();
   const [data, setData] = useState(initial);
@@ -75,11 +74,12 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
   const [hiddenMode, setHiddenMode] = useState('Active files');
   const [fileQuery, setFileQuery] = useState('');
   const [extension, setExtension] = useState('All extensions');
-  const [extensions, setExtensions] = useState<string[]>(() => extensionsOf(initial));
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
   const [countFilter, setCountFilter] = useState('All counts');
   const [sizeFilter, setSizeFilter] = useState('All sizes');
   const [keeperFilter, setKeeperFilter] = useState<KeeperFilterValue>('All groups');
+  const [sortKey, setSortKey] = useState<DuplicatesQuery['sortKey']>('count');
+  const [direction, setDirection] = useState<DuplicatesQuery['direction']>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState('25');
   const [selected, setSelected] = useState<Map<number, string>>(new Map());
@@ -101,8 +101,22 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
       hiddenMode: HIDDEN_FILTERS[hiddenMode] ?? 'active',
       page,
       pageSize: toPageSize(pageSize),
+      sortKey,
+      direction,
     }),
-    [fileQuery, appliedDirectories, extension, sizeFilter, countFilter, keeperFilter, hiddenMode, page, pageSize],
+    [
+      fileQuery,
+      appliedDirectories,
+      extension,
+      sizeFilter,
+      countFilter,
+      keeperFilter,
+      hiddenMode,
+      page,
+      pageSize,
+      sortKey,
+      direction,
+    ],
   );
 
   useEffect(() => {
@@ -143,21 +157,16 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
     };
   }, [query, revision]);
 
-  useEffect(() => {
-    setExtensions((current) => {
-      const next = new Set(current);
-      for (const group of data.groups) {
-        for (const entry of group.files) next.add(entry.extension);
-      }
-      return next.size === current.length ? current : [...next];
-    });
-  }, [data.groups]);
-
   const pageCount = Math.max(1, Math.ceil(data.totalGroups / toPageSize(pageSize)));
 
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
+
+  const extensionOptions = useMemo(
+    () => ['All extensions', ...data.extensionCounts.map((item) => item.extension)],
+    [data.extensionCounts],
+  );
 
   const hiddenKeys = useMemo(() => new Set(hiddenFiles.map(normalizeDirectoryKey)), [hiddenFiles]);
   const isHidden = useCallback((entry: Entry) => hiddenKeys.has(normalizeDirectoryKey(entry.path)), [hiddenKeys]);
@@ -193,7 +202,10 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
     else next[groupKey] = id;
     setKeeperByGroup(next);
     void saveKeepers({ data: { keepers: next } })
-      .then(() => setStaleKeepers(0))
+      .then(() => {
+        setStaleKeepers(0);
+        setRevision((value) => value + 1);
+      })
       .catch(() => notifications.show({ color: 'red', message: 'Could not save keepers.' }));
   };
 
@@ -330,7 +342,7 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
               setExtension(v ?? 'All extensions');
               setPage(1);
             }}
-            data={['All extensions', ...extensions]}
+            data={extensionOptions}
           />
           <Select
             size="xs"
@@ -395,6 +407,13 @@ export function DuplicatesPage({ initial, hidden }: { initial: DuplicatesResult;
         <DuplicateGroupTable
           groups={data.groups}
           keeperByGroup={keeperByGroup}
+          sortKey={sortKey}
+          direction={direction}
+          onSortChange={(key, nextDirection) => {
+            setSortKey(key);
+            setDirection(nextDirection);
+            setPage(1);
+          }}
           onToggleKeeper={toggleKeeper}
           onSelect={setSelectedFile}
           isHidden={isHidden}

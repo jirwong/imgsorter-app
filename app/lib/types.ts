@@ -125,8 +125,6 @@ export type FolderPickResult =
 
 export type KeeperMap = Record<string, number>;
 
-export type DuplicatesData = { groups: DuplicateGroup[]; keepers: KeeperMap; staleKeepers: number };
-
 export type LastScan = {
   finishedAt: string;
   directories: number;
@@ -175,6 +173,8 @@ export type DuplicatesQuery = {
   hiddenMode: 'active' | 'hidden' | 'all';
   page: number;
   pageSize: 10 | 25 | 50 | 100;
+  sortKey: 'count' | 'name' | 'redundant';
+  direction: 'asc' | 'desc';
 };
 
 export type DuplicatesResult = {
@@ -184,6 +184,7 @@ export type DuplicatesResult = {
   keepers: KeeperMap;
   staleKeepers: number;
   directoryCounts: { path: string; count: number; hidden: number; unit: 'group' }[];
+  extensionCounts: { extension: string; count: number }[];
   hiddenCount: number;
 };
 

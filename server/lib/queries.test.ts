@@ -57,9 +57,18 @@ const EMPTY_DUP_QUERY: DuplicatesQuery = {
   hiddenMode: 'active',
   page: 1,
   pageSize: 10,
+  sortKey: 'count',
+  direction: 'desc',
 };
 
-type TempEntry = { directory: string; filename: string; hash: string | null; path: string; size?: number };
+type TempEntry = {
+  directory: string;
+  filename: string;
+  hash: string | null;
+  path: string;
+  size?: number;
+  extension?: string;
+};
 
 function runWithTempEntries(rows: TempEntry[], run: () => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'imgsorter-keeper-'));
@@ -82,7 +91,15 @@ function runWithTempEntries(rows: TempEntry[], run: () => void): void {
     `INSERT INTO entries (size, directory, extension, filename, birthtime, hash, path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const row of rows) {
-    insert.run(row.size ?? 10, row.directory, '.jpg', row.filename, '2025-01-01T00:00:00Z', row.hash, row.path);
+    insert.run(
+      row.size ?? 10,
+      row.directory,
+      row.extension ?? '.jpg',
+      row.filename,
+      '2025-01-01T00:00:00Z',
+      row.hash,
+      row.path,
+    );
   }
   db.close();
   const previous = process.env.IMGSORTER_DB_PATH;
@@ -605,7 +622,12 @@ describe('queries against the committed sample db', () => {
         { directory: 'C:/Case', filename: 'same.jpg', hash: 'a', path: 'C:/Case/same-a2.jpg' },
       ],
       () => {
-        const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, pageSize: 10 }, ['C:/Case'], [], []);
+        const page = getDuplicateGroupsPage(
+          { ...EMPTY_DUP_QUERY, pageSize: 10, sortKey: 'name', direction: 'asc' },
+          ['C:/Case'],
+          [],
+          [],
+        );
         expect(page.groups.map((group) => group.key)).toEqual([
           'lower:apple.jpg',
           'upper:Apple.jpg',
@@ -614,6 +636,74 @@ describe('queries against the committed sample db', () => {
         ]);
       },
     );
+  });
+
+  it('sorts the full duplicate set before slicing each page', () => {
+    const countFirst = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ROOTS, [], []);
+    expect(countFirst.groups.map((group) => group.count)).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 3, 3]);
+    const countSecond = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 2, pageSize: 10 }, ROOTS, [], []);
+    expect(countSecond.groups.map((group) => group.count)).toEqual([3, 3, 3, 3, 3, 3, 2, 2, 2, 2]);
+    const countThird = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 3, pageSize: 10 }, ROOTS, [], []);
+    expect(countThird.groups.map((group) => group.count)).toEqual([2, 2, 2, 2]);
+    const redundantFirst = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 1, pageSize: 10, sortKey: 'redundant', direction: 'desc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(redundantFirst.groups.map((group) => group.key)).toEqual(countFirst.groups.map((group) => group.key));
+    const names = getDuplicateGroups(ROOTS).map((group) => group.key);
+    const nameFirst = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 1, pageSize: 10, sortKey: 'name', direction: 'asc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(nameFirst.groups.map((group) => group.key)).toEqual(names.slice(0, 10));
+    const nameSecond = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 2, pageSize: 10, sortKey: 'name', direction: 'asc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(nameSecond.groups.map((group) => group.key)).toEqual(names.slice(10, 20));
+  });
+
+  it('reports every duplicate extension before paging', () => {
+    const rows: TempEntry[] = [];
+    for (let index = 1; index <= 11; index += 1) {
+      const name = `a-${String(index).padStart(2, '0')}.jpg`;
+      const hash = `h${String(index).padStart(2, '0')}`;
+      rows.push({ directory: 'C:/Ext', filename: name, hash, path: `C:/Ext/${name}` });
+      rows.push({ directory: 'C:/Ext/Sub', filename: name, hash, path: `C:/Ext/Sub/${name}` });
+    }
+    rows.push({ directory: 'C:/Ext', filename: 'z.png', hash: 'h12', path: 'C:/Ext/z.png', extension: '.png' });
+    rows.push({ directory: 'C:/Ext/Sub', filename: 'z.png', hash: 'h12', path: 'C:/Ext/Sub/z.png', extension: '.png' });
+    runWithTempEntries(rows, () => {
+      const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ['C:/Ext'], [], []);
+      expect(page.groups.map((group) => group.name)).not.toContain('z.png');
+      expect(page.extensionCounts).toEqual([
+        { extension: '.jpg', count: 22 },
+        { extension: '.png', count: 2 },
+      ]);
+    });
+  });
+
+  it('normalizes a duplicate page and page size', () => {
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 0, pageSize: 999 as never }, ROOTS, [], []);
+    expect(page.groups).toHaveLength(10);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+  });
+
+  it('keeps the hidden count global when the hidden group is off the page', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const group = all.find((item) => item.count === 3) as (typeof all)[number];
+    const target = group.files[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 10000, pageSize: 100 }, ROOTS, hidden, []);
+    expect(page.groups).toEqual([]);
+    expect(page.hiddenCount).toBe(1);
+    expect(page.directoryCounts.reduce((sum, row) => sum + row.hidden, 0)).toBe(1);
   });
 
   it('returns an empty duplicate page past the end', () => {
