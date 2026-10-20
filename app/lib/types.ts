@@ -125,8 +125,6 @@ export type FolderPickResult =
 
 export type KeeperMap = Record<string, number>;
 
-export type DuplicatesData = { groups: DuplicateGroup[]; keepers: KeeperMap; staleKeepers: number };
-
 export type LastScan = {
   finishedAt: string;
   directories: number;
@@ -143,4 +141,64 @@ export type ResetResult = {
   entries: number;
   records: number;
   thumbnails: number;
+};
+
+export type FilesQuery = {
+  query: string;
+  selectedDirs: string[];
+  lockedDirs: string[];
+  extensions: string[];
+  sizeFilter: 'all' | 'under10' | '10to25' | 'over25';
+  hiddenMode: 'active' | 'hidden' | 'all';
+  page: number;
+  pageSize: 10 | 25 | 50 | 100;
+  sortKey: 'filename' | 'location' | 'type' | 'size';
+  direction: 'asc' | 'desc';
+};
+
+export type FilesResult = {
+  files: Entry[];
+  total: number;
+  directoryCounts: { path: string; count: number; hidden: number }[];
+  extensionCounts: { extension: string; count: number }[];
+  hiddenCount: number;
+};
+
+export type DuplicatesQuery = {
+  query: string;
+  selectedDirs: string[];
+  extensions: string[];
+  sizeFilter: 'all' | 'under10' | '10to25' | 'over25';
+  countFilter: 'all' | '2' | '3+';
+  keeperFilter: 'all' | 'with' | 'without';
+  hiddenMode: 'active' | 'hidden' | 'all';
+  page: number;
+  pageSize: 10 | 25 | 50 | 100;
+  sortKey: 'count' | 'name' | 'redundant';
+  direction: 'asc' | 'desc';
+};
+
+export type DuplicatesResult = {
+  groups: DuplicateGroup[];
+  totalGroups: number;
+  totalFiles: number;
+  keepers: KeeperMap;
+  staleKeepers: number;
+  directoryCounts: { path: string; count: number; hidden: number; unit: 'group' }[];
+  extensionCounts: { extension: string; count: number }[];
+  hiddenCount: number;
+};
+
+export type AnalyticsQuery = {
+  sizePage: number;
+  sizePageSize: 5 | 10 | 25 | 50;
+  copiesPage: number;
+  copiesPageSize: 5 | 10 | 25 | 50;
+};
+
+export type AnalyticsResult = {
+  rankedBySize: SizeRankRow[];
+  totalFiles: number;
+  rankedByCopies: CopyRankRow[];
+  totalCopies: number;
 };

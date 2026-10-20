@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { applyFilters } from '../../app/lib/filter-pipeline';
-import type { DirectoryStat, FilesInput } from '../../app/lib/types';
+import type { DirectoryStat, DuplicatesQuery, FilesInput, FilesQuery } from '../../app/lib/types';
 import { fixtureDbPath } from './db-path';
 import { closeReadConnections } from './db';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
@@ -14,9 +14,11 @@ import {
   countEntriesByDirectory,
   getAnalyticsData,
   getAnalyticsDataSql,
+  getAnalyticsPage,
   getDirectoryStats,
   getDirectoryStatsSql,
   getDuplicateGroups,
+  getDuplicateGroupsPage,
   getDuplicateGroupsSql,
   getEntryPathById,
   getEntryPathsByIds,
@@ -29,11 +31,46 @@ import {
   getShellDataSql,
   listEntries,
   listEntriesSql,
+  listFilesPage,
 } from './queries';
 
 const ROOTS = ['C:/Media', 'D:/Camera Imports'];
 
-type TempEntry = { directory: string; filename: string; hash: string | null; path: string };
+const EMPTY_QUERY: FilesQuery = {
+  query: '',
+  selectedDirs: [],
+  lockedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 10,
+  sortKey: 'location',
+  direction: 'asc',
+};
+
+const EMPTY_DUP_QUERY: DuplicatesQuery = {
+  query: '',
+  selectedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  countFilter: 'all',
+  keeperFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 10,
+  sortKey: 'count',
+  direction: 'desc',
+};
+
+type TempEntry = {
+  directory: string;
+  filename: string;
+  hash: string | null;
+  path: string;
+  size?: number;
+  extension?: string;
+};
 
 function runWithTempEntries(rows: TempEntry[], run: () => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'imgsorter-keeper-'));
@@ -56,7 +93,15 @@ function runWithTempEntries(rows: TempEntry[], run: () => void): void {
     `INSERT INTO entries (size, directory, extension, filename, birthtime, hash, path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const row of rows) {
-    insert.run(10, row.directory, '.jpg', row.filename, '2025-01-01T00:00:00Z', row.hash, row.path);
+    insert.run(
+      row.size ?? 10,
+      row.directory,
+      row.extension ?? '.jpg',
+      row.filename,
+      '2025-01-01T00:00:00Z',
+      row.hash,
+      row.path,
+    );
   }
   db.close();
   const previous = process.env.IMGSORTER_DB_PATH;
@@ -163,6 +208,180 @@ describe('queries against the committed sample db', () => {
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((entry) => entry.path.toLowerCase().includes('2025'))).toBe(true);
     expect(rows.every((entry) => !entry.filename.toLowerCase().includes('2025'))).toBe(true);
+  });
+
+  it('returns the first page with an exact total', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('normalizes an invalid page and page size', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 0, pageSize: 999 as never }, ROOTS, []);
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('filters files into each size band on a temp database', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Sizes', filename: 'small.jpg', hash: null, path: 'C:/Sizes/small.jpg', size: 9_000_000 },
+        {
+          directory: 'C:/Sizes',
+          filename: 'middle.jpg',
+          hash: null,
+          path: 'C:/Sizes/middle.jpg',
+          size: 15_000_000,
+        },
+        { directory: 'C:/Sizes', filename: 'large.jpg', hash: null, path: 'C:/Sizes/large.jpg', size: 26_000_000 },
+      ],
+      () => {
+        const roots = ['C:/Sizes'];
+        const under = listFilesPage({ ...EMPTY_QUERY, sizeFilter: 'under10' }, roots, []);
+        expect(under.files.map((file) => file.filename)).toEqual(['small.jpg']);
+        expect(under.total).toBe(1);
+        const middle = listFilesPage({ ...EMPTY_QUERY, sizeFilter: '10to25' }, roots, []);
+        expect(middle.files.map((file) => file.filename)).toEqual(['middle.jpg']);
+        expect(middle.total).toBe(1);
+        const over = listFilesPage({ ...EMPTY_QUERY, sizeFilter: 'over25' }, roots, []);
+        expect(over.files.map((file) => file.filename)).toEqual(['large.jpg']);
+        expect(over.total).toBe(1);
+      },
+    );
+  });
+
+  it('falls back for unknown sort keys and size filters', () => {
+    const page = listFilesPage(
+      { ...EMPTY_QUERY, sortKey: 'constructor' as never, sizeFilter: 'constructor' as never },
+      ROOTS,
+      [],
+    );
+    expect(page.files).toHaveLength(10);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('filters hidden paths that use backslashes and mixed case', () => {
+    const target = getOverviewStats(ROOTS).largestFiles[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'active', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(page.files.some((file) => file.id === target.id)).toBe(false);
+    expect(page.total).toBe(expected.totalFiles - 1);
+    expect(page.hiddenCount).toBe(1);
+    expect(page.directoryCounts.find((row) => row.path === target.directory)?.hidden).toBe(1);
+    const onlyHidden = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'hidden', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(onlyHidden.files.map((file) => file.id)).toEqual([target.id]);
+    expect(onlyHidden.total).toBe(1);
+  });
+
+  it('includes hidden rows when the hidden mode is all', () => {
+    const target = getOverviewStats(ROOTS).largestFiles[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const all = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all', page: 1, pageSize: 10 }, ROOTS, hidden);
+    expect(all.total).toBe(expected.totalFiles);
+    expect(all.hiddenCount).toBe(1);
+    const exact = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all', query: target.filename }, ROOTS, hidden);
+    expect(exact.files.map((file) => file.id)).toEqual([target.id]);
+  });
+
+  it('keeps hidden files on a browse page', () => {
+    const lockedDirs = ['C:/Media'];
+    const visible = listFilesPage({ ...EMPTY_QUERY, lockedDirs, pageSize: 100 }, ROOTS, []);
+    const target = visible.files[0];
+    expect(target).toBeDefined();
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = listFilesPage({ ...EMPTY_QUERY, lockedDirs, hiddenMode: 'all', pageSize: 100 }, ROOTS, hidden);
+    expect(page.files.some((file) => file.id === target.id)).toBe(true);
+    expect(page.hiddenCount).toBe(1);
+  });
+
+  it('skips the hidden predicate when the hidden list is empty', () => {
+    const active = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'active' }, ROOTS, []);
+    expect(active.total).toBe(expected.totalFiles);
+    expect(active.hiddenCount).toBe(0);
+    expect(active.directoryCounts.every((row) => row.hidden === 0)).toBe(true);
+    const all = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all' }, ROOTS, []);
+    expect(all.total).toBe(expected.totalFiles);
+    expect(all.hiddenCount).toBe(0);
+    expect(listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'hidden' }, ROOTS, [])).toEqual({
+      files: [],
+      total: 0,
+      directoryCounts: [],
+      extensionCounts: [],
+      hiddenCount: 0,
+    });
+  });
+
+  it('returns a non-overlapping second page', () => {
+    const first = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    const second = listFilesPage({ ...EMPTY_QUERY, page: 2, pageSize: 10 }, ROOTS, []);
+    expect(second.files).toHaveLength(10);
+    const firstIds = new Set(first.files.map((file) => file.id));
+    expect(second.files.every((file) => !firstIds.has(file.id))).toBe(true);
+  });
+
+  it('returns directory and extension counts that match the scope', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.directoryCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.extensionCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.directoryCounts.every((row) => row.path.startsWith('C:/') || row.path.startsWith('D:/'))).toBe(true);
+  });
+
+  it('returns an empty page past the end', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, page: 10000, pageSize: 100 }, ROOTS, []);
+    expect(page.files).toEqual([]);
+    expect(page.total).toBe(expected.totalFiles);
+  });
+
+  it('searches filenames and filters extensions', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, query: 'duplicate', extensions: ['.jpg'] }, ROOTS, []);
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.files.every((file) => file.filename.includes('duplicate') && file.extension === '.jpg')).toBe(true);
+    expect(page.extensionCounts.map((row) => row.extension)).toEqual(['.jpg']);
+  });
+
+  it('sorts pages through the whitelisted columns', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, sortKey: 'filename', direction: 'desc' }, ROOTS, []);
+    const filenames = page.files.map((file) => file.filename);
+    expect(filenames).toEqual([...filenames].sort().reverse());
+    const bySize = listFilesPage({ ...EMPTY_QUERY, sortKey: 'size', direction: 'desc' }, ROOTS, []);
+    const sizes = bySize.files.map((file) => file.size);
+    expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
+  });
+
+  it('narrows the locked tree with the directory picker', () => {
+    const treeOnly = listFilesPage({ ...EMPTY_QUERY, lockedDirs: ['C:/Media'], pageSize: 100 }, ROOTS, []);
+    expect(treeOnly.files.some((file) => file.directory.startsWith('C:/Media/2024'))).toBe(true);
+    const narrowed = listFilesPage(
+      { ...EMPTY_QUERY, selectedDirs: ['C:/Media/2025'], lockedDirs: ['C:/Media'], pageSize: 100 },
+      ROOTS,
+      [],
+    );
+    expect(narrowed.total).toBeGreaterThan(0);
+    expect(narrowed.total).toBeLessThan(treeOnly.total);
+    expect(narrowed.files.every((file) => file.directory.startsWith('C:/Media/2025'))).toBe(true);
+  });
+
+  it('scopes the directory picker counts to the locked tree', () => {
+    const tree = listFilesPage({ ...EMPTY_QUERY, lockedDirs: ['C:/Media/2025'], pageSize: 10 }, ROOTS, []);
+    const page = listFilesPage(
+      { ...EMPTY_QUERY, selectedDirs: ['C:/Media/2025/Trips'], lockedDirs: ['C:/Media/2025'], pageSize: 10 },
+      ROOTS,
+      [],
+    );
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.files.every((file) => file.directory.startsWith('C:/Media/2025/Trips'))).toBe(true);
+    expect(page.directoryCounts.every((row) => row.path.startsWith('C:/Media/2025'))).toBe(true);
+    expect(page.directoryCounts.reduce((n, row) => n + row.count, 0)).toBe(tree.total);
+    expect(page.extensionCounts.reduce((n, row) => n + row.count, 0)).toBe(page.total);
+  });
+
+  it('keeps picker counts when a directory filter hides the page', () => {
+    const page = listFilesPage({ ...EMPTY_QUERY, selectedDirs: ['C:/Media/2025'], page: 1, pageSize: 10 }, ROOTS, []);
+    expect(page.files.every((file) => file.directory.startsWith('C:/Media/2025'))).toBe(true);
+    expect(page.total).toBeGreaterThan(0);
+    expect(page.total).toBeLessThan(expected.totalFiles);
+    expect(page.directoryCounts.reduce((n, row) => n + row.count, 0)).toBe(expected.totalFiles);
+    expect(page.extensionCounts.reduce((n, row) => n + row.count, 0)).toBe(page.total);
   });
 
   it('orders listings by directory then filename', () => {
@@ -285,6 +504,82 @@ describe('queries against the committed sample db', () => {
     expect(data).toEqual(getAnalyticsData(ROOTS));
   });
 
+  it('returns one page of each ranking with exact totals', () => {
+    const result = getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, ROOTS);
+    expect(result.rankedBySize).toHaveLength(10);
+    expect(result.totalFiles).toBe(expected.totalFiles);
+    expect(result.rankedByCopies).toHaveLength(10);
+    expect(result.totalCopies).toBe(expected.duplicateGroups);
+  });
+
+  it('continues both analytics rankings on page two', () => {
+    const full = getAnalyticsDataSql(ROOTS);
+    const result = getAnalyticsPage({ sizePage: 2, sizePageSize: 10, copiesPage: 2, copiesPageSize: 10 }, ROOTS);
+    expect(result.rankedBySize).toEqual(full.rankedBySize.slice(10, 20));
+    expect(result.rankedByCopies).toEqual(full.rankedByCopies.slice(10, 20));
+    expect(result.totalFiles).toBe(full.rankedBySize.length);
+    expect(result.totalCopies).toBe(full.rankedByCopies.length);
+  });
+
+  it('normalizes invalid analytics pages and page sizes', () => {
+    const full = getAnalyticsDataSql(ROOTS);
+    const result = getAnalyticsPage(
+      { sizePage: 0, sizePageSize: 999 as never, copiesPage: -3, copiesPageSize: 7 as never },
+      ROOTS,
+    );
+    expect(result.rankedBySize).toEqual(full.rankedBySize.slice(0, 10));
+    expect(result.rankedByCopies).toEqual(full.rankedByCopies.slice(0, 10));
+    expect(result.totalFiles).toBe(full.rankedBySize.length);
+    expect(result.totalCopies).toBe(full.rankedByCopies.length);
+  });
+
+  it('returns an empty analytics page past the end', () => {
+    const result = getAnalyticsPage(
+      { sizePage: 10_000, sizePageSize: 50, copiesPage: 10_000, copiesPageSize: 50 },
+      ROOTS,
+    );
+    expect(result.rankedBySize).toEqual([]);
+    expect(result.totalFiles).toBe(expected.totalFiles);
+    expect(result.rankedByCopies).toEqual([]);
+    expect(result.totalCopies).toBe(expected.duplicateGroups);
+  });
+
+  it('pages the copies ranking in SQL with exact totals', () => {
+    const full = getAnalyticsDataSql(ROOTS).rankedByCopies;
+    const first = getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, ROOTS);
+    const second = getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 2, copiesPageSize: 10 }, ROOTS);
+    const third = getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 3, copiesPageSize: 10 }, ROOTS);
+    expect(full).toHaveLength(expected.duplicateGroups);
+    expect(first.rankedByCopies).toEqual(full.slice(0, 10));
+    expect(second.rankedByCopies).toEqual(full.slice(10, 20));
+    expect(third.rankedByCopies).toEqual(full.slice(20, 30));
+    expect(second.rankedByCopies[0]).toEqual({ name: 'duplicate-12.jpg', count: 3 });
+    expect(first.totalCopies).toBe(expected.duplicateGroups);
+    expect(second.totalCopies).toBe(expected.duplicateGroups);
+    expect(third.totalCopies).toBe(expected.duplicateGroups);
+    const names = [...first.rankedByCopies, ...second.rankedByCopies, ...third.rankedByCopies].map((row) => row.name);
+    expect(new Set(names).size).toBe(names.length);
+    const counts = full.map((row) => row.count);
+    expect([...counts].sort((a, b) => b - a)).toEqual(counts);
+  });
+
+  it('clamps a huge page value on files, duplicates and analytics', () => {
+    const files = listFilesPage({ ...EMPTY_QUERY, page: 1e20 }, ROOTS, []);
+    expect(files.files).toEqual([]);
+    expect(files.total).toBe(expected.totalFiles);
+    const duplicates = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1e20 }, ROOTS, [], []);
+    expect(duplicates.groups).toEqual([]);
+    expect(duplicates.totalGroups).toBe(expected.duplicateGroups);
+    const analytics = getAnalyticsPage(
+      { sizePage: 1e20, sizePageSize: 10, copiesPage: 1e20, copiesPageSize: 10 },
+      ROOTS,
+    );
+    expect(analytics.rankedBySize).toEqual([]);
+    expect(analytics.totalFiles).toBe(expected.totalFiles);
+    expect(analytics.rankedByCopies).toEqual([]);
+    expect(analytics.totalCopies).toBe(expected.duplicateGroups);
+  });
+
   it('returns shell totals', () => {
     const shell = getShellData(ROOTS);
     expect(shell.files).toBe(expected.totalFiles);
@@ -339,6 +634,236 @@ describe('queries against the committed sample db', () => {
       expect(group.size).toBe(6_400);
       expect(group.redundantSpace).toBe((group.count - 1) * group.size);
     }
+  });
+
+  it('returns one page of duplicate groups and an exact total', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ROOTS, [], []);
+    expect(page.groups).toHaveLength(10);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles);
+    expect(page.groups.every((group) => group.files.length === group.count)).toBe(true);
+    expect(page.groups.every((group) => group.redundantSpace === (group.count - 1) * group.size)).toBe(true);
+    expect(page.keepers).toEqual({});
+    expect(page.staleKeepers).toBe(0);
+    const second = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 2, pageSize: 10 }, ROOTS, [], []);
+    expect(second.groups).toHaveLength(10);
+    const firstKeys = new Set(page.groups.map((group) => group.key));
+    expect(second.groups.every((group) => !firstKeys.has(group.key))).toBe(true);
+  });
+
+  it('filters duplicate groups by count and size', () => {
+    const twos = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, countFilter: '2', pageSize: 100 }, ROOTS, [], []);
+    expect(twos.totalGroups).toBe(8);
+    expect(twos.groups.every((group) => group.count === 2)).toBe(true);
+    const threes = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, countFilter: '3+', pageSize: 100 }, ROOTS, [], []);
+    expect(threes.totalGroups).toBe(16);
+    expect(threes.groups.every((group) => group.count >= 3)).toBe(true);
+    const under = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, sizeFilter: 'under10', pageSize: 100 }, ROOTS, [], []);
+    expect(under.totalGroups).toBe(expected.duplicateGroups);
+    const middle = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, sizeFilter: '10to25', pageSize: 100 }, ROOTS, [], []);
+    expect(middle.totalGroups).toBe(0);
+    expect(middle.groups).toEqual([]);
+    expect(middle.totalFiles).toBe(0);
+  });
+
+  it('filters duplicate groups by keeper membership', () => {
+    const [group] = getDuplicateGroups(ROOTS);
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    const keeperPaths = [raw, raw];
+    const withKeeper = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, keeperFilter: 'with', pageSize: 100 },
+      ROOTS,
+      [],
+      keeperPaths,
+    );
+    expect(withKeeper.totalGroups).toBe(1);
+    expect(withKeeper.groups.map((item) => item.key)).toEqual([group.key]);
+    expect(withKeeper.keepers[group.key]).toBe(id);
+    expect(withKeeper.staleKeepers).toBe(0);
+    const without = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, keeperFilter: 'without', pageSize: 100 },
+      ROOTS,
+      [],
+      keeperPaths,
+    );
+    expect(without.totalGroups).toBe(expected.duplicateGroups - 1);
+    expect(without.groups.some((item) => item.key === group.key)).toBe(false);
+  });
+
+  it('filters hidden duplicate members that use backslashes and mixed case', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const group = all.find((item) => item.count === 3) as (typeof all)[number];
+    const target = group.files[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, pageSize: 100 }, ROOTS, hidden, []);
+    const filtered = page.groups.find((item) => item.key === group.key);
+    expect(filtered?.count).toBe(group.count);
+    expect(filtered?.files.map((file) => file.id)).not.toContain(target.id);
+    expect(filtered?.files).toHaveLength(group.count - 1);
+    expect(filtered?.redundantSpace).toBe((group.count - 1) * group.size);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles - 1);
+    expect(page.hiddenCount).toBe(1);
+    const directory = page.directoryCounts.find((row) => row.path === target.directory);
+    expect(directory?.hidden).toBe(1);
+    expect(directory?.unit).toBe('group');
+    const onlyHidden = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, hiddenMode: 'hidden', pageSize: 100 },
+      ROOTS,
+      hidden,
+      [],
+    );
+    expect(onlyHidden.totalGroups).toBe(1);
+    expect(onlyHidden.totalFiles).toBe(1);
+    expect(onlyHidden.groups[0].key).toBe(group.key);
+    expect(onlyHidden.groups[0].count).toBe(group.count);
+    expect(onlyHidden.groups[0].files.map((file) => file.id)).toEqual([target.id]);
+  });
+
+  it('filters duplicate members by directory', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const group = all.find((item) => item.count === 4) as (typeof all)[number];
+    const directory = group.files[group.files.length - 1].directory;
+    const expectedGroups = all.filter((item) => item.files.some((file) => file.directory === directory));
+    const page = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, selectedDirs: [directory], pageSize: 100 },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(expectedGroups.length).toBe(8);
+    expect(page.totalGroups).toBe(expectedGroups.length);
+    expect(page.groups.every((item) => item.files.every((file) => file.directory === directory))).toBe(true);
+    expect(page.groups.every((item) => item.files.length < item.count)).toBe(true);
+    expect(page.directoryCounts.reduce((sum, row) => sum + row.count, 0)).toBeGreaterThan(page.totalGroups);
+  });
+
+  it('orders duplicate pages with localeCompare and a key tie-break', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-1.jpg' },
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-2.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-1.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-2.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'b', path: 'C:/Case/same-b1.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'b', path: 'C:/Case/same-b2.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'a', path: 'C:/Case/same-a1.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'a', path: 'C:/Case/same-a2.jpg' },
+      ],
+      () => {
+        const page = getDuplicateGroupsPage(
+          { ...EMPTY_DUP_QUERY, pageSize: 10, sortKey: 'name', direction: 'asc' },
+          ['C:/Case'],
+          [],
+          [],
+        );
+        expect(page.groups.map((group) => group.key)).toEqual([
+          'lower:apple.jpg',
+          'upper:Apple.jpg',
+          'a:same.jpg',
+          'b:same.jpg',
+        ]);
+      },
+    );
+  });
+
+  it('sorts the full duplicate set before slicing each page', () => {
+    const countFirst = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ROOTS, [], []);
+    expect(countFirst.groups.map((group) => group.count)).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 3, 3]);
+    const countSecond = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 2, pageSize: 10 }, ROOTS, [], []);
+    expect(countSecond.groups.map((group) => group.count)).toEqual([3, 3, 3, 3, 3, 3, 2, 2, 2, 2]);
+    const countThird = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 3, pageSize: 10 }, ROOTS, [], []);
+    expect(countThird.groups.map((group) => group.count)).toEqual([2, 2, 2, 2]);
+    const redundantFirst = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 1, pageSize: 10, sortKey: 'redundant', direction: 'desc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(redundantFirst.groups.map((group) => group.key)).toEqual(countFirst.groups.map((group) => group.key));
+    const names = getDuplicateGroups(ROOTS).map((group) => group.key);
+    const nameFirst = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 1, pageSize: 10, sortKey: 'name', direction: 'asc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(nameFirst.groups.map((group) => group.key)).toEqual(names.slice(0, 10));
+    const nameSecond = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, page: 2, pageSize: 10, sortKey: 'name', direction: 'asc' },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(nameSecond.groups.map((group) => group.key)).toEqual(names.slice(10, 20));
+  });
+
+  it('reports every duplicate extension before paging', () => {
+    const rows: TempEntry[] = [];
+    for (let index = 1; index <= 11; index += 1) {
+      const name = `a-${String(index).padStart(2, '0')}.jpg`;
+      const hash = `h${String(index).padStart(2, '0')}`;
+      rows.push({ directory: 'C:/Ext', filename: name, hash, path: `C:/Ext/${name}` });
+      rows.push({ directory: 'C:/Ext/Sub', filename: name, hash, path: `C:/Ext/Sub/${name}` });
+    }
+    rows.push({ directory: 'C:/Ext', filename: 'z.png', hash: 'h12', path: 'C:/Ext/z.png', extension: '.png' });
+    rows.push({ directory: 'C:/Ext/Sub', filename: 'z.png', hash: 'h12', path: 'C:/Ext/Sub/z.png', extension: '.png' });
+    runWithTempEntries(rows, () => {
+      const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ['C:/Ext'], [], []);
+      expect(page.groups.map((group) => group.name)).not.toContain('z.png');
+      expect(page.extensionCounts).toEqual([
+        { extension: '.jpg', count: 22 },
+        { extension: '.png', count: 2 },
+      ]);
+    });
+  });
+
+  it('normalizes a duplicate page and page size', () => {
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 0, pageSize: 999 as never }, ROOTS, [], []);
+    expect(page.groups).toHaveLength(10);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+  });
+
+  it('keeps the hidden count global when the hidden group is off the page', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const group = all.find((item) => item.count === 3) as (typeof all)[number];
+    const target = group.files[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 10000, pageSize: 100 }, ROOTS, hidden, []);
+    expect(page.groups).toEqual([]);
+    expect(page.hiddenCount).toBe(1);
+    expect(page.directoryCounts.reduce((sum, row) => sum + row.hidden, 0)).toBe(1);
+  });
+
+  it('skips the duplicate hidden predicate when the hidden list is empty', () => {
+    const active = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, hiddenMode: 'active' }, ROOTS, [], []);
+    expect(active.totalGroups).toBe(expected.duplicateGroups);
+    expect(active.hiddenCount).toBe(0);
+    expect(active.directoryCounts.every((row) => row.hidden === 0)).toBe(true);
+    const onlyHidden = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, hiddenMode: 'hidden', pageSize: 100 },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(onlyHidden.groups).toEqual([]);
+    expect(onlyHidden.totalGroups).toBe(0);
+    expect(onlyHidden.totalFiles).toBe(0);
+    expect(onlyHidden.hiddenCount).toBe(0);
+  });
+
+  it('returns an empty duplicate page past the end', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 10000, pageSize: 100 }, ROOTS, [], []);
+    expect(page.groups).toEqual([]);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles);
+    expect(page.hiddenCount).toBe(0);
   });
 
   it('counts entries under a root case- and separator-insensitively', () => {
@@ -472,7 +997,7 @@ describe('queries against the committed sample db', () => {
     );
   });
 
-  it('orders duplicate groups with localeCompare, not SQLite BINARY order', () => {
+  it('orders duplicate groups with localeCompare and the copies ranking with BINARY order', () => {
     runWithTempEntries(
       [
         { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-1.jpg' },
@@ -484,7 +1009,13 @@ describe('queries against the committed sample db', () => {
         expect('Apple.jpg'.localeCompare('apple.jpg')).toBeGreaterThan(0);
         const roots = ['C:/Case'];
         expect(getDuplicateGroups(roots).map((group) => group.name)).toEqual(['apple.jpg', 'Apple.jpg']);
-        expect(getAnalyticsDataSql(roots).rankedByCopies.map((row) => row.name)).toEqual(['apple.jpg', 'Apple.jpg']);
+        expect(getAnalyticsDataSql(roots).rankedByCopies.map((row) => row.name)).toEqual(['Apple.jpg', 'apple.jpg']);
+        expect(
+          getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, roots).rankedByCopies,
+        ).toEqual([
+          { name: 'Apple.jpg', count: 2 },
+          { name: 'apple.jpg', count: 2 },
+        ]);
       },
     );
   });
@@ -527,6 +1058,12 @@ describe('queries against the committed sample db', () => {
       expect(getDuplicateGroups(ROOTS)).toEqual([]);
       expect(getAnalyticsData(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
       expect(getAnalyticsDataSql(ROOTS)).toEqual({ rankedBySize: [], rankedByCopies: [] });
+      expect(getAnalyticsPage({ sizePage: 1, sizePageSize: 10, copiesPage: 1, copiesPageSize: 10 }, ROOTS)).toEqual({
+        rankedBySize: [],
+        totalFiles: 0,
+        rankedByCopies: [],
+        totalCopies: 0,
+      });
       expect(getOverviewStats(ROOTS)).toEqual({
         totalFiles: 0,
         totalSize: 0,
@@ -538,6 +1075,13 @@ describe('queries against the committed sample db', () => {
       });
       expect(countEntriesByDirectory('C:/Photos')).toBe(0);
       expect(getPreferencesCounts(['C:/Photos'])).toEqual({ 'C:/Photos': 0 });
+      expect(listFilesPage(EMPTY_QUERY, ROOTS, [])).toEqual({
+        files: [],
+        total: 0,
+        directoryCounts: [],
+        extensionCounts: [],
+        hiddenCount: 0,
+      });
     } finally {
       if (previous === undefined) {
         delete process.env.IMGSORTER_DB_PATH;

@@ -1,11 +1,92 @@
+import { useEffect, useRef, useState } from 'react';
+import { notifications } from '@mantine/notifications';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DirectoryTree } from '../../components/common/DirectoryTree';
 import { FilesTable } from '../files/FilesTable';
 import { useApp } from '../../lib/app-context';
-import type { DirectoryNode, Entry } from '../../lib/types';
+import { getBrowseData } from '../../../server/routes/browse';
+import type { DirectoryNode, FilesQuery, FilesResult } from '../../lib/types';
 
-export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNode[] }) {
+export const DEFAULT_BROWSE_QUERY: FilesQuery = {
+  query: '',
+  selectedDirs: [],
+  lockedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  hiddenMode: 'all',
+  page: 1,
+  pageSize: 25,
+  sortKey: 'location',
+  direction: 'asc',
+};
+
+type BrowseResult = FilesResult & { tree: DirectoryNode[] };
+
+function queryKey(query: FilesQuery): string {
+  return JSON.stringify({
+    ...query,
+    selectedDirs: [...query.selectedDirs].sort(),
+    lockedDirs: [...query.lockedDirs].sort(),
+  });
+}
+
+export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; selectedDirs: string[] }) {
   const { setSelectedFile } = useApp();
+  const [query, setQuery] = useState<FilesQuery>(() => ({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs }));
+  const [data, setData] = useState<FilesResult>(initial);
+  const [tree, setTree] = useState<DirectoryNode[]>(initial.tree);
+  const [loading, setLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const initialised = useRef(false);
+  const loaderData = useRef(initial);
+  const loaderDirs = useRef(selectedDirs);
+  const dataKey = useRef(queryKey({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs }));
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    if (loaderData.current === initial && loaderDirs.current === selectedDirs) return;
+    loaderData.current = initial;
+    loaderDirs.current = selectedDirs;
+    setData(initial);
+    setTree(initial.tree);
+    setQuery((current) => ({ ...current, lockedDirs: selectedDirs }));
+    dataKey.current = queryKey({ ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs });
+    setRevision((value) => value + 1);
+  }, [initial, selectedDirs]);
+
+  const applyQuery = (next: FilesQuery) => {
+    setQuery({ ...next, lockedDirs: selectedDirs, hiddenMode: 'all' });
+  };
+
+  useEffect(() => {
+    if (!initialised.current) {
+      initialised.current = true;
+      return;
+    }
+    const key = queryKey(query);
+    if (key === dataKey.current) return;
+    let cancelled = false;
+    const id = ++requestId.current;
+    setLoading(true);
+    getBrowseData({ data: query })
+      .then((result) => {
+        if (cancelled || id !== requestId.current) return;
+        setData(result);
+        setTree(result.tree);
+        dataKey.current = key;
+      })
+      .catch(() => {
+        if (!cancelled && id === requestId.current) {
+          notifications.show({ color: 'red', message: 'Could not load files.' });
+        }
+      })
+      .finally(() => {
+        if (!cancelled && id === requestId.current) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query, revision]);
 
   return (
     <>
@@ -17,7 +98,13 @@ export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNod
       <div className="browse-layout">
         <DirectoryTree tree={tree} />
         <div className="browse-results">
-          <FilesTable files={files} onSelect={setSelectedFile} />
+          <FilesTable
+            data={data}
+            loading={loading}
+            lockedDirs={selectedDirs}
+            onQueryChange={applyQuery}
+            onSelect={setSelectedFile}
+          />
         </div>
       </div>
     </>

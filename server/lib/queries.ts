@@ -2,13 +2,20 @@ import '@tanstack/react-start/server-only';
 import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { normalizeDirectoryPath } from '../../app/lib/directory-path';
+import { normalizeDirectoryKey, normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type {
   AnalyticsData,
+  AnalyticsQuery,
+  AnalyticsResult,
+  CopyRankRow,
   DirectoryStat,
   DuplicateGroup,
+  DuplicatesQuery,
+  DuplicatesResult,
   Entry,
   FilesInput,
+  FilesQuery,
+  FilesResult,
   KeeperMap,
   OverviewData,
   ShellData,
@@ -62,6 +69,57 @@ function toEntry(row: EntryRow): Entry {
 export type DuplicateGroupRow = { hash: string; filename: string; n: number; firstId: number };
 
 type CountRow = { n: number };
+
+const FILE_PAGE_SIZES = [10, 25, 50, 100] as const;
+
+type FilePageSize = (typeof FILE_PAGE_SIZES)[number];
+
+const ANALYTICS_PAGE_SIZES = [5, 10, 25, 50] as const;
+
+type AnalyticsPageSize = (typeof ANALYTICS_PAGE_SIZES)[number];
+
+const FILE_SORT_COLUMNS = new Map<FilesQuery['sortKey'], string>([
+  ['filename', 'filename'],
+  ['location', 'directory'],
+  ['type', 'extension'],
+  ['size', 'size'],
+]);
+
+const FILE_SIZE_FILTERS = new Map<FilesQuery['sizeFilter'], string>([
+  ['all', '1'],
+  ['under10', 'size < 10000000'],
+  ['10to25', 'size >= 10000000 AND size <= 25000000'],
+  ['over25', 'size > 25000000'],
+]);
+
+const DUPLICATE_COUNT_FILTERS = new Map<DuplicatesQuery['countFilter'], string>([
+  ['all', '1'],
+  ['2', 'm.n = 2'],
+  ['3+', 'm.n >= 3'],
+]);
+
+const DUPLICATE_SIZE_FILTERS = new Map<DuplicatesQuery['sizeFilter'], string>([
+  ['all', '1'],
+  ['under10', 'm.size < 10000000'],
+  ['10to25', 'm.size >= 10000000 AND m.size <= 25000000'],
+  ['over25', 'm.size > 25000000'],
+]);
+
+const HIDDEN_MATCH_SQL = `lower(replace(path, '\\', '/')) IN (SELECT value FROM json_each(?))`;
+
+const MAX_PAGE = 1_000_000;
+
+function normalizePage(value: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(1, Math.floor(value)), MAX_PAGE) : 1;
+}
+
+function normalizePageSize(value: number): FilePageSize {
+  return (FILE_PAGE_SIZES as readonly number[]).includes(value) ? (value as FilePageSize) : 10;
+}
+
+function normalizeAnalyticsPageSize(value: number): AnalyticsPageSize {
+  return (ANALYTICS_PAGE_SIZES as readonly number[]).includes(value) ? (value as AnalyticsPageSize) : 10;
+}
 
 type KeeperRow = {
   pathKey: string;
@@ -235,6 +293,146 @@ export function listEntries(input: FilesInput, roots: string[]): Entry[] {
   return listEntriesSql(input, roots);
 }
 
+type FilesDirectoryCountRow = { directory: string; n: number; hidden: number };
+
+type FilesExtensionCountRow = { extension: string; n: number };
+
+export function listFilesPage(input: FilesQuery, roots: string[], hidden: string[]): FilesResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const hasHidden = hidden.length > 0;
+    if (!hasHidden && input.hiddenMode === 'hidden') {
+      return { files: [], total: 0, directoryCounts: [], extensionCounts: [], hiddenCount: 0 };
+    }
+    const hiddenJson = hasHidden
+      ? JSON.stringify(hidden.map((path) => normalizeDirectoryKey(storagePath(db, path))))
+      : '';
+    const hiddenFilter =
+      !hasHidden || input.hiddenMode === 'all'
+        ? null
+        : input.hiddenMode === 'hidden'
+          ? HIDDEN_MATCH_SQL
+          : `NOT (${HIDDEN_MATCH_SQL})`;
+
+    const where: string[] = [scope.sql];
+    const whereParams: (string | number)[] = [...scope.params];
+
+    const search = escapeLike(input.query.trim().toLowerCase());
+    if (search) {
+      where.push(`(lower(filename) LIKE ? ESCAPE '\\' OR lower(path) LIKE ? ESCAPE '\\')`);
+      whereParams.push(`%${search}%`, `%${search}%`);
+    }
+
+    const sizeFilter = FILE_SIZE_FILTERS.get(input.sizeFilter) ?? '1';
+    if (sizeFilter !== '1') where.push(sizeFilter);
+
+    const pickerFilter: string[] = [];
+    const pickerParams: string[] = [];
+    if (input.selectedDirs.length > 0) {
+      const scopes = input.selectedDirs.map((directory) => subtreeClause(storagePath(db, directory)));
+      pickerFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
+      pickerParams.push(...scopes.flatMap((item) => item.params));
+    }
+
+    const lockedFilter: string[] = [];
+    const lockedParams: string[] = [];
+    if (input.lockedDirs.length > 0) {
+      const scopes = input.lockedDirs.map((directory) => subtreeClause(storagePath(db, directory)));
+      lockedFilter.push(`(${scopes.map((item) => item.sql).join(' OR ')})`);
+      lockedParams.push(...scopes.flatMap((item) => item.params));
+    }
+
+    const directoryFilter = [...pickerFilter, ...lockedFilter];
+    const directoryParams = [...pickerParams, ...lockedParams];
+
+    const extensionFilter: string[] = [];
+    const extensionParams: string[] = [];
+    if (input.extensions.length > 0) {
+      extensionFilter.push(`extension IN (${input.extensions.map(() => '?').join(', ')})`);
+      extensionParams.push(...input.extensions);
+    }
+
+    const filteredWhere = [...where, ...directoryFilter, ...extensionFilter];
+    const filteredParams = [...whereParams, ...directoryParams, ...extensionParams];
+    const pageWhere = [...filteredWhere];
+    const pageParams = [...filteredParams];
+    if (hiddenFilter) {
+      pageWhere.push(hiddenFilter);
+      pageParams.push(hiddenJson);
+    }
+    const page = normalizePage(input.page);
+    const pageSize = normalizePageSize(input.pageSize);
+    const sortColumn = FILE_SORT_COLUMNS.get(input.sortKey) ?? 'directory';
+    const direction = input.direction === 'desc' ? 'DESC' : 'ASC';
+    const whereSql = pageWhere.join(' AND ');
+
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${whereSql}`).get(...pageParams) as CountRow;
+    const rows = db
+      .prepare(
+        `SELECT id, size, directory, extension, filename, birthtime, hash, path
+        FROM entries
+        WHERE ${whereSql}
+        ORDER BY ${sortColumn} ${direction}, filename ASC, directory ASC
+        LIMIT ? OFFSET ?`,
+      )
+      .all(...pageParams, pageSize, (page - 1) * pageSize) as EntryRow[];
+
+    const directoryWhere = [...where, ...lockedFilter, ...extensionFilter];
+    const directoryWhereParams = [...whereParams, ...lockedParams, ...extensionParams];
+    const directorySelect: string[] = [];
+    const directoryCaseParams: string[] = [];
+    if (input.hiddenMode === 'all' || !hasHidden) {
+      directorySelect.push('COUNT(*) AS n');
+    } else {
+      const visible = input.hiddenMode === 'hidden' ? HIDDEN_MATCH_SQL : `NOT (${HIDDEN_MATCH_SQL})`;
+      directorySelect.push(`SUM(CASE WHEN ${visible} THEN 1 ELSE 0 END) AS n`);
+      directoryCaseParams.push(hiddenJson);
+    }
+    if (hasHidden) {
+      directorySelect.push(`SUM(CASE WHEN ${HIDDEN_MATCH_SQL} THEN 1 ELSE 0 END) AS hidden`);
+      directoryCaseParams.push(hiddenJson);
+    } else {
+      directorySelect.push('0 AS hidden');
+    }
+    const directoryRows = db
+      .prepare(
+        `SELECT directory, ${directorySelect.join(', ')}
+        FROM entries WHERE ${directoryWhere.join(' AND ')} GROUP BY directory ORDER BY directory`,
+      )
+      .all(...directoryCaseParams, ...directoryWhereParams) as FilesDirectoryCountRow[];
+
+    const extensionWhere = [...where, ...directoryFilter];
+    const extensionWhereParams = [...whereParams, ...directoryParams];
+    if (hiddenFilter) {
+      extensionWhere.push(hiddenFilter);
+      extensionWhereParams.push(hiddenJson);
+    }
+    const extensionRows = db
+      .prepare(
+        `SELECT extension, COUNT(*) AS n
+        FROM entries WHERE ${extensionWhere.join(' AND ')} GROUP BY extension ORDER BY extension`,
+      )
+      .all(...extensionWhereParams) as FilesExtensionCountRow[];
+
+    const hiddenCount = hasHidden
+      ? (db
+          .prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${[...filteredWhere, HIDDEN_MATCH_SQL].join(' AND ')}`)
+          .get(...filteredParams, hiddenJson) as CountRow)
+      : { n: 0 };
+
+    return {
+      files: rows.map(toEntry),
+      total: total.n,
+      directoryCounts: directoryRows
+        .map((row) => ({ path: mapPathToDisplay(row.directory), count: row.n, hidden: row.hidden }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+      extensionCounts: extensionRows.map((row) => ({ extension: row.extension, count: row.n })),
+      hiddenCount: hiddenCount.n,
+    };
+  });
+  return result ?? { files: [], total: 0, directoryCounts: [], extensionCounts: [], hiddenCount: 0 };
+}
+
 export function getDirectoryStatsSql(roots: string[]): DirectoryStat[] {
   const stats = withRead((db) => {
     const scope = readScope(db, roots);
@@ -253,22 +451,77 @@ export function getDirectoryStats(roots: string[]): DirectoryStat[] {
   return getDirectoryStatsSql(roots);
 }
 
+function copyRankSql(scope: ScopeClause): string {
+  return `SELECT filename, COUNT(*) AS n
+    FROM entries INDEXED BY idx_entries_hash_filename_dir_norm
+    WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+    GROUP BY hash, filename
+    HAVING COUNT(*) > 1
+    ORDER BY n DESC, filename ASC`;
+}
+
+function copyRankRows(db: DatabaseType, scope: ScopeClause): CopyRankRow[] {
+  const rows = db.prepare(copyRankSql(scope)).all(...scope.params) as { filename: string; n: number }[];
+  return rows.map((row) => ({ name: row.filename, count: row.n }));
+}
+
+function copyRankTotal(db: DatabaseType, scope: ScopeClause): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM (
+        SELECT hash, filename FROM entries INDEXED BY idx_entries_hash_filename_dir_norm
+        WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+        GROUP BY hash, filename
+        HAVING COUNT(*) > 1
+      )`,
+    )
+    .get(...scope.params) as CountRow;
+  return row.n;
+}
+
 export function getAnalyticsDataSql(roots: string[]): AnalyticsData {
   const data = withRead((db) => {
     const scope = readScope(db, roots);
     const rankedBySize = db
       .prepare(`SELECT filename, size FROM entries WHERE ${scope.sql} ORDER BY size DESC, filename ASC`)
       .all(...scope.params) as { filename: string; size: number }[];
-    const rankedByCopies = duplicateGroupRows(db, scope)
-      .sort((a, b) => b.n - a.n || a.filename.localeCompare(b.filename))
-      .map((row) => ({ name: row.filename, count: row.n }));
-    return { rankedBySize, rankedByCopies };
+    return { rankedBySize, rankedByCopies: copyRankRows(db, scope) };
   });
   return data ?? { rankedBySize: [], rankedByCopies: [] };
 }
 
 export function getAnalyticsData(roots: string[]): AnalyticsData {
   return getAnalyticsDataSql(roots);
+}
+
+export function getAnalyticsPage(input: AnalyticsQuery, roots: string[]): AnalyticsResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const sizePage = normalizePage(input.sizePage);
+    const sizePageSize = normalizeAnalyticsPageSize(input.sizePageSize);
+    const copiesPage = normalizePage(input.copiesPage);
+    const copiesPageSize = normalizeAnalyticsPageSize(input.copiesPageSize);
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
+    const rankedBySize = db
+      .prepare(
+        `SELECT filename, size FROM entries WHERE ${scope.sql}
+        ORDER BY size DESC, filename ASC LIMIT ? OFFSET ?`,
+      )
+      .all(...scope.params, sizePageSize, (sizePage - 1) * sizePageSize) as { filename: string; size: number }[];
+    const rankedByCopies = db
+      .prepare(`${copyRankSql(scope)} LIMIT ? OFFSET ?`)
+      .all(...scope.params, copiesPageSize, (copiesPage - 1) * copiesPageSize) as {
+      filename: string;
+      n: number;
+    }[];
+    return {
+      rankedBySize,
+      totalFiles: total.n,
+      rankedByCopies: rankedByCopies.map((row) => ({ name: row.filename, count: row.n })),
+      totalCopies: copyRankTotal(db, scope),
+    };
+  });
+  return result ?? { rankedBySize: [], totalFiles: 0, rankedByCopies: [], totalCopies: 0 };
 }
 
 export function getShellDataSql(roots: string[]): ShellData {
@@ -352,6 +605,262 @@ export function getDuplicateGroupsSql(roots: string[]): DuplicateGroup[] {
 
 export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
   return getDuplicateGroupsSql(roots);
+}
+
+type DuplicatePageRow = {
+  hash: string;
+  filename: string;
+  n: number;
+  size: number;
+  extension: string;
+  visible: number;
+};
+
+type DuplicateDirectoryRow = { directory: string; n: number; hidden: number };
+
+type DuplicateExtensionRow = { extension: string; n: number };
+
+function duplicateRedundantSpace(row: DuplicatePageRow): number {
+  return (row.n - 1) * row.size;
+}
+
+function duplicateMemberClause(
+  input: DuplicatesQuery,
+  hiddenJson: string,
+  directoryJson: string,
+  hasHidden: boolean,
+): ScopeClause {
+  const conditions: string[] = [];
+  const params: string[] = [];
+  if (input.hiddenMode !== 'all') {
+    if (!hasHidden) {
+      if (input.hiddenMode === 'hidden') conditions.push('0');
+    } else {
+      conditions.push(input.hiddenMode === 'hidden' ? HIDDEN_MATCH_SQL : `NOT (${HIDDEN_MATCH_SQL})`);
+      params.push(hiddenJson);
+    }
+  }
+  const query = escapeLike(input.query.trim().toLowerCase());
+  if (query) {
+    conditions.push(`(lower(e.filename) LIKE ? ESCAPE '\\' OR lower(e.path) LIKE ? ESCAPE '\\')`);
+    params.push(`%${query}%`, `%${query}%`);
+  }
+  if (input.selectedDirs.length > 0) {
+    conditions.push(
+      `lower(replace(e.directory, '\\', '/')) IN (SELECT lower(replace(value, '\\', '/')) FROM json_each(?))`,
+    );
+    params.push(directoryJson);
+  }
+  if (input.extensions.length > 0) {
+    conditions.push(`e.extension IN (${input.extensions.map(() => '?').join(', ')})`);
+    params.push(...input.extensions);
+  }
+  return { sql: conditions.length === 0 ? '1' : conditions.join(' AND '), params };
+}
+
+const DUPLICATE_PAGE_GROUPS_DDL = `DROP TABLE IF EXISTS temp.dup_page_groups;
+CREATE TEMP TABLE dup_page_groups (
+  hash TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  n INTEGER NOT NULL,
+  size INTEGER,
+  extension TEXT,
+  PRIMARY KEY (hash, filename)
+) WITHOUT ROWID`;
+
+const DUPLICATE_PAGE_GROUPS_INSERT = (
+  scopeSql: string,
+) => `INSERT INTO temp.dup_page_groups (hash, filename, n, size, extension)
+SELECT g.hash, g.filename, g.n, e.size, e.extension
+FROM (
+  SELECT hash, filename, COUNT(*) AS n, MIN(id) AS first_id
+  FROM entries INDEXED BY idx_entries_hash_filename_dir_norm
+  WHERE ${scopeSql} AND hash IS NOT NULL AND hash <> ''
+  GROUP BY hash, filename
+  HAVING COUNT(*) > 1
+) AS g
+JOIN entries AS e ON e.id = g.first_id`;
+
+export function getDuplicateGroupsPage(
+  input: DuplicatesQuery,
+  roots: string[],
+  hidden: string[],
+  keeperPaths: string[],
+): DuplicatesResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const hasHidden = hidden.length > 0;
+    const hiddenJson = hasHidden
+      ? JSON.stringify(hidden.map((path) => normalizeDirectoryKey(storagePath(db, path))))
+      : '';
+    const directoryJson = JSON.stringify(
+      input.selectedDirs.map((directory) => normalizeDirectoryKey(storagePath(db, directory))),
+    );
+    const member = duplicateMemberClause(input, hiddenJson, directoryJson, hasHidden);
+    const countFilter = DUPLICATE_COUNT_FILTERS.get(input.countFilter) ?? '1';
+    const sizeFilter = DUPLICATE_SIZE_FILTERS.get(input.sizeFilter) ?? '1';
+    const keeperFilter =
+      input.keeperFilter === 'with'
+        ? 'EXISTS (SELECT 1 FROM keeper_keys k WHERE k.hash = m.hash AND k.filename = m.filename)'
+        : input.keeperFilter === 'without'
+          ? 'NOT EXISTS (SELECT 1 FROM keeper_keys k WHERE k.hash = m.hash AND k.filename = m.filename)'
+          : '1';
+
+    db.pragma('query_only = OFF');
+    try {
+      db.exec(DUPLICATE_PAGE_GROUPS_DDL);
+      try {
+        db.prepare(DUPLICATE_PAGE_GROUPS_INSERT(scope.sql)).run(...scope.params);
+        const keeperCte =
+          input.keeperFilter === 'all'
+            ? ''
+            : `keeper_keys AS (
+              SELECT DISTINCT e.hash, e.filename
+              FROM entries AS e
+              JOIN temp.dup_page_groups AS m ON m.hash = e.hash AND m.filename = e.filename
+              WHERE ${scope.sql} AND lower(replace(e.path, '\\', '/')) IN (SELECT lower(replace(value, '\\', '/')) FROM json_each(?))
+            ),`;
+        const keeperParams = keeperCte ? [...scope.params, JSON.stringify(keeperPaths)] : [];
+
+        const rows = db
+          .prepare(
+            `WITH ${keeperCte}
+            filtered AS (
+              SELECT m.hash AS hash, m.filename AS filename, m.n AS n, m.size AS size, m.extension AS extension,
+                COUNT(*) AS visible
+              FROM temp.dup_page_groups AS m
+              CROSS JOIN entries AS e ON e.hash = m.hash AND e.filename = m.filename AND ${scope.sql}
+              WHERE ${member.sql} AND ${keeperFilter} AND ${countFilter} AND ${sizeFilter}
+              GROUP BY m.hash, m.filename
+            )
+            SELECT hash, filename, n, size, extension, visible FROM filtered`,
+          )
+          .all(...keeperParams, ...scope.params, ...member.params) as DuplicatePageRow[];
+
+        const ordered: (DuplicatePageRow & { key: string })[] = [];
+        for (const row of rows) ordered.push({ ...row, key: `${row.hash}:${row.filename}` });
+        const sortKey = input.sortKey === 'name' || input.sortKey === 'redundant' ? input.sortKey : 'count';
+        const direction = input.direction === 'asc' ? 1 : -1;
+        ordered.sort((a, b) => {
+          const result =
+            sortKey === 'name'
+              ? a.filename.localeCompare(b.filename)
+              : sortKey === 'redundant'
+                ? duplicateRedundantSpace(a) - duplicateRedundantSpace(b)
+                : a.n - b.n;
+          if (result !== 0) return result * direction;
+          return a.key.localeCompare(b.key);
+        });
+        const totalGroups = ordered.length;
+        const totalFiles = ordered.reduce((sum, row) => sum + row.visible, 0);
+        const page = normalizePage(input.page);
+        const pageSize = normalizePageSize(input.pageSize);
+        const paged = ordered.slice((page - 1) * pageSize, page * pageSize);
+
+        let members: EntryRow[] = [];
+        if (paged.length > 0) {
+          members = db
+            .prepare(
+              `WITH keys AS (
+                SELECT json_extract(value, '$[0]') AS hash, json_extract(value, '$[1]') AS filename
+                FROM json_each(?)
+              )
+              SELECT e.id, e.size, e.directory, e.extension, e.filename, e.birthtime, e.hash, e.path
+              FROM entries AS e
+              JOIN keys AS k ON k.hash = e.hash AND k.filename = e.filename
+              WHERE ${scope.sql} AND ${member.sql}
+              ORDER BY e.filename ASC, e.id ASC`,
+            )
+            .all(
+              JSON.stringify(paged.map((row) => [row.hash, row.filename])),
+              ...scope.params,
+              ...member.params,
+            ) as EntryRow[];
+        }
+
+        const groups = paged.map((row) => {
+          const group: DuplicateGroup = {
+            key: row.key,
+            hash: row.hash,
+            name: row.filename,
+            count: row.n,
+            size: row.size,
+            redundantSpace: duplicateRedundantSpace(row),
+            extension: row.extension,
+            directories: [],
+            files: [],
+          };
+          return group;
+        });
+        const groupByKey = new Map(groups.map((group) => [group.key, group]));
+        for (const row of members) {
+          const group = groupByKey.get(`${row.hash}:${row.filename}`);
+          if (!group) continue;
+          const entry = toEntry(row);
+          group.files.push(entry);
+          if (!group.directories.includes(entry.directory)) group.directories.push(entry.directory);
+        }
+
+        const directories = db
+          .prepare(
+            `SELECT e.directory AS directory,
+              COUNT(DISTINCT m.hash || ':' || m.filename) AS n,
+              ${hasHidden ? `SUM(CASE WHEN ${HIDDEN_MATCH_SQL} THEN 1 ELSE 0 END)` : '0'} AS hidden
+            FROM temp.dup_page_groups AS m
+            CROSS JOIN entries AS e ON e.hash = m.hash AND e.filename = m.filename AND ${scope.sql}
+            GROUP BY e.directory
+            ORDER BY e.directory`,
+          )
+          .all(...(hasHidden ? [hiddenJson] : []), ...scope.params) as DuplicateDirectoryRow[];
+
+        const extensions = db
+          .prepare(
+            `SELECT e.extension AS extension, COUNT(*) AS n
+            FROM temp.dup_page_groups AS m
+            CROSS JOIN entries AS e ON e.hash = m.hash AND e.filename = m.filename AND ${scope.sql}
+            GROUP BY e.extension
+            ORDER BY e.extension`,
+          )
+          .all(...scope.params) as DuplicateExtensionRow[];
+
+        return {
+          groups,
+          totalGroups,
+          totalFiles,
+          keepers: {} as KeeperMap,
+          staleKeepers: 0,
+          directoryCounts: directories
+            .map((row) => ({
+              path: mapPathToDisplay(row.directory),
+              count: row.n,
+              hidden: row.hidden,
+              unit: 'group' as const,
+            }))
+            .sort((a, b) => a.path.localeCompare(b.path)),
+          extensionCounts: extensions.map((row) => ({ extension: row.extension, count: row.n })),
+          hiddenCount: directories.reduce((sum, row) => sum + row.hidden, 0),
+        };
+      } finally {
+        db.exec('DROP TABLE IF EXISTS temp.dup_page_groups');
+      }
+    } finally {
+      db.pragma('query_only = ON');
+    }
+  });
+  const { keepers, stale } = getKeeperDataSql(keeperPaths, roots);
+  if (!result) {
+    return {
+      groups: [],
+      totalGroups: 0,
+      totalFiles: 0,
+      keepers,
+      staleKeepers: stale.length,
+      directoryCounts: [],
+      extensionCounts: [],
+      hiddenCount: 0,
+    };
+  }
+  return { ...result, keepers, staleKeepers: stale.length };
 }
 
 export function countEntriesByDirectory(root: string): number {

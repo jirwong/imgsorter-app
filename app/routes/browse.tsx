@@ -1,5 +1,5 @@
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
-import { BrowsePage } from '../features/browse/BrowsePage';
+import { BrowsePage, DEFAULT_BROWSE_QUERY } from '../features/browse/BrowsePage';
 import { useSelectedDirsSearchParams } from '../lib/filter-sync';
 import { getBrowseData } from '../../server/routes/browse';
 
@@ -13,20 +13,16 @@ export const Route = createFileRoute('/browse')({
     selectedDirs: normalizeDirs(search.selectedDirs),
   }),
   loaderDeps: ({ search }) => ({ selectedDirs: search.selectedDirs }),
-  loader: async ({ deps }) =>
-    getBrowseData({
-      data: {
-        query: '',
-        dir: 'All directories',
-        ext: 'All types',
-        selectedDirs: deps.selectedDirs ?? [],
-      },
-    }),
+  loader: async ({ deps }) => {
+    const selectedDirs = deps.selectedDirs ?? [];
+    const initial = await getBrowseData({ data: { ...DEFAULT_BROWSE_QUERY, lockedDirs: selectedDirs } });
+    return { initial, selectedDirs };
+  },
   component: BrowseRoute,
 });
 
 function BrowseRoute() {
   useSelectedDirsSearchParams();
-  const { files, tree } = useLoaderData({ from: '/browse' });
-  return <BrowsePage files={files} tree={tree} />;
+  const { initial, selectedDirs } = useLoaderData({ from: '/browse' });
+  return <BrowsePage initial={initial} selectedDirs={selectedDirs} />;
 }

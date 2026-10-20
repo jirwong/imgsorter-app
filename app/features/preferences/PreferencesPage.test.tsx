@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { DEFAULT_APP_CONFIG } from '../../lib/app-config-defaults';
 
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   pickDirectory: vi.fn(),
   clearThumbnailCache: vi.fn(),
   notifyShow: vi.fn(),
+  routerInvalidate: vi.fn(),
 }));
 
 vi.mock('../../../server/routes/preferences', () => ({
@@ -32,7 +33,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>();
   return {
     ...actual,
-    useRouter: () => ({ invalidate: vi.fn(async () => {}) }),
+    useRouter: () => ({ invalidate: mocks.routerInvalidate }),
     useLoaderData: () => ({ files: 0, size: 0 }),
   };
 });
@@ -53,10 +54,18 @@ const config = {
 
 const counts = { 'C:/Media/2025': 42, 'D:/Camera Imports': 0 };
 
-function renderPage() {
+function deferred() {
+  let resolve!: (value: unknown) => void;
+  const promise = new Promise<unknown>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+function renderPage(pageConfig = config, pageCounts = counts) {
   render(
     <MantineProvider defaultColorScheme="dark">
-      <PreferencesPage config={config} counts={counts} />
+      <PreferencesPage config={pageConfig} counts={pageCounts} />
     </MantineProvider>,
   );
 }
@@ -65,6 +74,7 @@ describe('PreferencesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.clearThumbnailCache.mockResolvedValue({ removed: 2 });
+    mocks.routerInvalidate.mockResolvedValue(undefined);
   });
 
   it('renders the application tab with a disabled database name', () => {
@@ -88,6 +98,195 @@ describe('PreferencesPage', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Maintenance' }));
     expect(screen.getByText('Library index')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset library index' })).toBeInTheDocument();
+  });
+
+  it('disables the checkbox and remove button while the save is in flight', async () => {
+    const pending = deferred();
+    mocks.saveDirectories.mockReturnValue(pending.promise);
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const checkbox = screen.getByLabelText('Enable C:/Media/2025');
+    const row = checkbox.closest('.preference-row') as HTMLElement;
+    const other = screen.getByLabelText('Enable D:/Camera Imports');
+    const otherRow = other.closest('.preference-row') as HTMLElement;
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeDisabled());
+    expect(within(row).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    expect(other).toBeDisabled();
+    expect(within(otherRow).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    pending.resolve({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: false },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(within(row).getByRole('button', { name: 'Remove' })).toBeEnabled();
+    expect(other).toBeEnabled();
+    expect(within(otherRow).getByRole('button', { name: 'Remove' })).toBeEnabled();
+  });
+
+  it('blocks a second toggle while a save is in flight', async () => {
+    const pending = deferred();
+    mocks.saveDirectories.mockReturnValue(pending.promise);
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const first = screen.getByLabelText('Enable C:/Media/2025');
+    const second = screen.getByLabelText('Enable D:/Camera Imports');
+    fireEvent.click(first);
+    await waitFor(() => expect(second).toBeDisabled());
+    fireEvent.click(second);
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: false },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    await waitFor(() => expect(second).toBeEnabled());
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles the toggle from the server response', async () => {
+    mocks.saveDirectories.mockResolvedValue({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: true },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const checkbox = screen.getByLabelText('Enable C:/Media/2025');
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    await waitFor(() => expect(checkbox).toBeEnabled());
+    expect(checkbox).toBeChecked();
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+    expect(mocks.saveDirectories.mock.calls[0][0]).toEqual({
+      data: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: false },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+    });
+  });
+
+  it('shows the indexed count for a disabled directory', () => {
+    renderPage(
+      {
+        ...config,
+        directories: {
+          indexed: [
+            { path: 'C:/Media/2025', enabled: true },
+            { path: 'D:/Camera Imports', enabled: false },
+          ],
+          ignored: [],
+        },
+      },
+      { 'C:/Media/2025': 42, 'D:/Camera Imports': 9 },
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    expect(screen.getByText(/42 files/)).toBeInTheDocument();
+    expect(screen.getByText(/9 files/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Enable D:/Camera Imports')).not.toBeChecked();
+  });
+
+  it('rolls back the toggle when the save fails', async () => {
+    mocks.saveDirectories.mockRejectedValue(new Error('save failed'));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const checkbox = screen.getByLabelText('Enable C:/Media/2025');
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    await waitFor(() => expect(checkbox).toBeChecked());
+    expect(checkbox).toBeEnabled();
+  });
+
+  it('blocks adding a directory while a save is in flight', async () => {
+    const pending = deferred();
+    mocks.saveDirectories.mockReturnValue(pending.promise);
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    const checkbox = screen.getByLabelText('Enable C:/Media/2025');
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(checkbox).toBeDisabled());
+    const addButtons = screen.getAllByRole('button', { name: 'Add directory' });
+    expect(addButtons[0]).toBeDisabled();
+    expect(addButtons[1]).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/New' } });
+    fireEvent.click(addButtons[0]);
+    fireEvent.change(screen.getByLabelText('Add globally ignored directory'), { target: { value: 'C:/Media/New' } });
+    fireEvent.click(addButtons[1]);
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: false },
+          { path: 'D:/Camera Imports', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    await waitFor(() => expect(addButtons[0]).toBeEnabled());
+    expect(addButtons[1]).toBeEnabled();
+  });
+
+  it('blocks a second add while the add save is in flight', async () => {
+    const pending = deferred();
+    mocks.saveDirectories.mockReturnValue(pending.promise);
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/New' } });
+    const addButtons = screen.getAllByRole('button', { name: 'Add directory' });
+    fireEvent.click(addButtons[0]);
+    await waitFor(() => expect(addButtons[0]).toBeDisabled());
+    expect(addButtons[1]).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/Second' } });
+    fireEvent.click(addButtons[0]);
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
+    pending.resolve({
+      directories: {
+        indexed: [
+          { path: 'C:/Media/2025', enabled: true },
+          { path: 'D:/Camera Imports', enabled: true },
+          { path: 'C:/Media/New', enabled: true },
+        ],
+        ignored: [],
+      },
+      application: DEFAULT_APP_CONFIG.application,
+    });
+    await waitFor(() => expect(addButtons[0]).toBeEnabled());
+    expect(addButtons[1]).toBeEnabled();
+  });
+
+  it('shows a toast and refreshes when adding a directory fails', async () => {
+    mocks.saveDirectories.mockRejectedValue(new Error('save failed'));
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
+    fireEvent.change(screen.getByLabelText('Add indexed directory'), { target: { value: 'C:/Media/New' } });
+    const addButtons = screen.getAllByRole('button', { name: 'Add directory' });
+    fireEvent.click(addButtons[0]);
+    await waitFor(() => expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'red' })));
+    await waitFor(() => expect(mocks.routerInvalidate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(addButtons[0]).toBeEnabled());
+    expect(screen.getByText('C:/Media/2025')).toBeInTheDocument();
+    expect(screen.queryByText('C:/Media/New')).not.toBeInTheDocument();
+    expect(mocks.saveDirectories).toHaveBeenCalledTimes(1);
   });
 
   it('saves a new indexed directory', async () => {

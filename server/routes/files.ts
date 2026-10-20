@@ -1,10 +1,11 @@
 import { createServerFn } from '@tanstack/react-start';
-import type { FilesInput } from '../../app/lib/types';
+import type { FilesQuery } from '../../app/lib/types';
 
-export const getFilteredEntries = createServerFn({ method: 'POST' })
-  .validator((input: FilesInput) => input)
+export const getFilesPage = createServerFn({ method: 'POST' })
+  .validator((input: FilesQuery) => input)
   .handler(async ({ data }) => {
-    const { listEntries } = await import('../lib/queries');
+    const { listFilesPage } = await import('../lib/queries');
     const { enabledRoots } = await import('../lib/directory-scope');
-    return { files: listEntries(data, enabledRoots()) };
+    const { hiddenService } = await import('../lib/hidden');
+    return listFilesPage(data, enabledRoots(), hiddenService.get());
   });

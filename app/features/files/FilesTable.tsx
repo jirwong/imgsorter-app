@@ -1,45 +1,83 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Checkbox, Group, Select, Stack, Table, Text, TextInput } from '@mantine/core';
 import { Search } from 'lucide-react';
 import { DirectoryPicker } from '../../components/common/DirectoryPicker';
 import { normalizeDirectoryKey } from '../../lib/directory-path';
 import { formatBytes } from '../../lib/format';
-import type { Entry } from '../../lib/types';
+import type { Entry, FilesQuery, FilesResult } from '../../lib/types';
 
 export type FilesTableProps = {
-  files: Entry[];
-  unique?: boolean;
+  data: FilesResult;
+  loading: boolean;
+  lockedDirs?: string[];
   hidden?: string[];
   onHide?: (path: string) => void;
   onHideMany?: (paths: string[]) => void;
   onUnhide?: (path: string) => void;
   onUnhideMany?: (paths: string[]) => void;
   onClearHidden?: () => void;
+  onQueryChange: (query: FilesQuery) => void;
   onSelect: (e: Entry) => void;
 };
 
+const SIZE_FILTERS: Record<string, FilesQuery['sizeFilter']> = {
+  'All sizes': 'all',
+  'Under 10 MB': 'under10',
+  '10–25 MB': '10to25',
+  'Over 25 MB': 'over25',
+};
+
+const HIDDEN_FILTERS: Record<string, FilesQuery['hiddenMode']> = {
+  'Active files': 'active',
+  'Hidden files': 'hidden',
+  'All files': 'all',
+};
+
+function toPageSize(value: string): FilesQuery['pageSize'] {
+  switch (value) {
+    case '10':
+      return 10;
+    case '50':
+      return 50;
+    case '100':
+      return 100;
+    default:
+      return 25;
+  }
+}
+
 export function FilesTable({
-  files,
-  unique,
+  data,
+  loading,
+  lockedDirs,
   hidden,
   onHide,
   onHideMany,
   onUnhide,
   onUnhideMany,
   onClearHidden,
+  onQueryChange,
   onSelect,
 }: FilesTableProps) {
   const [fileQuery, setFileQuery] = useState('');
   const [appliedDirectories, setAppliedDirectories] = useState<string[]>([]);
-  const [count, setCount] = useState('All counts');
   const [size, setSize] = useState('All sizes');
   const [extension, setExtension] = useState('All extensions');
   const [hiddenFilter, setHiddenFilter] = useState('Active files');
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Map<number, string>>(new Map());
   const [pageSize, setPageSize] = useState('25');
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState<'filename' | 'location' | 'type' | 'size'>('location');
-  const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortKey, setSortKey] = useState<FilesQuery['sortKey']>('location');
+  const [direction, setDirection] = useState<FilesQuery['direction']>('asc');
+  const sentQuery = useRef(false);
+  const lockedKey = [...(lockedDirs ?? [])].sort().join('|');
+  const [lockedPageKey, setLockedPageKey] = useState(lockedKey);
+
+  if (lockedPageKey !== lockedKey) {
+    setLockedPageKey(lockedKey);
+    setPage(1);
+    if (appliedDirectories.length > 0) setAppliedDirectories([]);
+  }
 
   const hiddenEnabled =
     hidden !== undefined &&
@@ -49,95 +87,66 @@ export function FilesTable({
     onUnhideMany !== undefined &&
     onClearHidden !== undefined;
   const hiddenKeys = useMemo(() => new Set((hidden ?? []).map(normalizeDirectoryKey)), [hidden]);
-  const isHidden = useCallback((e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path)), [hiddenKeys]);
+  const isHidden = (e: Entry) => hiddenKeys.has(normalizeDirectoryKey(e.path));
 
-  const directories = useMemo(() => [...new Set(files.map((e) => e.directory))], [files]);
-  const directoryOptions = useMemo(() => {
-    const counts = new Map<string, { count: number; hidden: number }>();
-    for (const e of files) {
-      const entry = counts.get(e.directory) ?? { count: 0, hidden: 0 };
-      entry.count += 1;
-      if (hiddenEnabled && isHidden(e)) entry.hidden += 1;
-      counts.set(e.directory, entry);
-    }
-    return directories.map((d) => {
-      const countsForDir = counts.get(d) ?? { count: 0, hidden: 0 };
-      return {
-        value: d,
-        label: d,
-        count: countsForDir.count,
-        ...(hiddenEnabled ? { hidden: countsForDir.hidden } : {}),
-      };
-    });
-  }, [directories, files, hiddenEnabled, isHidden]);
-  const extensions = useMemo(() => [...new Set(files.map((e) => e.extension))], [files]);
-  const hiddenCount = useMemo(() => files.filter((e) => isHidden(e)).length, [files, isHidden]);
-  const selectedPaths = useMemo(() => files.filter((e) => selected.has(e.id)).map((e) => e.path), [files, selected]);
-
-  const list = useMemo(
+  const directoryOptions = useMemo(
     () =>
-      [...files]
-        .filter(
-          (e) =>
-            (hiddenFilter === 'All files' || (hiddenFilter === 'Hidden files' ? isHidden(e) : !isHidden(e))) &&
-            (!fileQuery || `${e.filename} ${e.path}`.toLowerCase().includes(fileQuery.toLowerCase())) &&
-            (appliedDirectories.length === 0 || appliedDirectories.includes(e.directory)) &&
-            (extension === 'All extensions' || e.extension === extension) &&
-            (count === 'All counts' || count === 'Unique only') &&
-            (size === 'All sizes' ||
-              (size === 'Under 10 MB' && e.size < 10000000) ||
-              (size === '10–25 MB' && e.size >= 10000000 && e.size <= 25000000) ||
-              (size === 'Over 25 MB' && e.size > 25000000)),
-        )
-        .sort((a, b) => {
-          if (!unique) return a.filename.localeCompare(b.filename);
-          const av =
-            sortKey === 'size'
-              ? a.size
-              : sortKey === 'filename'
-                ? a.filename
-                : sortKey === 'location'
-                  ? a.directory
-                  : a.extension;
-          const bv =
-            sortKey === 'size'
-              ? b.size
-              : sortKey === 'filename'
-                ? b.filename
-                : sortKey === 'location'
-                  ? b.directory
-                  : b.extension;
-          const result =
-            typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
-          return direction === 'asc' ? result : -result;
-        }),
-    [files, fileQuery, appliedDirectories, extension, count, size, hiddenFilter, isHidden, unique, sortKey, direction],
+      data.directoryCounts.map((item) => ({
+        value: item.path,
+        label: item.path,
+        count: item.count,
+        ...(hiddenEnabled ? { hidden: item.hidden } : {}),
+      })),
+    [data.directoryCounts, hiddenEnabled],
   );
+  const extensions = useMemo(() => data.extensionCounts.map((item) => item.extension), [data.extensionCounts]);
+  const selectedPaths = useMemo(() => [...selected.values()], [selected]);
 
-  const pageLimit = Number(pageSize);
-  const pageCount = Math.max(1, Math.ceil(list.length / pageLimit));
-  const pageRows = list.slice((page - 1) * pageLimit, page * pageLimit);
+  const pageLimit = toPageSize(pageSize);
+  const pageCount = Math.max(1, Math.ceil(data.total / pageLimit));
+  const pageRows = data.files;
   const allVisibleSelected = pageRows.length > 0 && pageRows.every((e) => selected.has(e.id));
   const someVisibleSelected = pageRows.some((e) => selected.has(e.id));
 
-  useEffect(() => {
-    setPage(1);
-  }, [fileQuery, appliedDirectories, extension, count, size, hiddenFilter, sortKey, direction, pageSize, list.length]);
+  const query: FilesQuery = {
+    query: fileQuery,
+    selectedDirs: appliedDirectories,
+    lockedDirs: lockedDirs ?? [],
+    extensions: extension === 'All extensions' ? [] : [extension],
+    sizeFilter: SIZE_FILTERS[size] ?? 'all',
+    hiddenMode: HIDDEN_FILTERS[hiddenFilter] ?? 'active',
+    page,
+    pageSize: pageLimit,
+    sortKey,
+    direction,
+  };
 
-  const toggleSelected = (id: number) => {
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
+
+  useEffect(() => {
+    if (!sentQuery.current) {
+      sentQuery.current = true;
+      return;
+    }
+    onQueryChange(query);
+  }, [fileQuery, appliedDirectories, lockedKey, extension, size, hiddenFilter, page, pageSize, sortKey, direction]);
+
+  const toggleSelected = (id: number, path: string) => {
     setSelected((current) => {
-      const next = new Set(current);
+      const next = new Map(current);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else next.set(id, path);
       return next;
     });
   };
 
   const toggleAllVisible = () => {
     setSelected((current) => {
-      const next = new Set(current);
+      const next = new Map(current);
       if (allVisibleSelected) pageRows.forEach((e) => next.delete(e.id));
-      else pageRows.forEach((e) => next.add(e.id));
+      else pageRows.forEach((e) => next.set(e.id, e.path));
       return next;
     });
   };
@@ -145,7 +154,7 @@ export function FilesTable({
   const dropSelected = (id: number) => {
     setSelected((current) => {
       if (!current.has(id)) return current;
-      const next = new Set(current);
+      const next = new Map(current);
       next.delete(id);
       return next;
     });
@@ -163,30 +172,29 @@ export function FilesTable({
 
   const hideSelected = () => {
     onHideMany?.(selectedPaths);
-    setSelected(new Set());
+    setSelected(new Map());
   };
 
   const unhideSelected = () => {
     onUnhideMany?.(selectedPaths);
-    setSelected(new Set());
+    setSelected(new Map());
   };
 
-  const headerClick = (key: 'filename' | 'location' | 'type' | 'size') => {
+  const headerClick = (key: FilesQuery['sortKey']) => {
     if (sortKey === key) {
       setDirection((value) => (value === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
       setDirection(key === 'size' ? 'desc' : 'asc');
     }
+    setPage(1);
   };
 
-  const arrow = (key: 'filename' | 'location' | 'type' | 'size') =>
-    sortKey === key ? (direction === 'asc' ? '↑' : '↓') : '';
+  const arrow = (key: FilesQuery['sortKey']) => (sortKey === key ? (direction === 'asc' ? '↑' : '↓') : '');
 
-  const header = (key: 'filename' | 'location' | 'type' | 'size', label: string) => (
-    <Table.Th className={unique ? 'sortable-th' : undefined} onClick={unique ? () => headerClick(key) : undefined}>
-      {label}
-      {unique ? ` ${arrow(key)}` : ''}
+  const header = (key: FilesQuery['sortKey'], label: string) => (
+    <Table.Th className="sortable-th" onClick={() => headerClick(key)}>
+      {label} {arrow(key)}
     </Table.Th>
   );
 
@@ -194,28 +202,48 @@ export function FilesTable({
     <>
       <TextInput
         value={fileQuery}
-        onChange={(event) => setFileQuery(event.currentTarget.value)}
+        onChange={(event) => {
+          setFileQuery(event.currentTarget.value);
+          setPage(1);
+        }}
         placeholder="Filter filename or path"
         leftSection={<Search size={15} />}
       />
-      <DirectoryPicker applied={appliedDirectories} options={directoryOptions} onApply={setAppliedDirectories} />
+      <DirectoryPicker
+        applied={appliedDirectories}
+        options={directoryOptions}
+        onApply={(dirs) => {
+          setAppliedDirectories(dirs);
+          setPage(1);
+        }}
+      />
       {hiddenEnabled && (
         <Select
           aria-label="Hidden filter"
           value={hiddenFilter}
-          onChange={(v) => setHiddenFilter(v ?? 'Active files')}
+          onChange={(v) => {
+            setHiddenFilter(v ?? 'Active files');
+            setPage(1);
+          }}
           data={['Active files', 'Hidden files', 'All files']}
         />
       )}
-      <Select value={count} onChange={(v) => setCount(v ?? 'All counts')} data={['All counts', 'Unique only']} />
       <Select
+        aria-label="Size filter"
         value={size}
-        onChange={(v) => setSize(v ?? 'All sizes')}
+        onChange={(v) => {
+          setSize(v ?? 'All sizes');
+          setPage(1);
+        }}
         data={['All sizes', 'Under 10 MB', '10–25 MB', 'Over 25 MB']}
       />
       <Select
+        aria-label="Extension filter"
         value={extension}
-        onChange={(v) => setExtension(v ?? 'All extensions')}
+        onChange={(v) => {
+          setExtension(v ?? 'All extensions');
+          setPage(1);
+        }}
         data={['All extensions', ...extensions]}
       />
     </>
@@ -240,23 +268,28 @@ export function FilesTable({
       )}
       {hiddenEnabled && (
         <Text size="sm" c="dimmed">
-          {hiddenCount} hidden
+          {data.hiddenCount} hidden
         </Text>
       )}
-      {hiddenEnabled && hiddenFilter === 'Hidden files' && hiddenCount > 0 && (
+      {hiddenEnabled && hiddenFilter === 'Hidden files' && data.hiddenCount > 0 && (
         <Button variant="subtle" size="xs" onClick={onClearHidden}>
           Restore all
         </Button>
       )}
+      {loading && (
+        <Text size="sm" c="dimmed">
+          Loading…
+        </Text>
+      )}
       <Text size="sm" c="dimmed">
-        {list.length} files found
+        {data.total} files found
       </Text>
     </>
   );
 
   return (
     <>
-      {unique ? (
+      {hiddenEnabled ? (
         <Stack className="files-filter-rows" gap="8" mb="md">
           <Group className="duplicate-filters" gap="8">
             {filters}
@@ -269,7 +302,7 @@ export function FilesTable({
           <Group gap="8">{controls}</Group>
         </Group>
       )}
-      <Table className="files-table" highlightOnHover>
+      <Table className="files-table" highlightOnHover aria-busy={loading}>
         <Table.Thead>
           <Table.Tr>
             {hiddenEnabled && (
@@ -288,7 +321,7 @@ export function FilesTable({
             {header('location', 'Location')}
             {header('type', 'Type')}
             {header('size', 'Size')}
-            {unique && <Table.Th>Actions</Table.Th>}
+            <Table.Th>Actions</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -299,7 +332,7 @@ export function FilesTable({
                   <Checkbox
                     aria-label={`Select ${e.filename}`}
                     checked={selected.has(e.id)}
-                    onChange={() => toggleSelected(e.id)}
+                    onChange={() => toggleSelected(e.id, e.path)}
                     onClick={(event) => event.stopPropagation()}
                   />
                 </Table.Td>
@@ -329,47 +362,45 @@ export function FilesTable({
                   {formatBytes(e.size)}
                 </Text>
               </Table.Td>
-              {unique && (
-                <Table.Td>
-                  <Group gap={4} justify="flex-end" wrap="nowrap">
+              <Table.Td>
+                <Group gap={4} justify="flex-end" wrap="nowrap">
+                  <Button
+                    variant="subtle"
+                    size="xs"
+                    className="preview-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelect(e);
+                    }}
+                  >
+                    Preview
+                  </Button>
+                  {hiddenEnabled && isHidden(e) && (
                     <Button
                       variant="subtle"
                       size="xs"
-                      className="preview-button"
                       onClick={(event) => {
                         event.stopPropagation();
-                        onSelect(e);
+                        unhideOne(e);
                       }}
                     >
-                      Preview
+                      Unhide
                     </Button>
-                    {hiddenEnabled && isHidden(e) && (
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          unhideOne(e);
-                        }}
-                      >
-                        Unhide
-                      </Button>
-                    )}
-                    {hiddenEnabled && !isHidden(e) && (
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          hideOne(e);
-                        }}
-                      >
-                        Hide
-                      </Button>
-                    )}
-                  </Group>
-                </Table.Td>
-              )}
+                  )}
+                  {hiddenEnabled && !isHidden(e) && (
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        hideOne(e);
+                      }}
+                    >
+                      Hide
+                    </Button>
+                  )}
+                </Group>
+              </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
@@ -378,7 +409,10 @@ export function FilesTable({
         <Select
           aria-label="Items per page"
           value={pageSize}
-          onChange={(v) => setPageSize(v ?? '25')}
+          onChange={(v) => {
+            setPageSize(v ?? '25');
+            setPage(1);
+          }}
           data={['10', '25', '50', '100']}
           w={80}
         />

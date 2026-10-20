@@ -6,13 +6,16 @@ import { closeReadConnections, withRead } from '../server/lib/db';
 import { ensureReadSchema } from '../server/lib/schema';
 import {
   getAnalyticsData,
+  getAnalyticsPage,
   getDuplicateGroups,
+  getDuplicateGroupsPage,
   getOverviewStats,
   getPreferencesCounts,
   getShellData,
   listEntries,
+  listFilesPage,
 } from '../server/lib/queries';
-import type { FilesInput } from '../app/lib/types';
+import type { AnalyticsQuery, DuplicatesQuery, FilesInput, FilesQuery } from '../app/lib/types';
 
 const TOTAL_ROWS = 350_000;
 
@@ -49,6 +52,40 @@ const NARROW_QUERY: FilesInput = {
   dir: 'All directories',
   ext: 'All types',
   selectedDirs: [],
+};
+
+const FILES_PAGE_QUERY: FilesQuery = {
+  query: '',
+  selectedDirs: [],
+  lockedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 25,
+  sortKey: 'location',
+  direction: 'asc',
+};
+
+const DUPLICATES_PAGE_QUERY: DuplicatesQuery = {
+  query: '',
+  selectedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  countFilter: 'all',
+  keeperFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 25,
+  sortKey: 'count',
+  direction: 'desc',
+};
+
+const ANALYTICS_PAGE_QUERY: AnalyticsQuery = {
+  sizePage: 1,
+  sizePageSize: 10,
+  copiesPage: 1,
+  copiesPageSize: 10,
 };
 
 function buildDatabase(path: string): void {
@@ -140,6 +177,9 @@ function main(): void {
     measure('listEntries narrow query', () => listEntries(NARROW_QUERY, DISPLAY_ROOTS));
     measure('getDuplicateGroups', () => getDuplicateGroups(DISPLAY_ROOTS));
     measure('getAnalyticsData', () => getAnalyticsData(DISPLAY_ROOTS));
+    measure('listFilesPage', () => listFilesPage(FILES_PAGE_QUERY, DISPLAY_ROOTS, []));
+    measure('getDuplicateGroupsPage', () => getDuplicateGroupsPage(DUPLICATES_PAGE_QUERY, DISPLAY_ROOTS, [], []));
+    measure('getAnalyticsPage', () => getAnalyticsPage(ANALYTICS_PAGE_QUERY, DISPLAY_ROOTS));
   } finally {
     if (previous === undefined) delete process.env.IMGSORTER_DB_PATH;
     else process.env.IMGSORTER_DB_PATH = previous;

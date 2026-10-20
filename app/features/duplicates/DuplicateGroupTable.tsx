@@ -2,12 +2,15 @@ import { Fragment, useMemo, useState } from 'react';
 import { Badge, Button, Checkbox, Group, Table, Text } from '@mantine/core';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { formatBytes } from '../../lib/format';
-import type { DuplicateGroup, Entry } from '../../lib/types';
+import type { DuplicateGroup, DuplicatesQuery, Entry } from '../../lib/types';
 import { KeepToggle } from './KeepToggle';
 
 export type DuplicateGroupTableProps = {
   groups: DuplicateGroup[];
   keeperByGroup: Record<string, number>;
+  sortKey: DuplicatesQuery['sortKey'];
+  direction: DuplicatesQuery['direction'];
+  onSortChange: (sortKey: DuplicatesQuery['sortKey'], direction: DuplicatesQuery['direction']) => void;
   onToggleKeeper: (groupKey: string, id: number) => void;
   onSelect: (e: Entry) => void;
   isHidden: (e: Entry) => boolean;
@@ -20,6 +23,9 @@ export type DuplicateGroupTableProps = {
 export function DuplicateGroupTable({
   groups,
   keeperByGroup,
+  sortKey,
+  direction,
+  onSortChange,
   onToggleKeeper,
   onSelect,
   isHidden,
@@ -29,33 +35,15 @@ export function DuplicateGroupTable({
   onToggleMany,
 }: DuplicateGroupTableProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<'count' | 'name' | 'redundant'>('count');
-  const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
 
-  const sorted = useMemo(
-    () =>
-      [...groups].sort((a, b) => {
-        const av = sortKey === 'count' ? a.count : sortKey === 'redundant' ? a.redundantSpace : a.name;
-        const bv = sortKey === 'count' ? b.count : sortKey === 'redundant' ? b.redundantSpace : b.name;
-        const result =
-          typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
-        return direction === 'asc' ? result : -result;
-      }),
-    [groups, sortKey, direction],
-  );
-
-  const headerClick = (key: 'count' | 'name' | 'redundant') => {
-    if (sortKey === key) {
-      setDirection((v) => (v === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setDirection(key === 'name' ? 'asc' : 'desc');
-    }
+  const headerClick = (key: DuplicatesQuery['sortKey']) => {
+    const next = sortKey === key ? (direction === 'asc' ? 'desc' : 'asc') : key === 'name' ? 'asc' : 'desc';
+    onSortChange(key, next);
   };
 
-  const arrow = (key: 'count' | 'name' | 'redundant') => (sortKey === key ? (direction === 'asc' ? '↑' : '↓') : '');
+  const arrow = (key: DuplicatesQuery['sortKey']) => (sortKey === key ? (direction === 'asc' ? '↑' : '↓') : '');
 
-  const allIds = useMemo(() => sorted.flatMap((g) => g.files.map((e) => e.id)), [sorted]);
+  const allIds = useMemo(() => groups.flatMap((g) => g.files.map((e) => e.id)), [groups]);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
   const someSelected = allIds.some((id) => selected.has(id));
 
@@ -88,7 +76,7 @@ export function DuplicateGroupTable({
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {sorted.map((g) => {
+          {groups.map((g) => {
             const ids = g.files.map((e) => e.id);
             const groupAll = ids.length > 0 && ids.every((id) => selected.has(id));
             const groupSome = ids.some((id) => selected.has(id));
