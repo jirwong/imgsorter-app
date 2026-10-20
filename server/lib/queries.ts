@@ -14,9 +14,12 @@ import type {
   OverviewData,
   ShellData,
 } from '../../app/lib/types';
-import { mapPathToDisplay, rootLabelOf } from './labels';
+import { mapPathToDisplay, rootLabelOf, toStorageRoots } from './labels';
 import { isWithinRoots } from './directory-scope';
 import { sampleDbPath } from './db-path';
+import { withRead } from './db';
+import { scopeClause } from './scope-sql';
+import type { ScopeClause } from './scope-sql';
 
 type EntryRow = {
   id: number;
@@ -75,6 +78,40 @@ function readEntries(roots: string[]): Entry[] {
   return readScopedRows(roots).map(toEntry);
 }
 
+export type DuplicateGroupRow = { hash: string; filename: string; n: number; firstId: number };
+
+type CountRow = { n: number };
+
+function readScope(roots: string[]): ScopeClause {
+  return scopeClause(toStorageRoots(roots));
+}
+
+function duplicateGroupSql(scope: ScopeClause): string {
+  return `SELECT hash, filename, COUNT(*) AS n, MIN(id) AS firstId
+    FROM entries
+    WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+    GROUP BY hash, filename
+    HAVING COUNT(*) >= 2`;
+}
+
+export function duplicateGroupRows(db: DatabaseType, scope: ScopeClause): DuplicateGroupRow[] {
+  return db.prepare(duplicateGroupSql(scope)).all(...scope.params) as DuplicateGroupRow[];
+}
+
+function storageMapRows(
+  totalSize: number,
+  directories: { directory: string; n: number; bytes: number }[],
+): OverviewData['storageMap'] {
+  const byRoot = new Map<string, number>();
+  for (const { directory, bytes } of directories) {
+    const label = rootLabelOf(mapPathToDisplay(directory));
+    byRoot.set(label, (byRoot.get(label) ?? 0) + bytes);
+  }
+  return [...byRoot.entries()]
+    .map(([path, size]) => ({ path, size, share: totalSize === 0 ? 0 : Math.round((size / totalSize) * 100) }))
+    .sort((a, b) => b.size - a.size);
+}
+
 type DuplicateGrouping = {
   key: string;
   hash: string;
@@ -113,39 +150,67 @@ function groupDuplicates(entries: Entry[]): DuplicateGrouping[] {
   return result;
 }
 
-export function getOverviewStats(roots: string[]): OverviewData {
-  const entries = readEntries(roots);
-  const totalFiles = entries.length;
-  const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
-  const groups = groupDuplicates(entries);
-  const redundantSpace = groups.reduce((sum, group) => sum + (group.count - 1) * group.size, 0);
-
-  const hashCounts = new Map<string, number>();
-  for (const entry of entries) {
-    if (entry.hash) hashCounts.set(entry.hash, (hashCounts.get(entry.hash) ?? 0) + 1);
-  }
-  const uniqueFiles = [...hashCounts.values()].filter((count) => count === 1).length;
-
-  const byRoot = new Map<string, number>();
-  for (const entry of entries) {
-    const label = rootLabelOf(entry.directory);
-    byRoot.set(label, (byRoot.get(label) ?? 0) + entry.size);
-  }
-  const storageMap = [...byRoot.entries()]
-    .map(([path, size]) => ({ path, size, share: totalSize === 0 ? 0 : Math.round((size / totalSize) * 100) }))
-    .sort((a, b) => b.size - a.size);
-
-  const largestFiles = [...entries].sort((a, b) => b.size - a.size || a.filename.localeCompare(b.filename)).slice(0, 4);
-
+export function getOverviewStatsSql(roots: string[]): OverviewData {
+  const stats = withRead((db) => {
+    const scope = readScope(roots);
+    const files = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
+    const size = db
+      .prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM entries WHERE ${scope.sql}`)
+      .get(...scope.params) as CountRow;
+    const groups = duplicateGroupRows(db, scope);
+    const redundant = db
+      .prepare(
+        `SELECT COALESCE(SUM((g.n - 1) * e.size), 0) AS n
+        FROM (${duplicateGroupSql(scope)}) AS g
+        JOIN entries AS e ON e.id = g.firstId`,
+      )
+      .get(...scope.params) as CountRow;
+    const unique = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM (
+        SELECT hash FROM entries
+        WHERE ${scope.sql} AND hash IS NOT NULL AND hash <> ''
+        GROUP BY hash HAVING COUNT(*) = 1
+      )`,
+      )
+      .get(...scope.params) as CountRow;
+    const directories = db
+      .prepare(
+        `SELECT directory, COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes
+        FROM entries WHERE ${scope.sql} GROUP BY directory`,
+      )
+      .all(...scope.params) as { directory: string; n: number; bytes: number }[];
+    const largest = db
+      .prepare(
+        `SELECT id, size, directory, extension, filename, birthtime, hash, path
+        FROM entries WHERE ${scope.sql} ORDER BY size DESC, filename ASC LIMIT 4`,
+      )
+      .all(...scope.params) as EntryRow[];
+    const totalSize = size.n;
+    return {
+      totalFiles: files.n,
+      totalSize,
+      duplicateGroups: groups.length,
+      redundantSpace: redundant.n,
+      uniqueFiles: unique.n,
+      storageMap: storageMapRows(totalSize, directories),
+      largestFiles: largest.map(toEntry),
+    };
+  });
+  if (stats) return stats;
   return {
-    totalFiles,
-    totalSize,
-    duplicateGroups: groups.length,
-    redundantSpace,
-    uniqueFiles,
-    storageMap,
-    largestFiles,
+    totalFiles: 0,
+    totalSize: 0,
+    duplicateGroups: 0,
+    redundantSpace: 0,
+    uniqueFiles: 0,
+    storageMap: [],
+    largestFiles: [],
   };
+}
+
+export function getOverviewStats(roots: string[]): OverviewData {
+  return getOverviewStatsSql(roots);
 }
 
 export function listEntries(input: FilesInput, roots: string[]): Entry[] {
@@ -177,12 +242,23 @@ export function getAnalyticsData(roots: string[]): AnalyticsData {
   return { rankedBySize, rankedByCopies };
 }
 
+export function getShellDataSql(roots: string[]): ShellData {
+  const shell = withRead((db) => {
+    const scope = readScope(roots);
+    const files = db.prepare(`SELECT COUNT(*) AS n FROM entries WHERE ${scope.sql}`).get(...scope.params) as CountRow;
+    const size = db
+      .prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM entries WHERE ${scope.sql}`)
+      .get(...scope.params) as CountRow;
+    const duplicateGroups = db
+      .prepare(`SELECT COUNT(*) AS n FROM (${duplicateGroupSql(scope)})`)
+      .get(...scope.params) as CountRow;
+    return { files: files.n, size: size.n, duplicateGroups: duplicateGroups.n };
+  });
+  return shell ?? { files: 0, size: 0, duplicateGroups: 0 };
+}
+
 export function getShellData(roots: string[]): ShellData {
-  const entries = readEntries(roots);
-  const files = entries.length;
-  const size = entries.reduce((sum, entry) => sum + entry.size, 0);
-  const duplicateGroups = groupDuplicates(entries).length;
-  return { files, size, duplicateGroups };
+  return getShellDataSql(roots);
 }
 
 export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {

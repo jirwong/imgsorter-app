@@ -14,7 +14,9 @@ import {
   getEntryPathsByIds,
   getKeeperData,
   getOverviewStats,
+  getOverviewStatsSql,
   getShellData,
+  getShellDataSql,
   listEntries,
 } from './queries';
 
@@ -86,6 +88,23 @@ describe('queries against the committed sample db', () => {
     expect(shell.files).toBe(expected.totalFiles);
     expect(shell.size).toBe(expected.totalSize);
     expect(shell.duplicateGroups).toBe(expected.duplicateGroups);
+  });
+
+  it('computes shell totals in SQL and matches the fixture plan', () => {
+    expect(getShellDataSql(ROOTS)).toEqual({
+      files: expected.totalFiles,
+      size: expected.totalSize,
+      duplicateGroups: expected.duplicateGroups,
+    });
+  });
+
+  it('computes overview totals in SQL and matches the fixture plan', () => {
+    const stats = getOverviewStatsSql(ROOTS);
+    expect(stats.totalFiles).toBe(expected.totalFiles);
+    expect(stats.totalSize).toBe(expected.totalSize);
+    expect(stats.duplicateGroups).toBe(expected.duplicateGroups);
+    expect(stats.redundantSpace).toBe(expected.redundantSpace);
+    expect(stats.uniqueFiles).toBe(expected.uniqueFiles);
   });
 
   it('returns 24 duplicate groups with their member files', () => {
