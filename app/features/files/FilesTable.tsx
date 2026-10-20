@@ -76,6 +76,7 @@ export function FilesTable({
   if (lockedPageKey !== lockedKey) {
     setLockedPageKey(lockedKey);
     setPage(1);
+    if (appliedDirectories.length > 0) setAppliedDirectories([]);
   }
 
   const hiddenEnabled =

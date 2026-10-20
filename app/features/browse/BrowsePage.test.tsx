@@ -125,18 +125,23 @@ describe('BrowsePage', () => {
     );
 
     mocks.getBrowseData.mockClear();
-    rerender(pageElement(browseResult(), ['C:/Media/2024']));
-    await waitFor(() =>
-      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
-        data: expect.objectContaining({
-          selectedDirs: ['C:/Media/2025'],
-          lockedDirs: ['C:/Media/2024'],
-          page: 1,
-        }),
-      }),
-    );
+    rerender(pageElement(browseResult({ files: [entry(31, 'C:/Media/2024')], total: 1 }), ['C:/Media/2024']));
+    expect(await screen.findByText('file-31.jpg')).toBeInTheDocument();
+    expect(screen.queryByText('file-1.jpg')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^All directories$/ })).toBeInTheDocument();
+    expect(mocks.getBrowseData).not.toHaveBeenCalled();
+  });
 
-    applyPickerDirectories([], true);
+  it('drops the picker directory when the tree changes', async () => {
+    const { rerender } = renderPage(browseResult(), ['C:/Media']);
+    applyPickerDirectories(['C:/Media/2025']);
+    await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
+
+    mocks.getBrowseData.mockClear();
+    rerender(pageElement(browseResult(), ['C:/Media/2024']));
+    await screen.findByText('file-1.jpg');
+    expect(screen.getByRole('button', { name: /^All directories$/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Filter filename or path'), { target: { value: 'file' } });
     await waitFor(() =>
       expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
         data: expect.objectContaining({ selectedDirs: [], lockedDirs: ['C:/Media/2024'], page: 1 }),
@@ -177,18 +182,18 @@ describe('BrowsePage', () => {
     expect(mocks.getBrowseData).not.toHaveBeenCalled();
   });
 
-  it('refetches once when picker directories narrow the loader page', async () => {
+  it('refetches once when the loader page changes under the same tree', async () => {
     const { rerender } = renderPage(browseResult(), []);
     applyPickerDirectories(['C:/Media/2025']);
     await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
 
     mocks.getBrowseData.mockClear();
-    rerender(pageElement(browseResult(), ['C:/Media/2024']));
+    rerender(pageElement(browseResult({ files: [entry(31)], total: 2 }), []));
     await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
     expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
       data: expect.objectContaining({
         selectedDirs: ['C:/Media/2025'],
-        lockedDirs: ['C:/Media/2024'],
+        lockedDirs: [],
         page: 1,
       }),
     });

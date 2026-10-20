@@ -12,6 +12,8 @@ import { clearThumbnailCache } from '../../../server/routes/thumbnails';
 import { pickDirectory } from '../../../server/routes/native';
 import type { AppConfig, ApplicationConfig, IndexedDirectory } from '../../lib/types';
 
+const DIRECTORY_WRITE = 'directory-write';
+
 function metaKey(path: string): string {
   return normalizeDirectoryPath(path).toLowerCase();
 }
@@ -45,10 +47,16 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   };
 
   const persistDirectories = async (nextIndexed: IndexedDirectory[], nextIgnored: string[]): Promise<void> => {
-    const result = await saveDirectories({ data: { indexed: nextIndexed, ignored: nextIgnored } });
-    setIndexed(result.directories.indexed);
-    setIgnored(result.directories.ignored);
-    await refresh();
+    if (savingPath !== null) return;
+    setSavingPath(DIRECTORY_WRITE);
+    try {
+      const result = await saveDirectories({ data: { indexed: nextIndexed, ignored: nextIgnored } });
+      setIndexed(result.directories.indexed);
+      setIgnored(result.directories.ignored);
+      await refresh();
+    } finally {
+      setSavingPath(null);
+    }
   };
 
   const toggleIndexed = async (item: IndexedDirectory): Promise<void> => {
