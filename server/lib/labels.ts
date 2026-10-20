@@ -23,3 +23,32 @@ export function rootLabelOf(mappedPath: string): string {
   const first = mappedPath.split('/')[0] ?? mappedPath;
   return first;
 }
+
+type StorageMapping = { pattern: string; prefix: string };
+
+const STORAGE_MAPPINGS: StorageMapping[] = ROOT_LABELS.flatMap(({ prefix, label }) => {
+  const labelSegments = label.split('/');
+  const prefixSegments = prefix.split('/');
+  return labelSegments.slice(1).map((_, index) => {
+    const depth = index + 2;
+    return {
+      pattern: labelSegments.slice(0, depth).join('/').toLowerCase(),
+      prefix: prefixSegments.slice(0, depth).join('/'),
+    };
+  });
+}).sort((a, b) => b.pattern.length - a.pattern.length);
+
+export function toStoragePath(displayPath: string): string {
+  const normalized = displayPath.replace(/\\/g, '/');
+  const lower = normalized.toLowerCase();
+  for (const { pattern, prefix } of STORAGE_MAPPINGS) {
+    if (lower === pattern || lower.startsWith(`${pattern}/`)) {
+      return prefix + normalized.slice(pattern.length);
+    }
+  }
+  return normalized;
+}
+
+export function toStorageRoots(roots: string[]): string[] {
+  return roots.map(toStoragePath);
+}
