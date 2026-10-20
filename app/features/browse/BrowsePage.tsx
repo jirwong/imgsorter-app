@@ -1,33 +1,81 @@
+import { useEffect, useRef, useState } from 'react';
+import { notifications } from '@mantine/notifications';
 import { PageHeading } from '../../components/common/PageHeading';
 import { DirectoryTree } from '../../components/common/DirectoryTree';
 import { FilesTable } from '../files/FilesTable';
 import { useApp } from '../../lib/app-context';
-import type { DirectoryNode, Entry, FilesResult } from '../../lib/types';
+import { getBrowseData } from '../../../server/routes/browse';
+import type { DirectoryNode, FilesQuery, FilesResult } from '../../lib/types';
 
-function toFilesResult(files: Entry[]): FilesResult {
-  const directories = new Map<string, { count: number; hidden: number }>();
-  const extensions = new Map<string, number>();
-  for (const entry of files) {
-    const counts = directories.get(entry.directory) ?? { count: 0, hidden: 0 };
-    counts.count += 1;
-    directories.set(entry.directory, counts);
-    extensions.set(entry.extension, (extensions.get(entry.extension) ?? 0) + 1);
-  }
-  return {
-    files,
-    total: files.length,
-    directoryCounts: [...directories.entries()].map(([path, counts]) => ({
-      path,
-      count: counts.count,
-      hidden: counts.hidden,
-    })),
-    extensionCounts: [...extensions.entries()].map(([extension, count]) => ({ extension, count })),
-    hiddenCount: 0,
-  };
-}
+export const DEFAULT_BROWSE_QUERY: FilesQuery = {
+  query: '',
+  selectedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 25,
+  sortKey: 'location',
+  direction: 'asc',
+};
 
-export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNode[] }) {
+type BrowseResult = FilesResult & { tree: DirectoryNode[] };
+
+export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; selectedDirs: string[] }) {
   const { setSelectedFile } = useApp();
+  const [query, setQuery] = useState<FilesQuery>(() => ({ ...DEFAULT_BROWSE_QUERY, selectedDirs }));
+  const [data, setData] = useState<FilesResult>(initial);
+  const [tree, setTree] = useState<DirectoryNode[]>(initial.tree);
+  const [loading, setLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const initialised = useRef(false);
+  const loaderData = useRef(initial);
+  const loaderDirs = useRef(selectedDirs);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    if (loaderData.current === initial) return;
+    loaderData.current = initial;
+    setTree(initial.tree);
+    setRevision((value) => value + 1);
+  }, [initial]);
+
+  useEffect(() => {
+    if (loaderDirs.current === selectedDirs) return;
+    loaderDirs.current = selectedDirs;
+    setQuery((current) => ({ ...current, selectedDirs, page: 1 }));
+  }, [selectedDirs]);
+
+  useEffect(() => {
+    if (!initialised.current) {
+      initialised.current = true;
+      return;
+    }
+    let cancelled = false;
+    const id = ++requestId.current;
+    setLoading(true);
+    getBrowseData({ data: query })
+      .then((result) => {
+        if (cancelled || id !== requestId.current) return;
+        setData(result);
+        setTree(result.tree);
+      })
+      .catch(() => {
+        if (!cancelled && id === requestId.current) {
+          notifications.show({ color: 'red', message: 'Could not load files.' });
+        }
+      })
+      .finally(() => {
+        if (!cancelled && id === requestId.current) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [query, revision]);
+
+  const applyQuery = (next: FilesQuery) => {
+    setQuery({ ...next, selectedDirs: [...new Set([...selectedDirs, ...next.selectedDirs])] });
+  };
 
   return (
     <>
@@ -39,7 +87,7 @@ export function BrowsePage({ files, tree }: { files: Entry[]; tree: DirectoryNod
       <div className="browse-layout">
         <DirectoryTree tree={tree} />
         <div className="browse-results">
-          <FilesTable data={toFilesResult(files)} loading={false} onQueryChange={() => {}} onSelect={setSelectedFile} />
+          <FilesTable data={data} loading={loading} onQueryChange={applyQuery} onSelect={setSelectedFile} />
         </div>
       </div>
     </>
