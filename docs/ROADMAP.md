@@ -64,12 +64,12 @@ phase's brainstorm runs.*
 - **11 — Read-path and scan performance:** every read path filters in indexed SQL
   behind a cached read-only connection; Unique Files, Browse, Duplicates and
   Analytics page on the server; the Preferences directory toggle is one grouped
-  read; and the scan no longer builds the unused duplicate `records` table.
-  Measured on the synthetic 350k-row bench: Duplicates first page 125 ms and
-  Preferences counts 25–28 ms per root meet their targets; Unique Files 630 ms,
-  Analytics 402 ms, shell 580 ms and Overview 1,423 ms still miss
+  read; and the scan's duplicate-records phase is off, so the `records` table stays
+  empty. Measured on the final synthetic 350k-row bench: Duplicates first page
+  120 ms and Preferences counts 23–24 ms per root meet their targets; Unique Files
+  608 ms, Analytics 388 ms, shell 483 ms and Overview 1,375 ms still miss
   300/200/200/300 ms. Aggregate tables or a cache for those paths are a known
-  follow-up. Landed in PRs #108 (A1), #109 (A2), and the A3 scan PR. Spec:
+  follow-up. Landed in PRs #108 (A1), #109 (A2), and #110 (A3). Spec:
   [2026-10-20-performance-read-paths-design.md](superpowers/specs/2026-10-20-performance-read-paths-design.md);
   plan:
   [2026-10-20-performance-read-paths.md](superpowers/plans/2026-10-20-performance-read-paths.md).

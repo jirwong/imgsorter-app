@@ -162,11 +162,11 @@ review`.
   scope; A2 moved every read path to indexed SQL with server-side paging and made the
   Preferences directory toggle a single grouped read; **A3 turned the scan's
   duplicate-records phase off** and regenerated the fixture without records. Measured on
-  the synthetic 350k-row bench: Duplicates first page 125 ms and Preferences counts
-  25–28 ms per root meet their targets. The aggregate paths still miss: Unique Files
-  630 ms, Analytics 402 ms, shell 580 ms and Overview 1,423 ms against
+  the final synthetic 350k-row bench: Duplicates first page 120 ms and Preferences counts
+  23–24 ms per root meet their targets. The aggregate paths still miss: Unique Files
+  608 ms, Analytics 388 ms, shell 483 ms and Overview 1,375 ms against
   300/200/200/300 ms; aggregate tables or a cache for those paths remain a known
-  follow-up. Landed in PRs #108 (A1), #109 (A2), and the A3 scan PR. Spec at
+  follow-up. Landed in PRs #108 (A1), #109 (A2), and #110 (A3). Spec at
   `docs/superpowers/specs/2026-10-20-performance-read-paths-design.md`; plan at
   `docs/superpowers/plans/2026-10-20-performance-read-paths.md`.
 - Roadmap: `docs/ROADMAP.md`.
