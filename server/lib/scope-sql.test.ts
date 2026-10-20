@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { isWithinRoots } from './directory-scope';
 import { scopeClause, subtreeClause } from './scope-sql';
 
-const GROUP_SQL = '(directory_norm = ? OR (directory_norm >= ? AND directory_norm < ?))';
+const GROUP_SQL = '(directory_norm = lower(?) OR (directory_norm >= lower(?) AND directory_norm < lower(?)))';
 
 const DIRECTORIES = [
   'C:\\Media',
@@ -37,7 +37,7 @@ describe('subtreeClause', () => {
   it('emits one three-parameter group for a normalized root', () => {
     expect(subtreeClause('C:\\Media\\')).toEqual({
       sql: GROUP_SQL,
-      params: ['c:/media', 'c:/media/', 'c:/media0'],
+      params: ['C:/Media', 'C:/Media/', 'C:/Media0'],
     });
   });
 });
@@ -54,14 +54,14 @@ describe('scopeClause', () => {
     });
   });
 
-  it('normalizes case, separators, and trailing slashes', () => {
-    expect(scopeClause(['C:\\Media\\'])).toEqual(scopeClause(['c:/media']));
+  it('normalizes separators and trailing slashes', () => {
+    expect(scopeClause(['C:\\Media\\'])).toEqual(scopeClause(['C:/Media']));
   });
 
   it('joins multiple groups in parentheses', () => {
     expect(scopeClause(['C:/Media', 'D:\\Photos\\2025'])).toEqual({
       sql: `(${GROUP_SQL} OR ${GROUP_SQL})`,
-      params: ['c:/media', 'c:/media/', 'c:/media0', 'd:/photos/2025', 'd:/photos/2025/', 'd:/photos/20250'],
+      params: ['C:/Media', 'C:/Media/', 'C:/Media0', 'D:/Photos/2025', 'D:/Photos/2025/', 'D:/Photos/20250'],
     });
   });
 });
@@ -93,6 +93,11 @@ describe('scopeClause against SQLite', () => {
 
   it('matches a mixed-case backslash path in a subtree', () => {
     expect(matched(DIRECTORIES, ['c:/media/2025'])).toEqual(['C:\\Media\\2025', 'c:/media/2025']);
+  });
+
+  it('matches an accented root and its subtree with consistent non-ASCII casing', () => {
+    const directories = ['C:\\Photos\\Été', 'C:\\Photos\\Été\\Sub', 'C:\\Photos\\Été2'];
+    expect(matched(directories, ['C:/Photos/Été'])).toEqual(['C:\\Photos\\Été', 'C:\\Photos\\Été\\Sub']);
   });
 
   it('matches nothing when no roots are enabled', () => {

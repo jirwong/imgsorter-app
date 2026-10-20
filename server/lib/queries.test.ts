@@ -1,12 +1,14 @@
-import { copyFileSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { applyFilters } from '../../app/lib/filter-pipeline';
 import type { DirectoryStat, FilesInput } from '../../app/lib/types';
 import { fixtureDbPath } from './db-path';
 import { closeReadConnections } from './db';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
+import { toStoragePath } from './labels';
 import {
   clearIndex,
   countEntriesByDirectory,
@@ -111,6 +113,69 @@ describe('queries against the committed sample db', () => {
       const actual = listEntriesSql(input, ROOTS);
       const expectedRows = applyFilters(all, input.query, input.dir, input.ext, input.selectedDirs);
       expect(byId(actual)).toEqual(byId(expectedRows));
+    }
+  });
+
+  it('matches a path-only query through the lower(path) branch', () => {
+    const rows = listEntriesSql({ query: '2025', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((entry) => entry.path.toLowerCase().includes('2025'))).toBe(true);
+    expect(rows.every((entry) => !entry.filename.toLowerCase().includes('2025'))).toBe(true);
+  });
+
+  it('orders listings by directory then filename', () => {
+    const rows = listEntriesSql({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS);
+    for (let index = 1; index < rows.length; index += 1) {
+      const previous = rows[index - 1];
+      const current = rows[index];
+      const previousDir = toStoragePath(previous.directory);
+      const currentDir = toStoragePath(current.directory);
+      expect(previousDir < currentDir || (previousDir === currentDir && previous.filename <= current.filename)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('treats LIKE metacharacters literally in a query', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'imgsorter-like-'));
+    const path = join(dir, 'like.db');
+    const db = new Database(path);
+    db.exec(`
+      CREATE TABLE entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        size INTEGER,
+        directory TEXT,
+        extension TEXT,
+        filename TEXT,
+        birthtime TEXT,
+        hash TEXT,
+        path TEXT,
+        UNIQUE(path)
+      );
+    `);
+    const insert = db.prepare(
+      `INSERT INTO entries (size, directory, extension, filename, birthtime, hash, path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const filename of ['IMG21.jpg', 'IMG_1.jpg', '100%.jpg']) {
+      insert.run(10, 'C:/Custom', '.jpg', filename, '2025-01-01T00:00:00Z', null, `C:/Custom/${filename}`);
+    }
+    db.close();
+    const previous = process.env.IMGSORTER_DB_PATH;
+    process.env.IMGSORTER_DB_PATH = path;
+    try {
+      const input = (query: string): FilesInput => ({
+        query,
+        dir: 'All directories',
+        ext: 'All types',
+        selectedDirs: [],
+      });
+      expect(listEntriesSql(input('IMG_1'), ['C:/Custom']).map((entry) => entry.filename)).toEqual(['IMG_1.jpg']);
+      expect(listEntriesSql(input('%'), ['C:/Custom']).map((entry) => entry.filename)).toEqual(['100%.jpg']);
+    } finally {
+      if (previous === undefined) delete process.env.IMGSORTER_DB_PATH;
+      else process.env.IMGSORTER_DB_PATH = previous;
+      closeReadConnections();
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 
@@ -266,6 +331,8 @@ describe('queries against the committed sample db', () => {
   it('returns empty results for an empty roots list', () => {
     expect(getOverviewStats([]).totalFiles).toBe(0);
     expect(getDirectoryStats([])).toEqual([]);
+    expect(getDirectoryStatsSql([])).toEqual([]);
+    expect(listEntriesSql({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, [])).toEqual([]);
     expect(getDuplicateGroups([])).toEqual([]);
     expect(getShellData([])).toEqual({ files: 0, size: 0, duplicateGroups: 0 });
   });

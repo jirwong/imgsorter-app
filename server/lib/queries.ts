@@ -85,12 +85,16 @@ function readScope(roots: string[]): ScopeClause {
   return scopeClause(toStorageRoots(roots));
 }
 
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
 function filterClause(input: FilesInput): ScopeClause {
   const conditions: string[] = [];
   const params: string[] = [];
-  const query = input.query.trim().toLowerCase();
+  const query = escapeLike(input.query.trim().toLowerCase());
   if (query) {
-    conditions.push(`(lower(filename) LIKE ? OR lower(path) LIKE ?)`);
+    conditions.push(`(lower(filename) LIKE ? ESCAPE '\\' OR lower(path) LIKE ? ESCAPE '\\')`);
     params.push(`%${query}%`, `%${query}%`);
   }
   if (input.dir !== 'All directories') {
@@ -263,7 +267,7 @@ export function getDirectoryStatsSql(roots: string[]): DirectoryStat[] {
     const scope = readScope(roots);
     const rows = db
       .prepare(
-        `SELECT directory, COUNT(*) AS fileCount, SUM(size) AS size
+        `SELECT directory, COUNT(*) AS fileCount, COALESCE(SUM(size), 0) AS size
         FROM entries WHERE ${scope.sql} GROUP BY directory`,
       )
       .all(...scope.params) as { directory: string; fileCount: number; size: number }[];

@@ -1,12 +1,12 @@
 import '@tanstack/react-start/server-only';
-import { normalizeDirectoryKey } from '../../app/lib/directory-path';
+import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 
 export type ScopeClause = { sql: string; params: string[] };
 
-const GROUP_SQL = '(directory_norm = ? OR (directory_norm >= ? AND directory_norm < ?))';
+const GROUP_SQL = '(directory_norm = lower(?) OR (directory_norm >= lower(?) AND directory_norm < lower(?)))';
 
 export function subtreeClause(root: string): ScopeClause {
-  const key = normalizeDirectoryKey(root);
+  const key = normalizeDirectoryPath(root);
   return { sql: GROUP_SQL, params: [key, `${key}/`, `${key}0`] };
 }
 

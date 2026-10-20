@@ -197,7 +197,7 @@ closeReadConnections(): void
 fragment:
 
 ```sql
-(directory_norm = ? OR (directory_norm >= ? AND directory_norm < ?))
+(directory_norm = lower(?) OR (directory_norm >= lower(?) AND directory_norm < lower(?)))
 ```
 
 with parameters `root`, `root + '/'`, `root + '0'`.
@@ -207,8 +207,9 @@ with parameters `root`, `root + '/'`, `root + '0'`.
 - Multiple roots become an `OR` of the same three-parameter group. SQLite's OR
   optimization uses `idx_entries_dir_norm`.
 - An empty roots list yields `0` (nothing in scope), matching Phase 8.
-- Roots are normalized (lowercase, forward slashes, trailing slash removed)
-  before use.
+- Roots are normalized (forward slashes, trailing slash removed) without
+  lowercasing. Both the column and the parameters pass through SQLite `lower()`,
+  so ASCII comparison is case-insensitive and non-ASCII casing stays consistent.
 - Fixture roots are display paths. `server/lib/labels.ts` gains a reverse
   mapping (`C:/Media` → `@fixtures/Media`) so the predicate uses stored values.
   Result rows still pass through `mapPathToDisplay` for display.
@@ -417,7 +418,9 @@ shape. A3 is independent of both.
   named "push the scope into SQL" as a later phase. This is that phase.
 - **Stale `records` table:** it remains on disk for existing databases and is
   cleared by reset, but nothing writes or reads it after A3.
-- **ASCII-only case folding:** the generated column uses SQLite `lower()`, which
-  folds ASCII only. Directory names with non-ASCII uppercase letters match
-  case-sensitively. Windows paths in practice are mostly ASCII; a later phase
-  can add a custom collation or a JS-maintained normalized column.
+- **Case folding:** the generated column and the scope parameters both use
+  SQLite `lower()`, which folds ASCII only. ASCII directories are
+  case-insensitive; non-ASCII directories are case-sensitive but consistent, so
+  a correctly cased configured root still matches its subtree. Windows paths in
+  practice are mostly ASCII; a later phase can add a custom collation or a
+  JS-maintained normalized column.
