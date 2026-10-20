@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
 import { AppProvider } from '../../lib/app-context';
 import type { DirectoryNode, Entry, FilesResult } from '../../lib/types';
@@ -21,15 +21,15 @@ import { BrowsePage } from './BrowsePage';
 
 type BrowseResult = FilesResult & { tree: DirectoryNode[] };
 
-const entry = (id: number): Entry => ({
+const entry = (id: number, directory = 'C:/Media/2025'): Entry => ({
   id,
   size: 6_400,
-  directory: 'C:/Media/2025',
+  directory,
   extension: '.jpg',
   filename: `file-${id}.jpg`,
   birthtime: '2025-01-01T00:00:00Z',
   hash: `h${id}`,
-  path: `C:/Media/2025/file-${id}.jpg`,
+  path: `${directory}/file-${id}.jpg`,
 });
 
 const tree: DirectoryNode[] = [
@@ -44,10 +44,15 @@ const tree: DirectoryNode[] = [
 
 const otherTree: DirectoryNode[] = [{ label: 'D:\\', path: 'D:', fileCount: 0, size: 0, children: [] }];
 
+const directoryCounts = [
+  { path: 'C:/Media/2024', count: 1, hidden: 0 },
+  { path: 'C:/Media/2025', count: 2, hidden: 0 },
+];
+
 const browseResult = (overrides: Partial<BrowseResult> = {}): BrowseResult => ({
   files: [entry(1), entry(2)],
   total: 2,
-  directoryCounts: [{ path: 'C:/Media/2025', count: 2, hidden: 0 }],
+  directoryCounts,
   extensionCounts: [{ extension: '.jpg', count: 2 }],
   hiddenCount: 0,
   tree,
@@ -66,6 +71,14 @@ function pageElement(initial: BrowseResult = browseResult(), selectedDirs: strin
 
 function renderPage(initial: BrowseResult = browseResult(), selectedDirs: string[] = []) {
   return render(pageElement(initial, selectedDirs));
+}
+
+function applyPickerDirectories(dirs: string[], clear = false) {
+  fireEvent.click(screen.getByRole('button', { name: /^(All directories|\d+ directories)$/ }));
+  const dialog = screen.getByRole('dialog');
+  if (clear) fireEvent.click(within(dialog).getByRole('button', { name: 'Clear' }));
+  for (const dir of dirs) fireEvent.click(within(dialog).getByRole('checkbox', { name: dir }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }));
 }
 
 describe('BrowsePage', () => {
@@ -98,14 +111,65 @@ describe('BrowsePage', () => {
     );
   });
 
-  it('requests a page for the selected search-param directories', async () => {
-    const { rerender } = renderPage(browseResult(), []);
-    rerender(pageElement(browseResult(), ['C:/Media']));
+  it('keeps the tree and picker directories together', async () => {
+    const { rerender } = renderPage(browseResult(), ['C:/Media']);
+    applyPickerDirectories(['C:/Media/2025']);
     await waitFor(() =>
-      expect(mocks.getBrowseData).toHaveBeenCalledWith({
-        data: expect.objectContaining({ selectedDirs: ['C:/Media'], page: 1 }),
+      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ selectedDirs: ['C:/Media', 'C:/Media/2025'], page: 1 }),
       }),
     );
+
+    mocks.getBrowseData.mockClear();
+    rerender(pageElement(browseResult(), ['C:/Media/2024']));
+    await waitFor(() =>
+      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ selectedDirs: ['C:/Media/2024', 'C:/Media/2025'], page: 1 }),
+      }),
+    );
+
+    applyPickerDirectories([], true);
+    await waitFor(() =>
+      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ selectedDirs: ['C:/Media/2024'], page: 1 }),
+      }),
+    );
+  });
+
+  it('resets the table to page 1 when the tree changes', async () => {
+    mocks.getBrowseData.mockResolvedValueOnce(browseResult({ files: [entry(26)], total: 30 }));
+    const { rerender } = renderPage(browseResult({ total: 30 }), []);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() =>
+      expect(mocks.getBrowseData).toHaveBeenLastCalledWith({ data: expect.objectContaining({ page: 2 }) }),
+    );
+    await screen.findByText('file-26.jpg');
+
+    mocks.getBrowseData.mockClear();
+    rerender(pageElement(browseResult({ files: [entry(31)], total: 30 }), ['C:/Media']));
+    await waitFor(() => expect(document.querySelector('.analytics-pagination')).toHaveTextContent('Page 1 of 2'));
+    expect(screen.getByText('file-31.jpg')).toBeInTheDocument();
+    expect(mocks.getBrowseData).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch when the loader page matches the query', () => {
+    const { rerender } = renderPage(browseResult(), []);
+    rerender(pageElement(browseResult({ files: [entry(4)] }), ['C:/Media']));
+    expect(screen.getByText('file-4.jpg')).toBeInTheDocument();
+    expect(mocks.getBrowseData).not.toHaveBeenCalled();
+  });
+
+  it('refetches once when picker directories narrow the loader page', async () => {
+    const { rerender } = renderPage(browseResult(), []);
+    applyPickerDirectories(['C:/Media/2025']);
+    await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
+
+    mocks.getBrowseData.mockClear();
+    rerender(pageElement(browseResult(), ['C:/Media/2024']));
+    await waitFor(() => expect(mocks.getBrowseData).toHaveBeenCalledTimes(1));
+    expect(mocks.getBrowseData).toHaveBeenLastCalledWith({
+      data: expect.objectContaining({ selectedDirs: ['C:/Media/2024', 'C:/Media/2025'], page: 1 }),
+    });
   });
 
   it('renders the tree returned with a page', async () => {

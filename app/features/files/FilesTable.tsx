@@ -9,6 +9,7 @@ import type { Entry, FilesQuery, FilesResult } from '../../lib/types';
 export type FilesTableProps = {
   data: FilesResult;
   loading: boolean;
+  lockedDirs?: string[];
   hidden?: string[];
   onHide?: (path: string) => void;
   onHideMany?: (paths: string[]) => void;
@@ -48,6 +49,7 @@ function toPageSize(value: string): FilesQuery['pageSize'] {
 export function FilesTable({
   data,
   loading,
+  lockedDirs,
   hidden,
   onHide,
   onHideMany,
@@ -68,6 +70,18 @@ export function FilesTable({
   const [sortKey, setSortKey] = useState<FilesQuery['sortKey']>('location');
   const [direction, setDirection] = useState<FilesQuery['direction']>('asc');
   const sentQuery = useRef(false);
+  const lockedKey = [...(lockedDirs ?? [])].sort().join('|');
+  const [lockedPageKey, setLockedPageKey] = useState(lockedKey);
+
+  if (lockedPageKey !== lockedKey) {
+    setLockedPageKey(lockedKey);
+    setPage(1);
+  }
+
+  const selectedDirs = useMemo(
+    () => [...new Set([...(lockedDirs ?? []), ...appliedDirectories])],
+    [lockedDirs, appliedDirectories],
+  );
 
   const hiddenEnabled =
     hidden !== undefined &&
@@ -100,7 +114,7 @@ export function FilesTable({
 
   const query: FilesQuery = {
     query: fileQuery,
-    selectedDirs: appliedDirectories,
+    selectedDirs,
     extensions: extension === 'All extensions' ? [] : [extension],
     sizeFilter: SIZE_FILTERS[size] ?? 'all',
     hiddenMode: HIDDEN_FILTERS[hiddenFilter] ?? 'active',
@@ -120,7 +134,7 @@ export function FilesTable({
       return;
     }
     onQueryChange(query);
-  }, [fileQuery, appliedDirectories, extension, size, hiddenFilter, page, pageSize, sortKey, direction]);
+  }, [fileQuery, selectedDirs, extension, size, hiddenFilter, page, pageSize, sortKey, direction]);
 
   const toggleSelected = (id: number, path: string) => {
     setSelected((current) => {

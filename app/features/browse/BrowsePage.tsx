@@ -21,6 +21,10 @@ export const DEFAULT_BROWSE_QUERY: FilesQuery = {
 
 type BrowseResult = FilesResult & { tree: DirectoryNode[] };
 
+function queryKey(query: FilesQuery): string {
+  return JSON.stringify({ ...query, selectedDirs: [...query.selectedDirs].sort() });
+}
+
 export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; selectedDirs: string[] }) {
   const { setSelectedFile } = useApp();
   const [query, setQuery] = useState<FilesQuery>(() => ({ ...DEFAULT_BROWSE_QUERY, selectedDirs }));
@@ -31,26 +35,26 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
   const initialised = useRef(false);
   const loaderData = useRef(initial);
   const loaderDirs = useRef(selectedDirs);
+  const dataKey = useRef(queryKey({ ...DEFAULT_BROWSE_QUERY, selectedDirs }));
   const requestId = useRef(0);
 
   useEffect(() => {
-    if (loaderData.current === initial) return;
+    if (loaderData.current === initial && loaderDirs.current === selectedDirs) return;
     loaderData.current = initial;
-    setTree(initial.tree);
-    setRevision((value) => value + 1);
-  }, [initial]);
-
-  useEffect(() => {
-    if (loaderDirs.current === selectedDirs) return;
     loaderDirs.current = selectedDirs;
-    setQuery((current) => ({ ...current, selectedDirs, page: 1 }));
-  }, [selectedDirs]);
+    setData(initial);
+    setTree(initial.tree);
+    dataKey.current = queryKey({ ...DEFAULT_BROWSE_QUERY, selectedDirs });
+    setRevision((value) => value + 1);
+  }, [initial, selectedDirs]);
 
   useEffect(() => {
     if (!initialised.current) {
       initialised.current = true;
       return;
     }
+    const key = queryKey(query);
+    if (key === dataKey.current) return;
     let cancelled = false;
     const id = ++requestId.current;
     setLoading(true);
@@ -59,6 +63,7 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
         if (cancelled || id !== requestId.current) return;
         setData(result);
         setTree(result.tree);
+        dataKey.current = key;
       })
       .catch(() => {
         if (!cancelled && id === requestId.current) {
@@ -73,10 +78,6 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
     };
   }, [query, revision]);
 
-  const applyQuery = (next: FilesQuery) => {
-    setQuery({ ...next, selectedDirs: [...new Set([...selectedDirs, ...next.selectedDirs])] });
-  };
-
   return (
     <>
       <PageHeading
@@ -87,7 +88,13 @@ export function BrowsePage({ initial, selectedDirs }: { initial: BrowseResult; s
       <div className="browse-layout">
         <DirectoryTree tree={tree} />
         <div className="browse-results">
-          <FilesTable data={data} loading={loading} onQueryChange={applyQuery} onSelect={setSelectedFile} />
+          <FilesTable
+            data={data}
+            loading={loading}
+            lockedDirs={selectedDirs}
+            onQueryChange={setQuery}
+            onSelect={setSelectedFile}
+          />
         </div>
       </div>
     </>
