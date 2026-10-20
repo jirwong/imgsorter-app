@@ -21,6 +21,7 @@ Status legend: `[ ]` planned · `[~]` in progress · `[x]` complete
 | 8 | Enabled-directory scoping | Disabled directories hide from every page | `[x]` |
 | 9 | Hidden files (`app-config.db` `hidden` key; hide/unhide on Unique Files + Duplicates; bulk actions; hidden filters/counts) | Curate files without deleting them | `[x]` |
 | 10 | UI polish pass (page size + column sorting, preview copy actions, header filter/export removal, sidebar/content/directory-picker refinements, path-handling fixes) | Refined UI | `[x]` |
+| 11 | Read-path and scan performance (read cache + indexes, indexed SQL reads, server-side paging, records phase off) | Fast reads + no unused scan work | `[x]` |
 
 *Phase ordering and boundaries are provisional and will be refined as each
 phase's brainstorm runs.*
@@ -60,6 +61,19 @@ phase's brainstorm runs.*
   hidden counts; Browse scrolling and excluded-directory / resync path handling were
   fixed. Landed in PRs #86–#88 and #94–#101.
 
+- **11 — Read-path and scan performance:** every read path filters in indexed SQL
+  behind a cached read-only connection; Unique Files, Browse, Duplicates and
+  Analytics page on the server; the Preferences directory toggle is one grouped
+  read; and the scan's duplicate-records phase is off, so the `records` table stays
+  empty. Measured on the final synthetic 350k-row bench: Duplicates first page
+  120 ms and Preferences counts 23–24 ms per root meet their targets; Unique Files
+  608 ms, Analytics 388 ms, shell 483 ms and Overview 1,375 ms still miss
+  300/200/200/300 ms. Aggregate tables or a cache for those paths are a known
+  follow-up. Landed in PRs #108 (A1), #109 (A2), and #110 (A3). Spec:
+  [2026-10-20-performance-read-paths-design.md](superpowers/specs/2026-10-20-performance-read-paths-design.md);
+  plan:
+  [2026-10-20-performance-read-paths.md](superpowers/plans/2026-10-20-performance-read-paths.md).
+
 *Phases 9 and 10 have no spec or plan document. This roadmap records them
 retrospectively.*
 
@@ -91,6 +105,8 @@ spec → plan → PR loop):
 - Phase 5 is independent and can slot in anywhere after Phase 2.
 - Phase 9 depends on Phase 4a (the `app-config.db` store) and Phase 3 (Duplicates).
 - Phase 10 is a UI pass over the phases 1–8 pages and introduces no new data paths.
+- Phase 11 depends on Phases 2 and 8 (real data and enabled-root scoping must exist
+  before pushing the scope into SQL).
 
 ## Design decisions (cross-phase)
 
@@ -126,6 +142,7 @@ spec → plan → PR loop):
 | 8 | [2026-10-04-phase8-enabled-directory-scope-design.md](superpowers/specs/2026-10-04-phase8-enabled-directory-scope-design.md) |
 | 9 | *(no spec — retrospective; landed in PRs #89, #90, #92, #93, #102–#104)* |
 | 10 | *(no spec — retrospective; landed in PRs #86–#88, #94–#101)* |
+| 11 | [2026-10-20-performance-read-paths-design.md](superpowers/specs/2026-10-20-performance-read-paths-design.md) |
 
 ## How to add a phase
 

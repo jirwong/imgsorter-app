@@ -20,6 +20,7 @@ import {
   getDuplicateGroups,
   getDuplicateGroupsPage,
   getDuplicateGroupsSql,
+  getDuplicateStats,
   getEntryPathById,
   getEntryPathsByIds,
   getKeeperData,
@@ -622,6 +623,12 @@ describe('queries against the committed sample db', () => {
     expect(totalRedundant).toBe(expected.redundantSpace);
   });
 
+  it('counts duplicate groups and redundant files from the read layer', () => {
+    const stats = getDuplicateStats(ROOTS);
+    expect(stats.duplicateGroups).toBe(24);
+    expect(stats.duplicateFiles).toBeGreaterThan(0);
+  });
+
   it('matches the old JS grouping exactly', () => {
     const groups = getDuplicateGroupsSql(ROOTS);
     expect(groups).toHaveLength(expected.duplicateGroups);
@@ -1100,7 +1107,7 @@ describe('queries against the committed sample db', () => {
       expect(getDirectoryStats(ROOTS).length).toBeGreaterThan(0);
       const result = clearIndex();
       expect(result.entries).toBeGreaterThan(0);
-      expect(result.records).toBeGreaterThan(0);
+      expect(result.records).toBe(0);
       expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS)).toEqual([]);
       expect(getDirectoryStats(ROOTS)).toEqual([]);
     } finally {

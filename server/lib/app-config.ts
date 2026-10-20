@@ -55,7 +55,7 @@ function normalizeApplication(input: ApplicationConfig): ApplicationConfig {
   return {
     extensions: input.extensions.trim(),
     processDirectories: Boolean(input.processDirectories),
-    updateRecords: Boolean(input.updateRecords),
+    updateRecords: false,
     resyncDirectories,
     verifyFiles: resyncDirectories && Boolean(input.verifyFiles),
     generatePreviews: Boolean(input.generatePreviews),

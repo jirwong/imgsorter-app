@@ -8,7 +8,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   application: {
     extensions: 'jpg, png, gif, jpeg, mp4, mov',
     processDirectories: true,
-    updateRecords: true,
+    updateRecords: false,
     resyncDirectories: false,
     verifyFiles: false,
     generatePreviews: false,

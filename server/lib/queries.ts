@@ -195,6 +195,17 @@ export function duplicateGroupRows(db: DatabaseType, scope: ScopeClause): Duplic
   return db.prepare(duplicateGroupSql(scope)).all(...scope.params) as DuplicateGroupRow[];
 }
 
+export function getDuplicateStats(roots: string[]): { duplicateGroups: number; duplicateFiles: number } {
+  const stats = withRead((db) => {
+    const rows = duplicateGroupRows(db, readScope(db, roots));
+    return {
+      duplicateGroups: rows.length,
+      duplicateFiles: rows.reduce((sum, row) => sum + (row.n - 1), 0),
+    };
+  });
+  return stats ?? { duplicateGroups: 0, duplicateFiles: 0 };
+}
+
 function storageMapRows(
   totalSize: number,
   directories: { directory: string; n: number; bytes: number }[],

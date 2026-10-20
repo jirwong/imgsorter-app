@@ -17,13 +17,15 @@ const summary: RunSummary = {
   errors: [],
 };
 
+const duplicateStats = { duplicateGroups: 24, duplicateFiles: 9 };
+
 function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     directories: { indexed: [{ path: 'C:/Photos', enabled: true }], ignored: ['C:/Photos/Cache'] },
     application: {
       extensions: 'jpg, .PNG ,',
       processDirectories: true,
-      updateRecords: false,
+      updateRecords: true,
       resyncDirectories: true,
       verifyFiles: true,
       generatePreviews: false,
@@ -38,11 +40,18 @@ describe('createConfiguredScan', () => {
     const run = vi.fn(async (_config: RunConfiguration, _deps: RunConfiguredScanDeps) => summary);
     const recordScanned = vi.fn();
     const recordLastScan = vi.fn();
-    const scan = createConfiguredScan({ getConfig: () => baseConfig(), recordScanned, recordLastScan, run });
+    const getDuplicateStats = vi.fn(() => duplicateStats);
+    const scan = createConfiguredScan({
+      getConfig: () => baseConfig(),
+      recordScanned,
+      recordLastScan,
+      getDuplicateStats,
+      run,
+    });
 
     const result = await scan({ progress: sink, signal });
 
-    expect(result).toBe(summary);
+    expect(result).toEqual({ ...summary, duplicateGroups: 24, duplicateFiles: 9 });
     expect(run).toHaveBeenCalledTimes(1);
     const [config] = run.mock.calls[0];
     expect(config.directories).toEqual(['C:/Photos']);
@@ -51,6 +60,7 @@ describe('createConfiguredScan', () => {
     expect(config.update_records).toBe(false);
     expect(config.resync_directories).toBe(true);
     expect(config.resync_check_actual_file).toBe(true);
+    expect(getDuplicateStats).toHaveBeenCalledWith(['C:/Photos']);
     expect(recordScanned).toHaveBeenCalledWith(['C:/Photos'], expect.any(String));
     expect(recordLastScan).toHaveBeenCalledTimes(1);
     expect(recordLastScan).toHaveBeenCalledWith({
@@ -58,10 +68,44 @@ describe('createConfiguredScan', () => {
       directories: 1,
       filesScanned: 0,
       entriesWritten: 0,
-      duplicateGroups: 0,
-      duplicateFiles: 0,
+      duplicateGroups: 24,
+      duplicateFiles: 9,
       errors: 0,
     });
+  });
+
+  it('never enables the records phase', async () => {
+    const run = vi.fn(async (_config: RunConfiguration) => summary);
+    const scan = createConfiguredScan({
+      getConfig: () => baseConfig({ application: { ...baseConfig().application, updateRecords: true } }),
+      recordScanned: vi.fn(),
+      recordLastScan: vi.fn(),
+      getDuplicateStats: () => duplicateStats,
+      run,
+    });
+
+    await scan({ progress: sink, signal });
+
+    const [config] = run.mock.calls[0];
+    expect(config.update_records).toBe(false);
+  });
+
+  it('fills duplicate stats from the read layer', async () => {
+    const run = vi.fn(async () => summary);
+    const recordLastScan = vi.fn();
+    const scan = createConfiguredScan({
+      getConfig: () => baseConfig(),
+      recordScanned: vi.fn(),
+      recordLastScan,
+      getDuplicateStats: () => duplicateStats,
+      run,
+    });
+
+    const result = await scan({ progress: sink, signal });
+
+    expect(result.duplicateGroups).toBe(24);
+    expect(result.duplicateFiles).toBe(9);
+    expect(recordLastScan.mock.calls[0][0]).toMatchObject({ duplicateGroups: 24, duplicateFiles: 9 });
   });
 
   it('refuses when no directories are enabled', async () => {
@@ -71,6 +115,7 @@ describe('createConfiguredScan', () => {
       getConfig: () => baseConfig({ directories: { indexed: [{ path: 'C:/Photos', enabled: false }], ignored: [] } }),
       recordScanned: vi.fn(),
       recordLastScan,
+      getDuplicateStats: () => duplicateStats,
       run,
     });
     await expect(scan({ progress: sink, signal })).rejects.toBeInstanceOf(NoDirectoriesConfiguredError);
@@ -85,6 +130,7 @@ describe('createConfiguredScan', () => {
       getConfig: () => baseConfig({ application: { ...baseConfig().application, extensions: '  ' } }),
       recordScanned: vi.fn(),
       recordLastScan,
+      getDuplicateStats: () => duplicateStats,
       run,
     });
     await expect(scan({ progress: sink, signal })).rejects.toBeInstanceOf(NoDirectoriesConfiguredError);

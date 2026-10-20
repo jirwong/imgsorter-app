@@ -83,6 +83,12 @@ describe('PreferencesPage', () => {
     expect(screen.getByLabelText('Local database name')).toBeDisabled();
   });
 
+  it('does not render the update-records switch', () => {
+    renderPage();
+    expect(screen.queryByRole('switch', { name: 'Update duplicate records' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Update duplicate records')).not.toBeInTheDocument();
+  });
+
   it('shows configured directories on the directories tab', () => {
     renderPage();
     fireEvent.click(screen.getByRole('tab', { name: 'Directories' }));
