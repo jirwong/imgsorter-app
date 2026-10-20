@@ -77,7 +77,9 @@ export class ReadSchemaMissingError extends Error {}
 export function ensureReadSchema(db: Database): void
 ```
 
-Use `PRAGMA table_info(entries)` to detect the column. If `entries` does not exist, return. If `directory_norm` is missing, run:
+Use `PRAGMA table_xinfo(entries)` to detect the column. `table_info` omits
+virtual generated columns, so it would miss `directory_norm` on a second run.
+If `entries` does not exist, return. If `directory_norm` is missing, run:
 
 ```sql
 ALTER TABLE entries ADD COLUMN directory_norm TEXT

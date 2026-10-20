@@ -60,13 +60,6 @@ export function createConfiguredScan(deps: ConfiguredScanDeps): (deps: RunConfig
       resync_check_actual_file: config.application.verifyFiles,
     };
 
-    const database = new Database(runConfig.dbName);
-    try {
-      ensureReadSchema(database);
-    } finally {
-      database.close();
-    }
-
     const summary = await deps.run(runConfig, { progress, signal });
     const at = new Date().toISOString();
     deps.recordScanned(directories, at);
@@ -92,6 +85,12 @@ export const runConfiguredScan = createConfiguredScan({
     appConfigStore.recordLastScan(scan);
   },
   run: async (config, { progress, signal }) => {
+    const database = new Database(config.dbName);
+    try {
+      ensureReadSchema(database);
+    } finally {
+      database.close();
+    }
     const runner = new Runner(config, { reporter: silentReporter, progress, signal });
     try {
       return await runner.run();

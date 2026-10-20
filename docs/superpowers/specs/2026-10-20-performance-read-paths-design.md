@@ -158,8 +158,9 @@ CREATE INDEX IF NOT EXISTS idx_entries_hash_filename ON entries(hash, filename);
   with `ALTER TABLE`, and a virtual column does not rewrite the 355k-row table.
 - The engine inserts and updates do not name the column, so its writes stay
   valid and the column is recomputed automatically.
-- Column existence is checked with `PRAGMA table_info(entries)` before the
-  `ALTER TABLE`.
+- Column existence is checked with `PRAGMA table_xinfo(entries)` before the
+  `ALTER TABLE`. `table_info` omits virtual generated columns, so it would never
+  see `directory_norm` and the migration would fail on a second run.
 - `ensureReadSchema` runs lazily on the first read access, before the read
   connection is opened: `withRead` opens a short-lived writable connection,
   migrates once per process, then opens the reader. The scan path calls it before
