@@ -20,6 +20,7 @@ import {
   getDuplicateGroups,
   getDuplicateGroupsPage,
   getDuplicateGroupsSql,
+  getDuplicateStats,
   getEntryPathById,
   getEntryPathsByIds,
   getKeeperData,
@@ -620,6 +621,12 @@ describe('queries against the committed sample db', () => {
     }
     const totalRedundant = groups.reduce((sum, g) => sum + g.redundantSpace, 0);
     expect(totalRedundant).toBe(expected.redundantSpace);
+  });
+
+  it('counts duplicate groups and redundant files from the read layer', () => {
+    const stats = getDuplicateStats(ROOTS);
+    expect(stats.duplicateGroups).toBe(24);
+    expect(stats.duplicateFiles).toBeGreaterThan(0);
   });
 
   it('matches the old JS grouping exactly', () => {

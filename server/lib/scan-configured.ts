@@ -8,6 +8,7 @@ import type { RunSummary } from '../engine/types/run-summary';
 import type { AppConfig, LastScan } from '../../app/lib/types';
 import { appConfigStore } from './app-config';
 import { sampleDbPath } from './db-path';
+import { getDuplicateStats } from './queries';
 import { ensureReadSchema } from './schema';
 
 const silentReporter: Reporter = { debug() {}, info() {}, warn() {}, error() {}, printSummary() {} };
@@ -18,6 +19,7 @@ export type ConfiguredScanDeps = {
   getConfig: () => AppConfig;
   recordScanned: (paths: string[], at: string) => void;
   recordLastScan: (scan: LastScan) => void;
+  getDuplicateStats: (roots: string[]) => { duplicateGroups: number; duplicateFiles: number };
   run: (config: RunConfiguration, deps: RunConfiguredScanDeps) => Promise<RunSummary>;
 };
 
@@ -54,7 +56,7 @@ export function createConfiguredScan(deps: ConfiguredScanDeps): (deps: RunConfig
       extensions,
       directories,
       ignore_directories: config.directories.ignored,
-      update_records: config.application.updateRecords,
+      update_records: false,
       process_directories: config.application.processDirectories,
       resync_directories: config.application.resyncDirectories,
       resync_check_actual_file: config.application.verifyFiles,
@@ -62,17 +64,22 @@ export function createConfiguredScan(deps: ConfiguredScanDeps): (deps: RunConfig
 
     const summary = await deps.run(runConfig, { progress, signal });
     const at = new Date().toISOString();
+    const duplicateStats = deps.getDuplicateStats(directories);
     deps.recordScanned(directories, at);
     deps.recordLastScan({
       finishedAt: at,
       directories: directories.length,
       filesScanned: summary.filesScanned,
       entriesWritten: summary.entriesWritten,
-      duplicateGroups: summary.duplicateGroups,
-      duplicateFiles: summary.duplicateFiles,
+      duplicateGroups: duplicateStats.duplicateGroups,
+      duplicateFiles: duplicateStats.duplicateFiles,
       errors: summary.errors.length,
     });
-    return summary;
+    return {
+      ...summary,
+      duplicateGroups: duplicateStats.duplicateGroups,
+      duplicateFiles: duplicateStats.duplicateFiles,
+    };
   };
 }
 
@@ -84,6 +91,7 @@ export const runConfiguredScan = createConfiguredScan({
   recordLastScan: (scan) => {
     appConfigStore.recordLastScan(scan);
   },
+  getDuplicateStats,
   run: async (config, { progress, signal }) => {
     const database = new Database(config.dbName);
     try {

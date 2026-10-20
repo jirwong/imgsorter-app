@@ -400,23 +400,6 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
               </div>
               <div className="setting-row">
                 <div>
-                  <Text size="sm">Update duplicate records</Text>
-                  <Text size="xs" c="dimmed">
-                    Rebuild the duplicate summary after indexing.
-                  </Text>
-                </div>
-                <Switch
-                  checked={application.updateRecords}
-                  onChange={(event) => {
-                    const updateRecords = event.currentTarget.checked;
-                    setApplication((current) => ({ ...current, updateRecords }));
-                    setSaved(false);
-                  }}
-                  aria-label="Update duplicate records"
-                />
-              </div>
-              <div className="setting-row">
-                <div>
                   <Text size="sm">Resync directories</Text>
                   <Text size="xs" c="dimmed">
                     Remove entries for files that no longer exist or moved outside the app.

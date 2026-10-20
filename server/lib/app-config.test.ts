@@ -190,7 +190,7 @@ describe('createAppConfigStore', () => {
     expect(store.get().application.generatePreviews).toBe(true);
   });
 
-  it('reads a stored application without generatePreviews as off and keeps the other fields', () => {
+  it('reads a stored application without generatePreviews as off and forces updateRecords off', () => {
     store.get();
     const raw = new Database(dbPath);
     raw.prepare(`UPDATE app_config SET value = ? WHERE key = 'application'`).run(
@@ -206,7 +206,7 @@ describe('createAppConfigStore', () => {
     expect(store.get().application).toEqual({
       extensions: 'png',
       processDirectories: false,
-      updateRecords: true,
+      updateRecords: false,
       resyncDirectories: false,
       verifyFiles: false,
       generatePreviews: false,
