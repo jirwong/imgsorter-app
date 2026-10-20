@@ -282,6 +282,23 @@ describe('queries against the committed sample db', () => {
     expect(exact.files.map((file) => file.id)).toEqual([target.id]);
   });
 
+  it('skips the hidden predicate when the hidden list is empty', () => {
+    const active = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'active' }, ROOTS, []);
+    expect(active.total).toBe(expected.totalFiles);
+    expect(active.hiddenCount).toBe(0);
+    expect(active.directoryCounts.every((row) => row.hidden === 0)).toBe(true);
+    const all = listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'all' }, ROOTS, []);
+    expect(all.total).toBe(expected.totalFiles);
+    expect(all.hiddenCount).toBe(0);
+    expect(listFilesPage({ ...EMPTY_QUERY, hiddenMode: 'hidden' }, ROOTS, [])).toEqual({
+      files: [],
+      total: 0,
+      directoryCounts: [],
+      extensionCounts: [],
+      hiddenCount: 0,
+    });
+  });
+
   it('returns a non-overlapping second page', () => {
     const first = listFilesPage({ ...EMPTY_QUERY, page: 1, pageSize: 10 }, ROOTS, []);
     const second = listFilesPage({ ...EMPTY_QUERY, page: 2, pageSize: 10 }, ROOTS, []);
@@ -745,6 +762,23 @@ describe('queries against the committed sample db', () => {
     expect(page.groups).toEqual([]);
     expect(page.hiddenCount).toBe(1);
     expect(page.directoryCounts.reduce((sum, row) => sum + row.hidden, 0)).toBe(1);
+  });
+
+  it('skips the duplicate hidden predicate when the hidden list is empty', () => {
+    const active = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, hiddenMode: 'active' }, ROOTS, [], []);
+    expect(active.totalGroups).toBe(expected.duplicateGroups);
+    expect(active.hiddenCount).toBe(0);
+    expect(active.directoryCounts.every((row) => row.hidden === 0)).toBe(true);
+    const onlyHidden = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, hiddenMode: 'hidden', pageSize: 100 },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(onlyHidden.groups).toEqual([]);
+    expect(onlyHidden.totalGroups).toBe(0);
+    expect(onlyHidden.totalFiles).toBe(0);
+    expect(onlyHidden.hiddenCount).toBe(0);
   });
 
   it('returns an empty duplicate page past the end', () => {

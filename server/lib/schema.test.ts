@@ -70,10 +70,17 @@ describe('ensureReadSchema', () => {
 
     expect(columns(db).map((c) => c.name)).toContain('directory_norm');
     expect(indexNames(db)).toEqual(
-      expect.arrayContaining(['idx_entries_dir_norm', 'idx_entries_hash_filename', 'idx_entries_path_norm']),
+      expect.arrayContaining([
+        'idx_entries_dir_norm',
+        'idx_entries_hash_filename',
+        'idx_entries_hash_filename_dir_norm',
+        'idx_entries_path_norm',
+      ]),
     );
     expect(() => ensureReadSchema(db)).not.toThrow();
     expect(columns(db).filter((c) => c.name === 'directory_norm')).toHaveLength(1);
+    const covering = db.prepare(`PRAGMA index_info('idx_entries_hash_filename_dir_norm')`).all() as { name: string }[];
+    expect(covering.map((row) => row.name)).toEqual(['hash', 'filename', 'directory_norm']);
 
     const row = db.prepare('SELECT directory_norm FROM entries').get() as { directory_norm: string };
     expect(row.directory_norm).toBe('c:/media/photos');

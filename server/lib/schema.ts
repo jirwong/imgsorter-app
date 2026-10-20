@@ -7,6 +7,7 @@ const ADD_DIRECTORY_NORM = `ALTER TABLE entries ADD COLUMN directory_norm TEXT
 const CREATE_READ_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_entries_dir_norm ON entries(directory_norm);
   CREATE INDEX IF NOT EXISTS idx_entries_hash_filename ON entries(hash, filename);
+  CREATE INDEX IF NOT EXISTS idx_entries_hash_filename_dir_norm ON entries(hash, filename, directory_norm);
   CREATE INDEX IF NOT EXISTS idx_entries_path_norm ON entries(lower(replace(path, '\\', '/')));
 `;
 
