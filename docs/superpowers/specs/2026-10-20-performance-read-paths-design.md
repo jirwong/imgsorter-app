@@ -417,3 +417,7 @@ shape. A3 is independent of both.
   named "push the scope into SQL" as a later phase. This is that phase.
 - **Stale `records` table:** it remains on disk for existing databases and is
   cleared by reset, but nothing writes or reads it after A3.
+- **ASCII-only case folding:** the generated column uses SQLite `lower()`, which
+  folds ASCII only. Directory names with non-ASCII uppercase letters match
+  case-sensitively. Windows paths in practice are mostly ASCII; a later phase
+  can add a custom collation or a JS-maintained normalized column.

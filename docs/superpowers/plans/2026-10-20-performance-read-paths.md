@@ -104,7 +104,9 @@ Expected: PASS.
 
 In `server/lib/scan-runner.ts`, after the path-rewrite `UPDATE` and before `updateFileRecords()`, call `ensureReadSchema` on the same writable connection. Do not change `update_records` yet.
 
-In `server/lib/scan-configured.ts`, before `deps.run`, open a writable connection to `runConfig.dbName` and call `ensureReadSchema`. Close it before the scan starts.
+In the exported `runConfiguredScan`'s `run` callback, open `config.dbName`, call
+`ensureReadSchema`, and close it before constructing `Runner`. Keep
+`createConfiguredScan` pure so its unit tests never open a database file.
 
 - [ ] **Step 6: Commit**
 
@@ -1016,7 +1018,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
-- In `scan-configured.ts`, set `update_records: false`, and after `deps.run` compute `getDuplicateStats(directories)` from the read layer. Return a summary with those values, and store them in `last_scan`.
+- In `scan-configured.ts`, set `update_records: false`, and after `deps.run` compute `getDuplicateStats(directories)` from the read layer. Return a summary with those values, and store them in `last_scan`. Keep the `ensureReadSchema` call in the production `run` callback.
 - Add `getDuplicateStats(roots: string[]): { duplicateGroups: number; duplicateFiles: number }` to `queries.ts`. It reuses `duplicateGroupRows` from Task 5: `duplicateGroups` is the row count, and `duplicateFiles` is `SUM(n - 1)`.
 - Remove the "Update duplicate records" switch from `PreferencesPage`.
 - Keep `updateRecords` in the config type for backward compatibility, default `false`, and normalize it to `false` on save.
