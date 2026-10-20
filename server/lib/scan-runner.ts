@@ -10,6 +10,7 @@ import { DbService } from '../engine/services/db-service';
 import { FIXTURE_ROOTS } from './fixture-plan';
 import { fixturesDir, sampleDbPath, virtualToReal } from './db-path';
 import { removeFixtureTree, writeFixtureTree } from './fixtures';
+import { ensureReadSchema } from './schema';
 
 const silentReporter: Reporter = { debug() {}, info() {}, warn() {}, error() {}, printSummary() {} };
 
@@ -59,6 +60,7 @@ export async function runFixtureScan({
            path = replace(replace(path, @root, '@fixtures'), char(92), '/'),
            birthtime = '2025-0' || ((id % 8) + 1) || '-1' || (id % 9) || 'T10:24:00Z'`,
       ).run({ root: fixturesDir() });
+      ensureReadSchema(db);
     } finally {
       db.close();
     }
