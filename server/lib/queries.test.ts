@@ -1107,7 +1107,7 @@ describe('queries against the committed sample db', () => {
       expect(getDirectoryStats(ROOTS).length).toBeGreaterThan(0);
       const result = clearIndex();
       expect(result.entries).toBeGreaterThan(0);
-      expect(result.records).toBeGreaterThan(0);
+      expect(result.records).toBe(0);
       expect(listEntries({ query: '', dir: 'All directories', ext: 'All types', selectedDirs: [] }, ROOTS)).toEqual([]);
       expect(getDirectoryStats(ROOTS)).toEqual([]);
     } finally {

@@ -157,4 +157,16 @@ review`.
   excluded-directory / resync path handling were fixed. Landed in PRs #86–#88 and
   #94–#101. No spec or plan was written for Phases 9–10; they are recorded here
   retrospectively.
+- Phase 11 (read-path and scan performance) — **complete**, split into A1–A3. A1 added
+  the read-only connection cache, the idempotent read schema and an index-friendly SQL
+  scope; A2 moved every read path to indexed SQL with server-side paging and made the
+  Preferences directory toggle a single grouped read; **A3 turned the scan's
+  duplicate-records phase off** and regenerated the fixture without records. Measured on
+  the synthetic 350k-row bench: Duplicates first page 125 ms and Preferences counts
+  25–28 ms per root meet their targets. The aggregate paths still miss: Unique Files
+  630 ms, Analytics 402 ms, shell 580 ms and Overview 1,423 ms against
+  300/200/200/300 ms; aggregate tables or a cache for those paths remain a known
+  follow-up. Landed in PRs #108 (A1), #109 (A2), and the A3 scan PR. Spec at
+  `docs/superpowers/specs/2026-10-20-performance-read-paths-design.md`; plan at
+  `docs/superpowers/plans/2026-10-20-performance-read-paths.md`.
 - Roadmap: `docs/ROADMAP.md`.

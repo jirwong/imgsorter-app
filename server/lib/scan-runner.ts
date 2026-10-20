@@ -6,7 +6,6 @@ import type { Reporter } from '../engine/output/reporter';
 import type { ProgressSink } from '../engine/types/progress';
 import type { RunConfiguration } from '../engine/types/configuration';
 import type { RunSummary } from '../engine/types/run-summary';
-import { DbService } from '../engine/services/db-service';
 import { FIXTURE_ROOTS } from './fixture-plan';
 import { fixturesDir, sampleDbPath, virtualToReal } from './db-path';
 import { removeFixtureTree, writeFixtureTree } from './fixtures';
@@ -32,7 +31,7 @@ export async function runFixtureScan({
     extensions: ['.jpg', '.png', '.gif'],
     directories: [...FIXTURE_ROOTS].map(virtualToReal),
     ignore_directories: [],
-    update_records: true,
+    update_records: false,
     process_directories: true,
     resync_directories: false,
     resync_check_actual_file: false,
@@ -63,13 +62,6 @@ export async function runFixtureScan({
       ensureReadSchema(db);
     } finally {
       db.close();
-    }
-
-    const service = new DbService(dbPath);
-    try {
-      service.updateFileRecords();
-    } finally {
-      service.close();
     }
   } finally {
     removeFixtureTree();
