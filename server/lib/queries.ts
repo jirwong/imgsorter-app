@@ -392,7 +392,6 @@ export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: K
   const keys = [...new Set(paths.map(normalizeDirectoryPath))];
   const rows = withRead((db) => {
     const scope = readScope(roots);
-    const placeholders = keys.map(() => '(?)').join(', ');
     return db
       .prepare(
         `WITH scoped AS MATERIALIZED (
@@ -410,7 +409,7 @@ export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: K
           WHERE hash IS NOT NULL AND hash <> ''
           GROUP BY hash, filename
         ),
-        lookup(path_key) AS (VALUES ${placeholders})
+        lookup(path_key) AS (SELECT value AS path_key FROM json_each(?))
         SELECT
           l.path_key AS pathKey,
           e.id,
@@ -426,7 +425,7 @@ export function getKeeperDataSql(paths: string[], roots: string[]): { keepers: K
         LEFT JOIN scoped_counts s ON s.hash = e.hash AND s.filename = e.filename
         ORDER BY e.id ASC`,
       )
-      .all(...scope.params, ...keys) as KeeperRow[];
+      .all(...scope.params, JSON.stringify(keys)) as KeeperRow[];
   });
   if (!rows) return { keepers, stale: [] };
   const byKey = new Map<string, KeeperRow>();

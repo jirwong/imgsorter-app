@@ -152,10 +152,14 @@ ALTER TABLE entries ADD COLUMN directory_norm TEXT
 
 CREATE INDEX IF NOT EXISTS idx_entries_dir_norm ON entries(directory_norm);
 CREATE INDEX IF NOT EXISTS idx_entries_hash_filename ON entries(hash, filename);
+CREATE INDEX IF NOT EXISTS idx_entries_path_norm ON entries(lower(replace(path, '\', '/')));
 ```
 
 - The column is **VIRTUAL** because SQLite cannot add a STORED generated column
   with `ALTER TABLE`, and a virtual column does not rewrite the 355k-row table.
+- `idx_entries_path_norm` indexes the normalized path expression used by keeper
+  and hidden path matching, so each keeper lookup is an indexed `SEARCH` instead
+  of a full scan of `entries`.
 - The engine inserts and updates do not name the column, so its writes stay
   valid and the column is recomputed automatically.
 - Column existence is checked with `PRAGMA table_xinfo(entries)` before the
@@ -406,8 +410,8 @@ shape. A3 is independent of both.
 
 ## 14. Trade-offs and follow-ups
 
-- **Index write cost:** the generated-column index adds a little work per scan
-  row. Against 0.88 ms per file for hashing, it is negligible.
+- **Index write cost:** the generated-column and expression indexes add a little
+  work per scan row. Against 0.88 ms per file for hashing, it is negligible.
 - **No engine speedup:** scan time stays dominated by serial hashing. A later
   phase can propose an upstream engine change for bounded parallel hashing.
 - **`LIKE` search:** a leading wildcard scans the scoped rows. Acceptable for a

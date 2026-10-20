@@ -69,7 +69,9 @@ describe('ensureReadSchema', () => {
     ensureReadSchema(db);
 
     expect(columns(db).map((c) => c.name)).toContain('directory_norm');
-    expect(indexNames(db)).toEqual(expect.arrayContaining(['idx_entries_dir_norm', 'idx_entries_hash_filename']));
+    expect(indexNames(db)).toEqual(
+      expect.arrayContaining(['idx_entries_dir_norm', 'idx_entries_hash_filename', 'idx_entries_path_norm']),
+    );
     expect(() => ensureReadSchema(db)).not.toThrow();
     expect(columns(db).filter((c) => c.name === 'directory_norm')).toHaveLength(1);
 
