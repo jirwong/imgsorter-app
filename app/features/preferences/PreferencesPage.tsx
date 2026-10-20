@@ -32,14 +32,85 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState('application');
   const [browsing, setBrowsing] = useState<'indexed' | 'ignored' | null>(null);
+  const [savingPath, setSavingPath] = useState<string | null>(null);
 
   const activeCount = useMemo(() => indexed.filter((item) => item.enabled).length, [indexed]);
+
+  const refresh = async (): Promise<void> => {
+    try {
+      await router.invalidate();
+    } catch {
+      notifications.show({ color: 'red', message: 'Could not refresh directory settings.' });
+    }
+  };
 
   const persistDirectories = async (nextIndexed: IndexedDirectory[], nextIgnored: string[]): Promise<void> => {
     const result = await saveDirectories({ data: { indexed: nextIndexed, ignored: nextIgnored } });
     setIndexed(result.directories.indexed);
     setIgnored(result.directories.ignored);
-    await router.invalidate();
+    await refresh();
+  };
+
+  const toggleIndexed = async (item: IndexedDirectory): Promise<void> => {
+    if (savingPath !== null) return;
+    const previousEnabled = item.enabled;
+    const optimistic = indexed.map((current) =>
+      current.path === item.path ? { ...current, enabled: !current.enabled } : current,
+    );
+    setSavingPath(item.path);
+    setIndexed(optimistic);
+    try {
+      try {
+        const result = await saveDirectories({ data: { indexed: optimistic, ignored } });
+        setIndexed(result.directories.indexed);
+        setIgnored(result.directories.ignored);
+      } catch {
+        setIndexed((current) =>
+          current.map((entry) => (entry.path === item.path ? { ...entry, enabled: previousEnabled } : entry)),
+        );
+        notifications.show({ color: 'red', message: 'Could not save directory settings.' });
+        return;
+      }
+      await refresh();
+    } finally {
+      setSavingPath(null);
+    }
+  };
+
+  const removeIndexed = async (item: IndexedDirectory): Promise<void> => {
+    if (savingPath !== null) return;
+    setSavingPath(item.path);
+    try {
+      try {
+        const result = await saveDirectories({
+          data: { indexed: indexed.filter((current) => current.path !== item.path), ignored },
+        });
+        setIndexed(result.directories.indexed);
+        setIgnored(result.directories.ignored);
+      } catch {
+        notifications.show({ color: 'red', message: 'Could not remove the directory.' });
+      }
+      await refresh();
+    } finally {
+      setSavingPath(null);
+    }
+  };
+
+  const removeIgnored = async (path: string): Promise<void> => {
+    if (savingPath !== null) return;
+    setSavingPath(path);
+    try {
+      try {
+        const result = await saveDirectories({ data: { indexed, ignored: ignored.filter((item) => item !== path) } });
+        setIndexed(result.directories.indexed);
+        setIgnored(result.directories.ignored);
+      } catch {
+        notifications.show({ color: 'red', message: 'Could not remove the directory.' });
+      }
+      await refresh();
+    } finally {
+      setSavingPath(null);
+    }
   };
 
   const addIndexed = () => {
@@ -178,14 +249,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                   <div className="preference-row" key={item.path}>
                     <Checkbox
                       checked={item.enabled}
-                      onChange={() =>
-                        void persistDirectories(
-                          indexed.map((current) =>
-                            current.path === item.path ? { ...current, enabled: !current.enabled } : current,
-                          ),
-                          ignored,
-                        )
-                      }
+                      disabled={savingPath !== null}
+                      onChange={() => void toggleIndexed(item)}
                       aria-label={`Enable ${item.path}`}
                     />
                     <FolderOpen size={16} />
@@ -200,12 +265,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                       variant="subtle"
                       size="xs"
                       color="red"
-                      onClick={() =>
-                        void persistDirectories(
-                          indexed.filter((current) => current.path !== item.path),
-                          ignored,
-                        )
-                      }
+                      disabled={savingPath !== null}
+                      onClick={() => void removeIndexed(item)}
                     >
                       Remove
                     </Button>
@@ -260,12 +321,8 @@ export function PreferencesPage({ config, counts }: { config: AppConfig; counts:
                       variant="subtle"
                       size="xs"
                       color="red"
-                      onClick={() =>
-                        void persistDirectories(
-                          indexed,
-                          ignored.filter((item) => item !== path),
-                        )
-                      }
+                      disabled={savingPath !== null}
+                      onClick={() => void removeIgnored(path)}
                     >
                       Remove
                     </Button>
