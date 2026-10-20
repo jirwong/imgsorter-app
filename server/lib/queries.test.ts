@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { applyFilters } from '../../app/lib/filter-pipeline';
-import type { DirectoryStat, FilesInput, FilesQuery } from '../../app/lib/types';
+import type { DirectoryStat, DuplicatesQuery, FilesInput, FilesQuery } from '../../app/lib/types';
 import { fixtureDbPath } from './db-path';
 import { closeReadConnections } from './db';
 import { buildFixtureFiles, expectedFixtureStats } from './fixture-plan';
@@ -17,6 +17,7 @@ import {
   getDirectoryStats,
   getDirectoryStatsSql,
   getDuplicateGroups,
+  getDuplicateGroupsPage,
   getDuplicateGroupsSql,
   getEntryPathById,
   getEntryPathsByIds,
@@ -44,6 +45,18 @@ const EMPTY_QUERY: FilesQuery = {
   pageSize: 10,
   sortKey: 'location',
   direction: 'asc',
+};
+
+const EMPTY_DUP_QUERY: DuplicatesQuery = {
+  query: '',
+  selectedDirs: [],
+  extensions: [],
+  sizeFilter: 'all',
+  countFilter: 'all',
+  keeperFilter: 'all',
+  hiddenMode: 'active',
+  page: 1,
+  pageSize: 10,
 };
 
 type TempEntry = { directory: string; filename: string; hash: string | null; path: string; size?: number };
@@ -471,6 +484,146 @@ describe('queries against the committed sample db', () => {
       expect(group.size).toBe(6_400);
       expect(group.redundantSpace).toBe((group.count - 1) * group.size);
     }
+  });
+
+  it('returns one page of duplicate groups and an exact total', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 1, pageSize: 10 }, ROOTS, [], []);
+    expect(page.groups).toHaveLength(10);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles);
+    expect(page.groups.every((group) => group.files.length === group.count)).toBe(true);
+    expect(page.groups.every((group) => group.redundantSpace === (group.count - 1) * group.size)).toBe(true);
+    expect(page.keepers).toEqual({});
+    expect(page.staleKeepers).toBe(0);
+    const second = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 2, pageSize: 10 }, ROOTS, [], []);
+    expect(second.groups).toHaveLength(10);
+    const firstKeys = new Set(page.groups.map((group) => group.key));
+    expect(second.groups.every((group) => !firstKeys.has(group.key))).toBe(true);
+  });
+
+  it('filters duplicate groups by count and size', () => {
+    const twos = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, countFilter: '2', pageSize: 100 }, ROOTS, [], []);
+    expect(twos.totalGroups).toBe(8);
+    expect(twos.groups.every((group) => group.count === 2)).toBe(true);
+    const threes = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, countFilter: '3+', pageSize: 100 }, ROOTS, [], []);
+    expect(threes.totalGroups).toBe(16);
+    expect(threes.groups.every((group) => group.count >= 3)).toBe(true);
+    const under = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, sizeFilter: 'under10', pageSize: 100 }, ROOTS, [], []);
+    expect(under.totalGroups).toBe(expected.duplicateGroups);
+    const middle = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, sizeFilter: '10to25', pageSize: 100 }, ROOTS, [], []);
+    expect(middle.totalGroups).toBe(0);
+    expect(middle.groups).toEqual([]);
+    expect(middle.totalFiles).toBe(0);
+  });
+
+  it('filters duplicate groups by keeper membership', () => {
+    const [group] = getDuplicateGroups(ROOTS);
+    const id = group.files[0].id;
+    const raw = getEntryPathsByIds([id])[0];
+    const keeperPaths = [raw, raw];
+    const withKeeper = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, keeperFilter: 'with', pageSize: 100 },
+      ROOTS,
+      [],
+      keeperPaths,
+    );
+    expect(withKeeper.totalGroups).toBe(1);
+    expect(withKeeper.groups.map((item) => item.key)).toEqual([group.key]);
+    expect(withKeeper.keepers[group.key]).toBe(id);
+    expect(withKeeper.staleKeepers).toBe(0);
+    const without = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, keeperFilter: 'without', pageSize: 100 },
+      ROOTS,
+      [],
+      keeperPaths,
+    );
+    expect(without.totalGroups).toBe(expected.duplicateGroups - 1);
+    expect(without.groups.some((item) => item.key === group.key)).toBe(false);
+  });
+
+  it('filters hidden duplicate members that use backslashes and mixed case', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const group = all.find((item) => item.count === 3) as (typeof all)[number];
+    const target = group.files[0];
+    const hidden = [target.path.toUpperCase().replace(/\//g, '\\')];
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, pageSize: 100 }, ROOTS, hidden, []);
+    const filtered = page.groups.find((item) => item.key === group.key);
+    expect(filtered?.count).toBe(group.count);
+    expect(filtered?.files.map((file) => file.id)).not.toContain(target.id);
+    expect(filtered?.files).toHaveLength(group.count - 1);
+    expect(filtered?.redundantSpace).toBe((group.count - 1) * group.size);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles - 1);
+    expect(page.hiddenCount).toBe(1);
+    const directory = page.directoryCounts.find((row) => row.path === target.directory);
+    expect(directory?.hidden).toBe(1);
+    expect(directory?.unit).toBe('group');
+    const onlyHidden = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, hiddenMode: 'hidden', pageSize: 100 },
+      ROOTS,
+      hidden,
+      [],
+    );
+    expect(onlyHidden.totalGroups).toBe(1);
+    expect(onlyHidden.totalFiles).toBe(1);
+    expect(onlyHidden.groups[0].key).toBe(group.key);
+    expect(onlyHidden.groups[0].count).toBe(group.count);
+    expect(onlyHidden.groups[0].files.map((file) => file.id)).toEqual([target.id]);
+  });
+
+  it('filters duplicate members by directory', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const group = all.find((item) => item.count === 4) as (typeof all)[number];
+    const directory = group.files[group.files.length - 1].directory;
+    const expectedGroups = all.filter((item) => item.files.some((file) => file.directory === directory));
+    const page = getDuplicateGroupsPage(
+      { ...EMPTY_DUP_QUERY, selectedDirs: [directory], pageSize: 100 },
+      ROOTS,
+      [],
+      [],
+    );
+    expect(expectedGroups.length).toBe(8);
+    expect(page.totalGroups).toBe(expectedGroups.length);
+    expect(page.groups.every((item) => item.files.every((file) => file.directory === directory))).toBe(true);
+    expect(page.groups.every((item) => item.files.length < item.count)).toBe(true);
+    expect(page.directoryCounts.reduce((sum, row) => sum + row.count, 0)).toBeGreaterThan(page.totalGroups);
+  });
+
+  it('orders duplicate pages with localeCompare and a key tie-break', () => {
+    runWithTempEntries(
+      [
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-1.jpg' },
+        { directory: 'C:/Case', filename: 'Apple.jpg', hash: 'upper', path: 'C:/Case/upper-2.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-1.jpg' },
+        { directory: 'C:/Case', filename: 'apple.jpg', hash: 'lower', path: 'C:/Case/lower-2.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'b', path: 'C:/Case/same-b1.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'b', path: 'C:/Case/same-b2.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'a', path: 'C:/Case/same-a1.jpg' },
+        { directory: 'C:/Case', filename: 'same.jpg', hash: 'a', path: 'C:/Case/same-a2.jpg' },
+      ],
+      () => {
+        const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, pageSize: 10 }, ['C:/Case'], [], []);
+        expect(page.groups.map((group) => group.key)).toEqual([
+          'lower:apple.jpg',
+          'upper:Apple.jpg',
+          'a:same.jpg',
+          'b:same.jpg',
+        ]);
+      },
+    );
+  });
+
+  it('returns an empty duplicate page past the end', () => {
+    const all = getDuplicateGroups(ROOTS);
+    const totalFiles = all.reduce((sum, group) => sum + group.count, 0);
+    const page = getDuplicateGroupsPage({ ...EMPTY_DUP_QUERY, page: 10000, pageSize: 100 }, ROOTS, [], []);
+    expect(page.groups).toEqual([]);
+    expect(page.totalGroups).toBe(expected.duplicateGroups);
+    expect(page.totalFiles).toBe(totalFiles);
+    expect(page.hiddenCount).toBe(0);
   });
 
   it('counts entries under a root case- and separator-insensitively', () => {

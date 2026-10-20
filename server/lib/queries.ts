@@ -7,6 +7,8 @@ import type {
   AnalyticsData,
   DirectoryStat,
   DuplicateGroup,
+  DuplicatesQuery,
+  DuplicatesResult,
   Entry,
   FilesInput,
   FilesQuery,
@@ -81,6 +83,19 @@ const FILE_SIZE_FILTERS = new Map<FilesQuery['sizeFilter'], string>([
   ['under10', 'size < 10000000'],
   ['10to25', 'size >= 10000000 AND size <= 25000000'],
   ['over25', 'size > 25000000'],
+]);
+
+const DUPLICATE_COUNT_FILTERS = new Map<DuplicatesQuery['countFilter'], string>([
+  ['all', '1'],
+  ['2', 'm.n = 2'],
+  ['3+', 'm.n >= 3'],
+]);
+
+const DUPLICATE_SIZE_FILTERS = new Map<DuplicatesQuery['sizeFilter'], string>([
+  ['all', '1'],
+  ['under10', 'm.size < 10000000'],
+  ['10to25', 'm.size >= 10000000 AND m.size <= 25000000'],
+  ['over25', 'm.size > 25000000'],
 ]);
 
 const HIDDEN_MATCH_SQL = `lower(replace(path, '\\', '/')) IN (SELECT value FROM json_each(?))`;
@@ -499,6 +514,197 @@ export function getDuplicateGroupsSql(roots: string[]): DuplicateGroup[] {
 
 export function getDuplicateGroups(roots: string[]): DuplicateGroup[] {
   return getDuplicateGroupsSql(roots);
+}
+
+type DuplicatePageRow = {
+  hash: string;
+  filename: string;
+  n: number;
+  size: number;
+  extension: string;
+  visible: number;
+};
+
+type DuplicateDirectoryRow = { directory: string; n: number; hidden: number };
+
+function duplicateMemberClause(input: DuplicatesQuery, hiddenJson: string, directoryJson: string): ScopeClause {
+  const conditions: string[] = [];
+  const params: string[] = [];
+  if (input.hiddenMode !== 'all') {
+    conditions.push(input.hiddenMode === 'hidden' ? HIDDEN_MATCH_SQL : `NOT (${HIDDEN_MATCH_SQL})`);
+    params.push(hiddenJson);
+  }
+  const query = escapeLike(input.query.trim().toLowerCase());
+  if (query) {
+    conditions.push(`(lower(e.filename) LIKE ? ESCAPE '\\' OR lower(e.path) LIKE ? ESCAPE '\\')`);
+    params.push(`%${query}%`, `%${query}%`);
+  }
+  if (input.selectedDirs.length > 0) {
+    conditions.push(
+      `lower(replace(e.directory, '\\', '/')) IN (SELECT lower(replace(value, '\\', '/')) FROM json_each(?))`,
+    );
+    params.push(directoryJson);
+  }
+  if (input.extensions.length > 0) {
+    conditions.push(`e.extension IN (${input.extensions.map(() => '?').join(', ')})`);
+    params.push(...input.extensions);
+  }
+  return { sql: conditions.length === 0 ? '1' : conditions.join(' AND '), params };
+}
+
+const DUPLICATE_SCOPED_SQL = (scopeSql: string) => `scoped AS MATERIALIZED (
+  SELECT id, size, directory, extension, filename, birthtime, hash, path
+  FROM entries WHERE ${scopeSql}
+),
+grouped AS (
+  SELECT hash, filename, COUNT(*) AS n, MIN(id) AS first_id
+  FROM scoped
+  WHERE hash IS NOT NULL AND hash <> ''
+  GROUP BY hash, filename
+  HAVING COUNT(*) > 1
+)`;
+
+export function getDuplicateGroupsPage(
+  input: DuplicatesQuery,
+  roots: string[],
+  hidden: string[],
+  keeperPaths: string[],
+): DuplicatesResult {
+  const result = withRead((db) => {
+    const scope = readScope(db, roots);
+    const hiddenJson = JSON.stringify(hidden.map((path) => normalizeDirectoryKey(storagePath(db, path))));
+    const directoryJson = JSON.stringify(
+      input.selectedDirs.map((directory) => normalizeDirectoryKey(storagePath(db, directory))),
+    );
+    const member = duplicateMemberClause(input, hiddenJson, directoryJson);
+    const countFilter = DUPLICATE_COUNT_FILTERS.get(input.countFilter) ?? '1';
+    const sizeFilter = DUPLICATE_SIZE_FILTERS.get(input.sizeFilter) ?? '1';
+    const keeperFilter =
+      input.keeperFilter === 'with'
+        ? 'EXISTS (SELECT 1 FROM keeper_keys k WHERE k.hash = m.hash AND k.filename = m.filename)'
+        : input.keeperFilter === 'without'
+          ? 'NOT EXISTS (SELECT 1 FROM keeper_keys k WHERE k.hash = m.hash AND k.filename = m.filename)'
+          : '1';
+    const keeperCte =
+      input.keeperFilter === 'all'
+        ? ''
+        : `keeper_keys AS (
+          SELECT DISTINCT hash, filename FROM scoped
+          WHERE lower(replace(path, '\\', '/')) IN (SELECT lower(replace(value, '\\', '/')) FROM json_each(?))
+        ),`;
+    const keeperParams = keeperCte ? [JSON.stringify(keeperPaths)] : [];
+
+    const rows = db
+      .prepare(
+        `WITH ${DUPLICATE_SCOPED_SQL(scope.sql)},
+        group_meta AS (
+          SELECT g.hash, g.filename, g.n, g.first_id, e.size, e.extension
+          FROM grouped g JOIN scoped e ON e.id = g.first_id
+        ),
+        visible AS (
+          SELECT e.hash, e.filename, COUNT(*) AS visible
+          FROM scoped e JOIN grouped g ON e.hash = g.hash AND e.filename = g.filename
+          WHERE ${member.sql}
+          GROUP BY e.hash, e.filename
+        ),
+        ${keeperCte}
+        filtered AS (
+          SELECT m.hash, m.filename, m.n, m.size, m.extension, v.visible
+          FROM group_meta m JOIN visible v ON v.hash = m.hash AND v.filename = m.filename
+          WHERE ${countFilter} AND ${sizeFilter} AND ${keeperFilter}
+        )
+        SELECT hash, filename, n, size, extension, visible FROM filtered`,
+      )
+      .all(...scope.params, ...member.params, ...keeperParams) as DuplicatePageRow[];
+
+    const ordered: (DuplicatePageRow & { key: string })[] = [];
+    for (const row of rows) ordered.push({ ...row, key: `${row.hash}:${row.filename}` });
+    ordered.sort((a, b) => a.filename.localeCompare(b.filename) || a.key.localeCompare(b.key));
+    const totalGroups = ordered.length;
+    const totalFiles = ordered.reduce((sum, row) => sum + row.visible, 0);
+    const page = normalizePage(input.page);
+    const pageSize = normalizePageSize(input.pageSize);
+    const paged = ordered.slice((page - 1) * pageSize, page * pageSize);
+
+    let members: EntryRow[] = [];
+    if (paged.length > 0) {
+      members = db
+        .prepare(
+          `WITH ${DUPLICATE_SCOPED_SQL(scope.sql)},
+          keys AS (SELECT value AS key FROM json_each(?))
+          SELECT e.id, e.size, e.directory, e.extension, e.filename, e.birthtime, e.hash, e.path
+          FROM scoped e JOIN keys k ON (e.hash || ':' || e.filename) = k.key
+          WHERE ${member.sql}
+          ORDER BY e.filename ASC, e.id ASC`,
+        )
+        .all(...scope.params, JSON.stringify(paged.map((row) => row.key)), ...member.params) as EntryRow[];
+    }
+
+    const groups = paged.map((row) => {
+      const group: DuplicateGroup = {
+        key: row.key,
+        hash: row.hash,
+        name: row.filename,
+        count: row.n,
+        size: row.size,
+        redundantSpace: (row.n - 1) * row.size,
+        extension: row.extension,
+        directories: [],
+        files: [],
+      };
+      return group;
+    });
+    const groupByKey = new Map(groups.map((group) => [group.key, group]));
+    for (const row of members) {
+      const group = groupByKey.get(`${row.hash}:${row.filename}`);
+      if (!group) continue;
+      const entry = toEntry(row);
+      group.files.push(entry);
+      if (!group.directories.includes(entry.directory)) group.directories.push(entry.directory);
+    }
+
+    const directories = db
+      .prepare(
+        `WITH ${DUPLICATE_SCOPED_SQL(scope.sql)}
+        SELECT e.directory AS directory,
+          COUNT(DISTINCT e.hash || ':' || e.filename) AS n,
+          SUM(CASE WHEN ${HIDDEN_MATCH_SQL} THEN 1 ELSE 0 END) AS hidden
+        FROM scoped e JOIN grouped g ON e.hash = g.hash AND e.filename = g.filename
+        GROUP BY e.directory
+        ORDER BY e.directory`,
+      )
+      .all(...scope.params, hiddenJson) as DuplicateDirectoryRow[];
+
+    return {
+      groups,
+      totalGroups,
+      totalFiles,
+      keepers: {} as KeeperMap,
+      staleKeepers: 0,
+      directoryCounts: directories
+        .map((row) => ({
+          path: mapPathToDisplay(row.directory),
+          count: row.n,
+          hidden: row.hidden,
+          unit: 'group' as const,
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+      hiddenCount: directories.reduce((sum, row) => sum + row.hidden, 0),
+    };
+  });
+  const { keepers, stale } = getKeeperDataSql(keeperPaths, roots);
+  if (!result) {
+    return {
+      groups: [],
+      totalGroups: 0,
+      totalFiles: 0,
+      keepers,
+      staleKeepers: stale.length,
+      directoryCounts: [],
+      hiddenCount: 0,
+    };
+  }
+  return { ...result, keepers, staleKeepers: stale.length };
 }
 
 export function countEntriesByDirectory(root: string): number {

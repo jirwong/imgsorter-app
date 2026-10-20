@@ -1,16 +1,16 @@
 import { createServerFn } from '@tanstack/react-start';
 import { normalizeDirectoryKey } from '../../app/lib/directory-path';
-import type { DuplicatesData, KeeperMap } from '../../app/lib/types';
+import type { DuplicatesQuery, DuplicatesResult, KeeperMap } from '../../app/lib/types';
 
-export const getDuplicatesData = createServerFn({ method: 'GET' }).handler(async (): Promise<DuplicatesData> => {
-  const { getDuplicateGroups, getKeeperData } = await import('../lib/queries');
-  const { enabledRoots } = await import('../lib/directory-scope');
-  const { appConfigStore } = await import('../lib/app-config');
-  const roots = enabledRoots();
-  const groups = getDuplicateGroups(roots);
-  const { keepers, stale } = getKeeperData(appConfigStore.getKeepers(), roots);
-  return { groups, keepers, staleKeepers: stale.length };
-});
+export const getDuplicatesData = createServerFn({ method: 'POST' })
+  .validator((input: DuplicatesQuery) => input)
+  .handler(async ({ data }): Promise<DuplicatesResult> => {
+    const { getDuplicateGroupsPage } = await import('../lib/queries');
+    const { enabledRoots } = await import('../lib/directory-scope');
+    const { hiddenService } = await import('../lib/hidden');
+    const { appConfigStore } = await import('../lib/app-config');
+    return getDuplicateGroupsPage(data, enabledRoots(), hiddenService.get(), appConfigStore.getKeepers());
+  });
 
 export const saveKeepers = createServerFn({ method: 'POST' })
   .validator((input: { keepers: KeeperMap }) => input)
