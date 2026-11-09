@@ -85,12 +85,12 @@ describe('FilePreviewDrawer', () => {
   });
 
   it('shows an error toast when reveal fails', async () => {
-    mocks.revealEntry.mockResolvedValue({ ok: false, reason: 'missing' });
+    mocks.revealEntry.mockResolvedValue({ ok: false, reason: 'not-found' });
     renderDrawer();
     fireEvent.click(await screen.findByRole('button', { name: 'Reveal' }));
     await waitFor(() =>
       expect(mocks.notifyShow).toHaveBeenCalledWith(
-        expect.objectContaining({ color: 'red', message: 'File not found.' }),
+        expect.objectContaining({ color: 'red', message: 'File is no longer available in the library.' }),
       ),
     );
   });

@@ -5,8 +5,9 @@ import { dirname } from 'node:path';
 import type { FolderPickResult, NativeActionResult } from '../../app/lib/types';
 import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import { appConfigStore } from './app-config';
+import { enabledRoots } from './directory-scope';
 import { virtualToReal } from './db-path';
-import { getEntryPathById } from './queries';
+import { getScopedEntryPathById } from './queries';
 
 export type Platform = string;
 export type NativeCommand = { command: string; args: string[]; verbatim?: boolean };
@@ -244,7 +245,7 @@ function defaultDeps(): NativeActionDeps {
   return {
     platform: process.platform,
     fileExists: (path) => existsSync(path),
-    getEntryPath: (id) => getEntryPathById(id),
+    getEntryPath: (id) => getScopedEntryPathById(id, enabledRoots()),
     getConfiguredRoots: () =>
       appConfigStore
         .get()

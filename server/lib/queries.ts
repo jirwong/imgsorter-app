@@ -921,6 +921,15 @@ export function getEntryPathById(id: number): string | null {
   }
 }
 
+export function getScopedEntryPathById(id: number, roots: string[]): string | null {
+  const path = withRead((db) => {
+    const scope = readScope(db, roots);
+    return db.prepare(`SELECT path FROM entries WHERE id = ? AND ${scope.sql}`).get(id, ...scope.params) as
+      { path: string } | undefined;
+  });
+  return path?.path ?? null;
+}
+
 export function getEntryPathsByIds(ids: number[]): string[] {
   if (ids.length === 0) return [];
   const db = openReadonly();
