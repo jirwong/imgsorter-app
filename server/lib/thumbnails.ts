@@ -7,7 +7,8 @@ import { normalizeDirectoryPath } from '../../app/lib/directory-path';
 import type { ThumbnailMap } from '../../app/lib/types';
 import { appConfigStore } from './app-config';
 import { thumbCacheDir, virtualToReal } from './db-path';
-import { getEntryPathById } from './queries';
+import { enabledRoots } from './directory-scope';
+import { getScopedEntryPathById } from './queries';
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 const THUMB_WIDTH = 256;
@@ -84,7 +85,7 @@ function defaultDeps(): ThumbnailDeps {
   const cacheDir = thumbCacheDir();
   return {
     cacheDir,
-    getEntryPath: (id) => getEntryPathById(id),
+    getEntryPath: (id) => getScopedEntryPathById(id, enabledRoots()),
     statFile: (path) => {
       try {
         const stat = statSync(path);

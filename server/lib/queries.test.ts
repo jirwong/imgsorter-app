@@ -22,6 +22,7 @@ import {
   getDuplicateGroupsSql,
   getDuplicateStats,
   getEntryPathById,
+  getScopedEntryPathById,
   getEntryPathsByIds,
   getKeeperData,
   getKeeperDataSql,
@@ -904,6 +905,13 @@ describe('queries against the committed sample db', () => {
     expect(typeof path).toBe('string');
     expect(path).toContain('@fixtures');
     expect(getEntryPathById(99999999)).toBeNull();
+  });
+
+  it('only resolves entry ids inside enabled roots', () => {
+    const [entry] = getOverviewStats(ROOTS).largestFiles;
+    expect(getScopedEntryPathById(entry.id, ROOTS)).toBe(getEntryPathById(entry.id));
+    expect(getScopedEntryPathById(entry.id, [])).toBeNull();
+    expect(getScopedEntryPathById(entry.id, ['C:/Elsewhere'])).toBeNull();
   });
 
   it('maps entry ids to raw paths and drops unknown ids', () => {

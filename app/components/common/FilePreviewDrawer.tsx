@@ -10,7 +10,7 @@ import { getThumbnails } from '../../../server/routes/thumbnails';
 import type { NativeActionFailure } from '../../lib/types';
 
 const FAILURE_MESSAGES: Record<NativeActionFailure, string> = {
-  'not-found': 'File not found.',
+  'not-found': 'File is no longer available in the library.',
   missing: 'File not found.',
   unsupported: 'This action is not supported here.',
   error: 'The action failed.',
