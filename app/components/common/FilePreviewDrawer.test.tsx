@@ -81,7 +81,9 @@ describe('FilePreviewDrawer', () => {
     renderDrawer();
     fireEvent.click(await screen.findByRole('button', { name: 'Reveal' }));
     await waitFor(() => expect(mocks.revealEntry).toHaveBeenCalledWith({ data: { id: 7 } }));
-    expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
+    expect(mocks.notifyShow).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'cyan', message: 'Opening the file manager.' }),
+    );
   });
 
   it('shows an error toast when reveal fails', async () => {
@@ -100,7 +102,9 @@ describe('FilePreviewDrawer', () => {
     renderDrawer();
     fireEvent.click(await screen.findByRole('button', { name: 'Open file' }));
     await waitFor(() => expect(mocks.openEntry).toHaveBeenCalledWith({ data: { id: 7 } }));
-    expect(mocks.notifyShow).toHaveBeenCalledWith(expect.objectContaining({ color: 'cyan' }));
+    expect(mocks.notifyShow).toHaveBeenCalledWith(
+      expect.objectContaining({ color: 'cyan', message: 'Opening file in the default application.' }),
+    );
   });
 
   it('renders the fetched preview', async () => {

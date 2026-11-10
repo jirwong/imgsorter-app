@@ -25,7 +25,7 @@ export type NativeActionDeps = {
   fileExists: (path: string) => boolean;
   getEntryPath: (id: number) => string | null;
   getConfiguredRoots: () => string[];
-  spawn: (command: NativeCommand) => void;
+  spawn: (command: NativeCommand) => Promise<void>;
   runAndCapture: (command: NativeCommand, timeoutMs: number) => Promise<RunCaptureResult>;
 };
 
@@ -201,10 +201,15 @@ export function spawnOptions(command: NativeCommand): SpawnOptions {
   };
 }
 
-function defaultSpawn(command: NativeCommand): void {
-  const child = spawn(command.command, command.args, spawnOptions(command));
-  child.on('error', () => {});
-  child.unref();
+function defaultSpawn(command: NativeCommand): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command.command, command.args, spawnOptions(command));
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
 }
 
 function defaultRunAndCapture(command: NativeCommand, timeoutMs: number): Promise<RunCaptureResult> {
@@ -269,7 +274,7 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
       const command =
         kind === 'reveal' ? buildRevealCommand(deps.platform, realPath) : buildOpenCommand(deps.platform, realPath);
       if (!command) return { ok: false, reason: 'unsupported' };
-      deps.spawn(command);
+      await deps.spawn(command);
       return { ok: true };
     } catch (error) {
       console.error('Native action failed', error);
@@ -293,7 +298,7 @@ export function createNativeActions(overrides: Partial<NativeActionDeps> = {}): 
       if (!deps.fileExists(path)) return { ok: false, reason: 'missing' };
       const command = buildRevealFolderCommand(deps.platform, path);
       if (!command) return { ok: false, reason: 'unsupported' };
-      deps.spawn(command);
+      await deps.spawn(command);
       return { ok: true };
     } catch (error) {
       console.error('Reveal folder failed', error);
