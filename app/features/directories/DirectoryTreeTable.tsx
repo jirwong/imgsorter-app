@@ -29,7 +29,7 @@ export function DirectoryTreeTable({ tree }: { tree: DirectoryNode[] }) {
   const reveal = (path: string) => {
     void revealFolder({ data: { path } })
       .then((result) => {
-        if (result.ok) notifications.show({ color: 'cyan', message: 'Folder shown in the file manager.' });
+        if (result.ok) notifications.show({ color: 'cyan', message: 'Opening the file manager.' });
         else notifications.show({ color: 'red', message: FAILURE_MESSAGES[result.reason] });
       })
       .catch(() => notifications.show({ color: 'red', message: 'The action failed.' }));

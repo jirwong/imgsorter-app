@@ -21,7 +21,7 @@ function makeDeps(overrides: Partial<NativeActionDeps> = {}) {
     fileExists: () => true,
     getEntryPath: () => 'C:/Media/2025/a.jpg',
     getConfiguredRoots: () => ['C:/Media'],
-    spawn: (command: NativeCommand) => {
+    spawn: async (command: NativeCommand) => {
       spawned.push(command);
     },
     runAndCapture: vi.fn(async () => idle),
@@ -128,6 +128,17 @@ describe('createNativeActions reveal and open', () => {
     expect(deps.spawned).toEqual([{ command: 'explorer', args: ['C:/Media/2025/a.jpg'] }]);
   });
 
+  it('reports an error when a file opener fails to start', async () => {
+    const actions = createNativeActions(
+      makeDeps({
+        spawn: async () => {
+          throw new Error('launch failed');
+        },
+      }),
+    );
+    expect(await actions.open(1)).toEqual({ ok: false, reason: 'error' });
+  });
+
   it('maps fixture paths before the existence check', async () => {
     const fileExists = vi.fn(() => true);
     const actions = createNativeActions(makeDeps({ getEntryPath: () => '@fixtures/Media/2025/a.jpg', fileExists }));
@@ -166,6 +177,17 @@ describe('createNativeActions revealFolder', () => {
     const actions = createNativeActions(deps);
     expect(await actions.revealFolder('C:/Media/2025')).toEqual({ ok: true });
     expect(deps.spawned[0].command).toBe('powershell');
+  });
+
+  it('reports an error when the folder opener fails to start', async () => {
+    const actions = createNativeActions(
+      makeDeps({
+        spawn: async () => {
+          throw new Error('launch failed');
+        },
+      }),
+    );
+    expect(await actions.revealFolder('C:/Media')).toEqual({ ok: false, reason: 'error' });
   });
 
   it('returns unsupported on an unknown platform', async () => {

@@ -55,7 +55,7 @@ export function FilePreviewDrawer() {
       if (result.ok) {
         notifications.show({
           color: 'cyan',
-          message: kind === 'reveal' ? 'File shown in the file manager.' : 'Opened in the default application.',
+          message: kind === 'reveal' ? 'Opening the file manager.' : 'Opening file in the default application.',
         });
       } else {
         notifications.show({ color: 'red', message: FAILURE_MESSAGES[result.reason] });
